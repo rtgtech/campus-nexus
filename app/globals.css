@@ -1,0 +1,123 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --cn-primary: #221d5c;
+  --cn-primary-container: #312978;
+  --cn-primary-fixed: #ddd9f4;
+  --cn-primary-fixed-dim: #b3abd9;
+  --cn-secondary: #ec2024;
+  --cn-secondary-container: #f45c5f;
+  --cn-secondary-fixed-dim: #ff9a9c;
+  --cn-tertiary: #191c22;
+  --cn-tertiary-fixed: #d4d7dc;
+  --cn-on-tertiary-fixed: #0f1115;
+  --cn-background: #f7f6fb;
+  --cn-surface: #f8f9fb;
+  --cn-surface-low: #f2f1f8;
+  --cn-surface-container: #e9e7f3;
+  --cn-surface-high: #dfdced;
+  --cn-surface-highest: #d2cfe3;
+  --cn-outline: #777d86;
+  --cn-outline-variant: #c8ccd3;
+  --cn-on-primary: #ffffff;
+  --cn-on-background: #111317;
+  --cn-on-surface: #111317;
+  --cn-on-surface-variant: #4a4f57;
+}
+
+html {
+  background: #f7f6fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  background: #f7f6fb;
+  color: #111317;
+  font-family: "Inter", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+.bg-background { background-color: var(--cn-background); }
+.bg-surface { background-color: var(--cn-surface); }
+.bg-surface-container-low { background-color: var(--cn-surface-low); }
+.bg-surface-container { background-color: var(--cn-surface-container); }
+.bg-surface-container-high { background-color: var(--cn-surface-high); }
+.bg-surface-container-highest { background-color: var(--cn-surface-highest); }
+.bg-primary { background-color: var(--cn-primary); }
+.bg-primary-container { background-color: var(--cn-primary-container); }
+.bg-primary-fixed { background-color: var(--cn-primary-fixed); }
+.bg-secondary { background-color: var(--cn-secondary); }
+.bg-secondary-container { background-color: var(--cn-secondary-container); }
+.bg-tertiary { background-color: var(--cn-tertiary); }
+.bg-tertiary-fixed { background-color: var(--cn-tertiary-fixed); }
+
+.bg-primary\/5 { background-color: rgb(34 29 92 / 0.05); }
+.bg-primary\/65 { background-color: rgb(34 29 92 / 0.65); }
+.bg-primary\/70 { background-color: rgb(34 29 92 / 0.7); }
+.bg-primary\/90 { background-color: rgb(34 29 92 / 0.9); }
+.bg-primary-fixed\/20 { background-color: rgb(221 217 244 / 0.2); }
+.bg-secondary\/10 { background-color: rgb(236 32 36 / 0.1); }
+.bg-secondary-container\/10 { background-color: rgb(244 92 95 / 0.1); }
+.bg-secondary-fixed-dim\/20 { background-color: rgb(255 154 156 / 0.2); }
+.bg-tertiary-fixed\/20 { background-color: rgb(212 215 220 / 0.2); }
+
+.text-primary { color: var(--cn-primary); }
+.text-secondary { color: var(--cn-secondary); }
+.text-on-primary { color: var(--cn-on-primary); }
+.text-on-background { color: var(--cn-on-background); }
+.text-on-surface { color: var(--cn-on-surface); }
+.text-on-surface-variant { color: var(--cn-on-surface-variant); }
+.text-on-tertiary-fixed { color: var(--cn-on-tertiary-fixed); }
+.text-outline { color: var(--cn-outline); }
+.text-primary\/60 { color: rgb(34 29 92 / 0.6); }
+
+.border-primary { border-color: var(--cn-primary); }
+.border-outline { border-color: var(--cn-outline); }
+.border-outline-variant { border-color: var(--cn-outline-variant); }
+.border-surface-container-highest { border-color: var(--cn-surface-highest); }
+.border-primary\/10 { border-color: rgb(34 29 92 / 0.1); }
+.border-outline-variant\/35 { border-color: rgb(200 204 211 / 0.35); }
+.border-outline-variant\/45 { border-color: rgb(200 204 211 / 0.45); }
+.border-outline-variant\/50 { border-color: rgb(200 204 211 / 0.5); }
+.border-outline-variant\/60 { border-color: rgb(200 204 211 / 0.6); }
+.border-outline-variant\/70 { border-color: rgb(200 204 211 / 0.7); }
+
+.shadow-primary\/20 {
+  --tw-shadow-color: rgb(34 29 92 / 0.2);
+}
+
+.hover\:bg-primary:hover { background-color: var(--cn-primary); }
+.hover\:bg-primary\/90:hover { background-color: rgb(34 29 92 / 0.9); }
+.hover\:bg-secondary\/10:hover { background-color: rgb(236 32 36 / 0.1); }
+.hover\:bg-surface-container:hover { background-color: var(--cn-surface-container); }
+.hover\:bg-surface-container-high:hover { background-color: var(--cn-surface-high); }
+.hover\:bg-surface-container-highest:hover { background-color: var(--cn-surface-highest); }
+.hover\:bg-surface-container-low:hover { background-color: var(--cn-surface-low); }
+.hover\:text-primary:hover { color: var(--cn-primary); }
+
+.focus\:border-primary:focus { border-color: var(--cn-primary); }
+.focus\:ring-secondary:focus { --tw-ring-color: var(--cn-secondary); }

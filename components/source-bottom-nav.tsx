@@ -1,0 +1,64 @@
+import Link from "next/link";
+
+type BottomNavKey = "feed" | "groups" | "games" | "messages" | "profile";
+
+type SourceBottomNavProps = {
+  active: BottomNavKey;
+  variant: "groups" | "games";
+};
+
+const items: Array<{ key: BottomNavKey; label: string; href: string; icon: string }> = [
+  { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
+  { key: "groups", label: "Groups", href: "/groups", icon: "groups" },
+  { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
+  { key: "messages", label: "Chat", href: "/messages", icon: "forum" },
+  { key: "profile", label: "Profile", href: "/alex", icon: "person" },
+];
+
+export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
+  const shellClass =
+    variant === "games"
+      ? "fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pt-3 pb-6 bg-white/95 dark:bg-primary/95 backdrop-blur-2xl border-t border-surface-container-highest shadow-2xl z-50"
+      : "fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pt-3 pb-6 bg-white/95 backdrop-blur-2xl border-t border-surface-container-highest shadow-xl z-50";
+
+  return (
+    <nav className={shellClass}>
+      {items.map((item) => {
+        const isActive = item.key === active;
+
+        let className =
+          "flex flex-col items-center justify-center px-3 py-1.5 transition-all duration-300";
+
+        if (isActive && variant === "groups" && item.key === "groups") {
+          className += " text-primary bg-primary/5 rounded-2xl px-4";
+        } else if (isActive && variant === "games" && item.key === "games") {
+          className += " text-secondary bg-secondary-fixed-dim/20 rounded-2xl active:scale-90";
+        } else {
+          className +=
+            " text-outline hover:text-primary";
+          if (variant === "games") {
+            className += " active:scale-90 duration-150";
+          }
+        }
+
+        return (
+          <Link key={item.key} href={item.href} className={className}>
+            <span
+              className="material-symbols-outlined"
+              style={
+                isActive && (item.key === "groups" || item.key === "games")
+                  ? { fontVariationSettings: "'FILL' 1" }
+                  : undefined
+              }
+            >
+              {item.icon}
+            </span>
+            <span className="mt-1 text-[10px] font-bold uppercase tracking-widest">
+              {item.label}
+            </span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
