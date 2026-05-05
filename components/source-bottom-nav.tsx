@@ -9,10 +9,10 @@ type SourceBottomNavProps = {
 
 const items: Array<{ key: BottomNavKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
-  { key: "club", label: "Clubs", href: "/club", icon: "groups" },
+  { key: "club", label: "Clubs", href: "/clubs", icon: "groups" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/messages", icon: "forum" },
-  { key: "profile", label: "Profile", href: "/alex", icon: "person" },
+  { key: "profile", label: "Profile", href: "/aarav", icon: "person" },
 ];
 
 export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {

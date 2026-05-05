@@ -12,15 +12,15 @@ type CampusShellProps = {
 
 const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
-  { key: "create-post", label: "Create post", href: "/", icon: "add" },
-  { key: "club", label: "Clubs", href: "/club", icon: "groups" },
+  { key: "create-post", label: "Create post", href: "/?=createpost", icon: "add" },
+  { key: "club", label: "Clubs", href: "/clubs", icon: "groups" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/messages", icon: "forum" },
-  { key: "profile", label: "Profile", href: "/alex", icon: "person" },
+  { key: "profile", label: "Profile", href: "/aarav", icon: "person" },
 ];
 
 function navHref(itemHref: string, userHref: string) {
-  return itemHref === "/alex" ? userHref : itemHref;
+  return itemHref === "/aarav" ? userHref : itemHref;
 }
 
 export function SectionTitle({
@@ -54,7 +54,7 @@ export function SectionTitle({
   );
 }
 
-export function CampusShell({ active, children, userHref = "/alex" }: CampusShellProps) {
+export function CampusShell({ active, children, userHref = "/aarav" }: CampusShellProps) {
   return (
     <div className="min-h-screen bg-background text-on-background">
       <header className="sticky top-0 z-50 border-b border-outline-variant/70 bg-white/80 backdrop-blur-xl">
@@ -72,7 +72,7 @@ export function CampusShell({ active, children, userHref = "/alex" }: CampusShel
               <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
               <input
                 className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant"
-                placeholder="Search campus spaces..."
+                placeholder="Search Bengaluru campus spaces..."
                 type="text"
               />
             </div>
@@ -124,12 +124,12 @@ export function CampusShell({ active, children, userHref = "/alex" }: CampusShel
 
             <div className="mt-8 overflow-hidden rounded-[28px] bg-primary p-6 text-white shadow-[0_24px_60px_rgba(34,29,92,0.24)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">Live on Campus</p>
-              <h3 className="mt-3 font-['Space_Grotesk'] text-xl font-bold">Nexus Spring Night</h3>
+              <h3 className="mt-3 font-['Space_Grotesk'] text-xl font-bold">Bengaluru Indie Night</h3>
               <p className="mt-2 text-sm leading-6 text-white/80">
-                Late-night mixer, open arcade, and student DJ sets across the quad tonight.
+                Open mic sets, filter coffee stalls, and student DJs are taking over the central lawn in Bengaluru tonight.
               </p>
               <button className="mt-5 rounded-full bg-white px-5 py-3 text-sm font-semibold text-primary transition hover:scale-[1.02]">
-                Reserve Spot
+                Book Pass
               </button>
             </div>
           </nav>

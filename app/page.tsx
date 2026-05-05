@@ -1,62 +1,35 @@
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
+import { CreatePostOverlay } from "@/components/create-post-overlay";
+import { DismissibleCampusPulse } from "@/components/dismissible-campus-pulse";
+import { getDemoData } from "@/lib/campus-api";
+import { fallbackFeed, type FeedData } from "@/lib/demo-data";
 import Link from "next/link";
 
-const feedCards = [
-  {
-    author: "Sarah Jenkins",
-    meta: "2h ago • Architecture Dept",
-    title: "Studio sunrise and a clean render pass.",
-    body: "The west wing caught the best light this morning, so we stayed late and turned the review wall into a mini gallery.",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDDbsQFosHW6vZSMffXbQjy-PzN-BoaByAnK_Sl_YFURfiMtKtThcON-b8DL2IDTKvMvU2NSqBHTN4XsURfSGSR8GYCacBCydrBdvSTc7o23v0F6RGvbsURQm5wt8ucXJM6CoPUd2hDx0Iwox_MfNZ85RjfPkecyZKOLXF9C_gJPF8v1hUdOF8eYEtpR2VYogWMBuM-2uovf2-Y8g_3OU5CBblw-bVGxFqGe9LMS1UeaRklI_oARDPiX34Z5Qk1F55QLV7lTJS87k0",
-    tag: "#architecture",
-    likes: "1.2k",
-    comments: "42",
-  },
-  {
-    author: "Mark Thompson",
-    meta: "5h ago • Sports Club",
-    title: "Spring campus feels",
-    body: "Finals are close, but this week still somehow feels cinematic.",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBwzpgmmiYF6RpJki5O0MBK3WD9yR4DhZsm4Fz7u0d1P203pGFKhis03MIUEN38icmvVItSo9XQhl9GGTMq3TMnRYjn5ckju4V6uii53IkzkHsZbQb2zV9qpiL_Q5hFKqtr7Hq7_csF5O3aaIoVmPUAIFdTuEPGVzYDAv-hloE7Kd6EynVr09EimJqdGWXdk9WBuNQYAgHWK6dDpqbuebxRRHoOG6DQ340iObPfIi2edREqK5fLiSwN-3THx82p7S7oHUp2xiZiln8",
-    tag: "#springfest",
-    likes: "856",
-    comments: "18",
-  },
-];
+type HomePageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
 
-const trending = [
-  { label: "Engineering", tag: "#HackTheQuad", posts: "4.2k posts today" },
-  { label: "Campus Life", tag: "#NexusLaunch", posts: "12.5k posts this week" },
-  { label: "Events", tag: "#SpringFest2026", posts: "2.1k RSVPs" },
-];
+function getSearchValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
 
-export default function HomePage() {
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const unnamedQuery = getSearchValue(resolvedSearchParams[""]);
+  const mode = getSearchValue(resolvedSearchParams.mode);
+  const view = getSearchValue(resolvedSearchParams.view);
+  const showCreatePost =
+    unnamedQuery === "createpost" || mode === "createpost" || view === "createpost";
+  const feedData = await getDemoData<FeedData>("/api/feed", fallbackFeed);
+
   return (
     <CampusShell active="feed">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="space-y-6">
-          <div className="overflow-hidden rounded-[32px] border border-outline-variant/60 bg-primary p-6 text-white shadow-[0_24px_60px_rgba(34,29,92,0.24)] md:p-8">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/75">Campus Pulse</p>
-            <h1 className="mt-3 max-w-2xl font-['Space_Grotesk'] text-4xl font-bold tracking-tight md:text-5xl">
-              One feed for classes, clubs, games, and the social orbit around them.
-            </h1>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-white/85 md:text-base">
-              Follow what your campus is building tonight, who is playing next, and which clubs are turning ideas into scenes.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-primary transition hover:scale-[1.02]">
-                Share Update
-              </button>
-              <Link
-                href="/club"
-                className="rounded-full border border-white/35 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                Explore Clubs
-              </Link>
-            </div>
-          </div>
+      <>
+        {showCreatePost ? <CreatePostOverlay /> : null}
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="space-y-6">
+          <DismissibleCampusPulse />
 
           <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-5 shadow-[0_12px_30px_rgba(27,27,35,0.06)] backdrop-blur-xl md:p-6">
             <div className="flex gap-4">
@@ -66,24 +39,36 @@ export default function HomePage() {
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2HG1xSJvAC-LTLuTgDj6ca7MKCl9pIhFHyow3UmQz2W4VnYd03tR47VxcwUR9KtWVt_AAtjU72yn00Fw3I1Uzoi08AanNjKwrZCDNzEY-8PnA19oa8SAbeWhNz14nkzGSrivl0FRKgrU60m_gnegiE-EufB6-vvjOZ9h2xlI8tAXtg4_o9OB28r0Y3O5tR6pGVS6nzBPuQl4e7T5uUr_koUHDIs_9qiQnQB6PAAKzCYzjfDHTewf0YaPXOd_hrTRZ_THoAcfdCSU"
               />
               <div className="flex-1">
-                <button className="w-full rounded-[20px] bg-surface-container px-4 py-4 text-left text-sm text-on-surface-variant transition hover:bg-surface-container-high">
-                  What is happening on campus, Alex?
-                </button>
+                <Link
+                  href="/?=createpost"
+                  className="block w-full rounded-[20px] bg-surface-container px-4 py-4 text-left text-sm text-on-surface-variant transition hover:bg-surface-container-high"
+                >
+                  What is happening in Bengaluru today, Aarav?
+                </Link>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-3 text-sm font-semibold text-on-surface-variant">
-                    <button className="rounded-full bg-primary-fixed px-4 py-2 text-primary">Photo</button>
-                    <button className="rounded-full bg-surface-container px-4 py-2 hover:text-primary">Video</button>
-                    <button className="rounded-full bg-surface-container px-4 py-2 hover:text-primary">Event</button>
+                    <Link href="/?=createpost" className="rounded-full bg-primary-fixed px-4 py-2 text-primary">
+                      Photo
+                    </Link>
+                    <Link href="/?=createpost" className="rounded-full bg-surface-container px-4 py-2 hover:text-primary">
+                      Video
+                    </Link>
+                    <Link href="/?=createpost" className="rounded-full bg-surface-container px-4 py-2 hover:text-primary">
+                      Event
+                    </Link>
                   </div>
-                  <button className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:bg-primary-container">
+                  <Link
+                    href="/?=createpost"
+                    className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:bg-primary-container"
+                  >
                     Post
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
 
-          {feedCards.map((card) => (
+          {feedData.feedCards.map((card) => (
             <article
               key={card.title}
               className="overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white/85 shadow-[0_12px_30px_rgba(27,27,35,0.06)] backdrop-blur-xl"
@@ -145,9 +130,9 @@ export default function HomePage() {
 
         <aside className="space-y-6">
           <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-6 shadow-[0_12px_30px_rgba(27,27,35,0.06)]">
-            <SectionTitle title="Trending" description="Signals moving fastest across campus." />
+            <SectionTitle title="Trending" description="Signals moving fastest across Bengaluru campuses." />
             <div className="mt-5 space-y-4">
-              {trending.map((item) => (
+              {feedData.trending.map((item) => (
                 <div key={item.tag} className="rounded-2xl bg-surface-container-low p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">{item.label}</p>
                   <p className="mt-2 font-['Space_Grotesk'] text-lg font-bold text-primary">{item.tag}</p>
@@ -160,11 +145,7 @@ export default function HomePage() {
           <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-6 shadow-[0_12px_30px_rgba(27,27,35,0.06)]">
             <SectionTitle title="Suggested People" description="Students near your circles." />
             <div className="mt-5 space-y-4">
-              {[
-                ["Emma Wilson", "Digital Arts"],
-                ["James Lee", "CS Sophomore"],
-                ["Maya Patel", "Debate + Design"],
-              ].map(([name, subtitle]) => (
+              {feedData.suggestedPeople.map(({ name, subtitle }) => (
                 <div key={name} className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <img
@@ -185,7 +166,8 @@ export default function HomePage() {
             </div>
           </div>
         </aside>
-      </div>
+        </div>
+      </>
     </CampusShell>
   );
 }

@@ -1,4 +1,6 @@
 import { SourceBottomNav } from "@/components/source-bottom-nav";
+import { getDemoData } from "@/lib/campus-api";
+import { fallbackGames, type GamesData } from "@/lib/demo-data";
 
 const gameCards = [
   {
@@ -69,7 +71,9 @@ const recentActivity = [
   },
 ];
 
-export default function GamesPage() {
+export default async function GamesPage() {
+  const gamesData = await getDemoData<GamesData>("/api/games", fallbackGames);
+
   return (
     <>
       <div className="min-h-screen bg-background pb-32 font-body-md text-on-surface">
@@ -133,7 +137,7 @@ export default function GamesPage() {
                 Nexus Arena: Cyber Drift
               </h1>
               <p className="max-w-lg font-body-lg text-white/80">
-                Beat the campus high score of 42,500 and earn the &apos;Speed Demon&apos; digital badge +
+                Beat the Bengaluru high score of 42,500 and earn the &apos;Speed Demon&apos; digital badge +
                 500 Nexus Credits.
               </p>
               <div className="flex gap-4 pt-4">
@@ -172,14 +176,14 @@ export default function GamesPage() {
             <div className="mb-6 flex items-end justify-between">
               <div>
                 <h2 className="font-headline-lg text-headline-lg">Nexus Originals</h2>
-                <p className="text-on-surface-variant">Hand-picked mini-games for campus breaks.</p>
+                <p className="text-on-surface-variant">Hand-picked mini-games for hostel breaks and Bengaluru downtime.</p>
               </div>
               <button className="flex items-center gap-1 font-label-md text-label-md text-secondary hover:underline">
                 View All <span className="material-symbols-outlined text-sm">arrow_forward</span>
               </button>
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {gameCards.map((card) => (
+              {gamesData.gameCards.map((card) => (
                 <div
                   key={card.title}
                   className="group relative overflow-hidden rounded-[24px] border border-outline-variant bg-surface-container transition-all duration-300 hover:border-secondary"
@@ -224,7 +228,7 @@ export default function GamesPage() {
                 <h2 className="font-headline-lg text-headline-lg">Top Rated This Semester</h2>
               </div>
               <div className="space-y-4">
-                {topRated.map((game) => (
+                {gamesData.topRated.map((game) => (
                   <div
                     key={game.rank}
                     className="group flex cursor-pointer items-center gap-4 rounded-2xl border border-transparent p-4 transition-colors hover:border-surface-container-highest hover:bg-white"
@@ -262,7 +266,7 @@ export default function GamesPage() {
                 <h2 className="font-headline-lg text-headline-lg">Jump Back In</h2>
               </div>
               <div className="space-y-6">
-                {recentActivity.map((item) => (
+                {gamesData.recentActivity.map((item) => (
                   <div key={item.title} className="flex items-center gap-4 p-2">
                     <div className="relative">
                       <img alt={item.title} className="h-12 w-12 rounded-lg object-cover" src={item.image} />
@@ -279,7 +283,7 @@ export default function GamesPage() {
               </div>
               <div className="mt-8 rounded-2xl bg-primary-container p-6 text-white">
                 <h5 className="mb-1 text-sm font-bold">Nexus Pro Tip</h5>
-                <p className="text-xs opacity-90">Multiplayer games earn 2x Credits on Fridays after 6 PM!</p>
+                <p className="text-xs opacity-90">Multiplayer games earn 2x Credits on Fridays after 6 PM in Bengaluru!</p>
               </div>
             </div>
           </section>

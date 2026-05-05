@@ -1,20 +1,24 @@
 import { CampusShell } from "@/components/campus-shell";
+import { getDemoData } from "@/lib/campus-api";
+import { fallbackMessages, type MessagesData } from "@/lib/demo-data";
 
 const conversations = [
-  { name: "Chloe Mitchell", preview: "You going to the Nexus Party tonight?", time: "Just now", active: true },
-  { name: "CS 301 Study Group", preview: "Does anyone have the notes for...", time: "12m ago" },
-  { name: "Jordan Hayes", preview: "Sent a photo", time: "1h ago" },
-  { name: "Sarah Jenkins", preview: "That project was wild, glad it's done!", time: "Yesterday" },
+  { name: "Nisha Rao", preview: "Are you going to the Indiranagar mixer tonight?", time: "Just now", active: true },
+  { name: "CSE Placement Prep", preview: "Did anyone save the aptitude notes from...", time: "12m ago" },
+  { name: "Karthik Menon", preview: "Sent a photo", time: "1h ago" },
+  { name: "Ananya Reddy", preview: "That design sprint was intense, but it landed well.", time: "Yesterday" },
 ];
 
 const messages = [
-  { side: "left", text: "Have you seen the lineup for the Campus Nexus festival? The main stage looks unreal." },
-  { side: "right", text: "I did. I am in if the early bird access is still open for Nexus Points holders." },
-  { side: "left", text: "There are a few left. I already grabbed mine and the poster looks excellent too." },
-  { side: "right", text: "Send me the link. I do not want to miss that one." },
+  { side: "left", text: "Did you see the lineup for the Bengaluru student fest? The main stage set looks solid." },
+  { side: "right", text: "Yes. I am going if early access is still open for campus pass holders." },
+  { side: "left", text: "A few slots are left. I booked mine already, and the poster drop looks great too." },
+  { side: "right", text: "Send the link. I do not want to miss this one." },
 ] as const;
 
-export default function MessagesPage() {
+export default async function MessagesPage() {
+  const messagesData = await getDemoData<MessagesData>("/api/messages", fallbackMessages);
+
   return (
     <CampusShell active="messages">
       <div className="overflow-hidden rounded-[30px] border border-outline-variant/60 bg-white shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
@@ -43,7 +47,7 @@ export default function MessagesPage() {
             </div>
 
             <div className="divide-y divide-outline-variant/35">
-              {conversations.map((conversation) => (
+              {messagesData.conversations.map((conversation) => (
                 <button
                   key={conversation.name}
                   className={[
@@ -79,12 +83,12 @@ export default function MessagesPage() {
             <header className="flex items-center justify-between border-b border-outline-variant/50 px-5 py-4 md:px-6">
               <div className="flex items-center gap-4">
                 <img
-                  alt="Chloe Mitchell"
+                  alt="Nisha Rao"
                   className="h-12 w-12 rounded-2xl object-cover"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmpD6cfKc-Dh3JQvkAIvvA4nGaCzgmv378CT-89HCyw5qq4O4BbuTtqQgLCmgtxR6asoWEMT-G24o3pnnHldbHPatXaQeHxNLjkuM1F89J9i6woQs8C34ERV_5ZqFsToCNW6Xb4hNBq8ET5Be81vDhDiIAnXsbMRMBdV--c81WRbSW5j1v72ah1oi_EzH13c8QHZFyDHbe0kJ8Frid9eM5I08DlVfz3EdVTvweHHRB1iORUVIU9Q30jEkxyk5qfu2jYEGZ6PuxS80"
                 />
                 <div>
-                  <h2 className="font-['Space_Grotesk'] text-xl font-bold text-on-background">Chloe Mitchell</h2>
+                  <h2 className="font-['Space_Grotesk'] text-xl font-bold text-on-background">Nisha Rao</h2>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Active now</p>
                 </div>
               </div>
@@ -104,7 +108,7 @@ export default function MessagesPage() {
                 </span>
               </div>
 
-              {messages.map((message, index) => (
+              {messagesData.messages.map((message, index) => (
                 <div
                   key={`${message.side}-${index}`}
                   className={message.side === "right" ? "flex justify-end" : "flex justify-start"}
