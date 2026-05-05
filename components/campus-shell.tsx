@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-type NavKey = "feed" | "groups" | "games" | "messages" | "profile";
+type NavKey = "feed" | "club" | "games" | "messages" | "profile";
+type NavItemKey = NavKey | "create-post";
 
 type CampusShellProps = {
   active: NavKey;
@@ -9,9 +10,10 @@ type CampusShellProps = {
   userHref?: string;
 };
 
-const navItems: Array<{ key: NavKey; label: string; href: string; icon: string }> = [
+const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
-  { key: "groups", label: "Groups", href: "/groups", icon: "groups" },
+  { key: "create-post", label: "Create post", href: "/", icon: "add" },
+  { key: "club", label: "Clubs", href: "/club", icon: "groups" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/messages", icon: "forum" },
   { key: "profile", label: "Profile", href: "/alex", icon: "person" },
@@ -56,15 +58,17 @@ export function CampusShell({ active, children, userHref = "/alex" }: CampusShel
   return (
     <div className="min-h-screen bg-background text-on-background">
       <header className="sticky top-0 z-50 border-b border-outline-variant/70 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-4 md:px-6">
+          <div className="flex items-center">
             <Link
               href="/"
               className="font-['Space_Grotesk'] text-2xl font-black tracking-[-0.06em] text-primary"
             >
               Campus Nexus
             </Link>
-            <div className="hidden rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 md:flex md:w-80 md:items-center md:gap-3">
+          </div>
+          <div className="hidden justify-center md:flex">
+            <div className="w-full max-w-sm rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 md:flex md:items-center md:gap-3">
               <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
               <input
                 className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant"
@@ -98,13 +102,16 @@ export function CampusShell({ active, children, userHref = "/alex" }: CampusShel
           <nav className="sticky top-24 space-y-2">
             {navItems.map((item) => {
               const selected = item.key === active;
+              const isCreatePost = item.key === "create-post";
               return (
                 <Link
                   key={item.key}
                   href={navHref(item.href, userHref)}
                   className={[
                     "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                    selected
+                    isCreatePost
+                      ? "bg-secondary text-white shadow-[0_18px_40px_rgba(236,32,36,0.22)] hover:scale-[1.01]"
+                      : selected
                       ? "bg-primary text-on-primary shadow-[0_18px_40px_rgba(34,29,92,0.22)]"
                       : "text-on-surface-variant hover:bg-surface-container hover:text-primary",
                   ].join(" ")}
@@ -135,17 +142,22 @@ export function CampusShell({ active, children, userHref = "/alex" }: CampusShel
         <div className="mx-auto flex max-w-lg items-center justify-around">
           {navItems.map((item) => {
             const selected = item.key === active;
+            const isCreatePost = item.key === "create-post";
             return (
               <Link
                 key={item.key}
                 href={navHref(item.href, userHref)}
                 className={[
                   "flex min-w-16 flex-col items-center rounded-2xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition",
-                  selected ? "bg-primary-fixed text-primary" : "text-on-surface-variant",
+                  isCreatePost
+                    ? "bg-secondary px-4 text-white"
+                    : selected
+                    ? "bg-primary-fixed text-primary"
+                    : "text-on-surface-variant",
                 ].join(" ")}
               >
                 <span className="material-symbols-outlined mb-1">{item.icon}</span>
-                <span>{item.label}</span>
+                <span>{isCreatePost ? "Create" : item.label}</span>
               </Link>
             );
           })}

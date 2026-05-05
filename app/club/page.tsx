@@ -1,6 +1,6 @@
 import { SourceBottomNav } from "@/components/source-bottom-nav";
 
-const spotlightGroups = [
+const spotlightClubs = [
   {
     badge: "Trending",
     badgeFill: true,
@@ -23,7 +23,7 @@ const spotlightGroups = [
   },
 ];
 
-const groupCards = [
+const clubCards = [
   {
     title: "Developer Circle",
     description:
@@ -91,7 +91,7 @@ const stats = [
   },
   {
     value: "2.8k",
-    label: "Total Groups",
+    label: "Total Clubs",
     className:
       "rounded-[24px] border border-surface-container-highest bg-white p-6 text-center shadow-sm",
     valueClass: "text-display-lg font-display-lg text-secondary",
@@ -115,7 +115,7 @@ const stats = [
   },
 ];
 
-export default function GroupsPage() {
+export default function ClubPage() {
   return (
     <>
       <div className="min-h-screen bg-background pb-32 font-body-md text-on-background">
@@ -131,7 +131,7 @@ export default function GroupsPage() {
                 <span className="material-symbols-outlined text-xl text-outline">search</span>
                 <input
                   className="w-64 border-none bg-transparent text-sm font-label-md focus:ring-0"
-                  placeholder="Search organizations..."
+                  placeholder="Search clubs..."
                   type="text"
                 />
               </div>
@@ -156,7 +156,7 @@ export default function GroupsPage() {
           <section className="space-y-6">
             <div className="flex items-end justify-between">
               <div>
-                <h2 className="font-headline-lg text-headline-lg text-on-background">Spotlight Groups</h2>
+                <h2 className="font-headline-lg text-headline-lg text-on-background">Spotlight Clubs</h2>
                 <p className="font-body-md text-on-surface-variant">Rising stars of the campus community</p>
               </div>
               <div className="flex gap-2">
@@ -169,28 +169,28 @@ export default function GroupsPage() {
               </div>
             </div>
             <div className="flex snap-x gap-4 overflow-x-auto pb-4 scrollbar-hide">
-              {spotlightGroups.map((group) => (
+              {spotlightClubs.map((club) => (
                 <div
-                  key={group.title}
+                  key={club.title}
                   className="group relative aspect-[16/9] min-w-[320px] snap-start cursor-pointer overflow-hidden rounded-[24px] shadow-xl md:min-w-[450px]"
                 >
                   <img
                     className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    src={group.image}
+                    src={club.image}
                   />
                   <div className="absolute inset-0 bg-primary/65" />
                   <div className="absolute bottom-0 left-0 p-6 text-white">
-                    <span className={`mb-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-widest text-white ${group.badgeClass} ${group.badge === "Trending" ? "animate-pulse" : ""}`}>
+                    <span className={`mb-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-widest text-white ${club.badgeClass} ${club.badge === "Trending" ? "animate-pulse" : ""}`}>
                       <span
                         className="material-symbols-outlined text-xs"
-                        style={group.badgeFill ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                        style={club.badgeFill ? { fontVariationSettings: "'FILL' 1" } : undefined}
                       >
-                        {group.icon}
+                        {club.icon}
                       </span>
-                      {group.badge}
+                      {club.badge}
                     </span>
-                    <h3 className="mb-1 font-headline-md text-headline-md">{group.title}</h3>
-                    <p className="line-clamp-1 font-body-md opacity-80">{group.description}</p>
+                    <h3 className="mb-1 font-headline-md text-headline-md">{club.title}</h3>
+                    <p className="line-clamp-1 font-body-md opacity-80">{club.description}</p>
                   </div>
                 </div>
               ))}
@@ -199,7 +199,7 @@ export default function GroupsPage() {
 
           <section className="space-y-6">
             <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide">
-              {["All Groups", "Academic", "Social", "Sports", "Hobby", "Wellness"].map((tab, index) => (
+              {["All Clubs", "Academic", "Social", "Sports", "Hobby", "Wellness"].map((tab, index) => (
                 <button
                   key={tab}
                   className={
@@ -214,7 +214,7 @@ export default function GroupsPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {groupCards.map((card) => (
+              {clubCards.map((card) => (
                 <div
                   key={card.title}
                   className="group overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
@@ -277,12 +277,12 @@ export default function GroupsPage() {
         <button className="group fixed bottom-24 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all hover:scale-110 active:scale-90">
           <span className="material-symbols-outlined text-3xl">group_add</span>
           <span className="absolute right-full mr-4 whitespace-nowrap rounded-2xl bg-primary px-4 py-2 text-sm font-label-md text-white opacity-0 transition-opacity group-hover:opacity-100">
-            Create Group
+            Create Club
           </span>
         </button>
       </div>
 
-      <SourceBottomNav active="groups" variant="groups" />
+      <SourceBottomNav active="club" variant="club" />
 
       <style
         dangerouslySetInnerHTML={{

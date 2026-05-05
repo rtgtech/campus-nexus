@@ -43,17 +43,17 @@ export default function HomePage() {
               One feed for classes, clubs, games, and the social orbit around them.
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-7 text-white/85 md:text-base">
-              Follow what your campus is building tonight, who is playing next, and which groups are turning ideas into scenes.
+              Follow what your campus is building tonight, who is playing next, and which clubs are turning ideas into scenes.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-primary transition hover:scale-[1.02]">
                 Share Update
               </button>
               <Link
-                href="/groups"
+                href="/club"
                 className="rounded-full border border-white/35 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
               >
-                Explore Groups
+                Explore Clubs
               </Link>
             </div>
           </div>

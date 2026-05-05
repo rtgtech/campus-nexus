@@ -1,15 +1,15 @@
 import Link from "next/link";
 
-type BottomNavKey = "feed" | "groups" | "games" | "messages" | "profile";
+type BottomNavKey = "feed" | "club" | "games" | "messages" | "profile";
 
 type SourceBottomNavProps = {
   active: BottomNavKey;
-  variant: "groups" | "games";
+  variant: "club" | "games";
 };
 
 const items: Array<{ key: BottomNavKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
-  { key: "groups", label: "Groups", href: "/groups", icon: "groups" },
+  { key: "club", label: "Clubs", href: "/club", icon: "groups" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/messages", icon: "forum" },
   { key: "profile", label: "Profile", href: "/alex", icon: "person" },
@@ -29,7 +29,7 @@ export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
         let className =
           "flex flex-col items-center justify-center px-3 py-1.5 transition-all duration-300";
 
-        if (isActive && variant === "groups" && item.key === "groups") {
+        if (isActive && variant === "club" && item.key === "club") {
           className += " text-primary bg-primary/5 rounded-2xl px-4";
         } else if (isActive && variant === "games" && item.key === "games") {
           className += " text-secondary bg-secondary-fixed-dim/20 rounded-2xl active:scale-90";
@@ -46,7 +46,7 @@ export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
             <span
               className="material-symbols-outlined"
               style={
-                isActive && (item.key === "groups" || item.key === "games")
+                isActive && (item.key === "club" || item.key === "games")
                   ? { fontVariationSettings: "'FILL' 1" }
                   : undefined
               }
