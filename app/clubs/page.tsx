@@ -1,7 +1,7 @@
 import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { CreateClubOverlay } from "@/components/create-club-overlay";
 import { getDemoData } from "@/lib/campus-api";
-import { fallbackClubs, type ClubsData } from "@/lib/demo-data";
+import { fallbackClubs, profileAvatar, type ClubsData } from "@/lib/demo-data";
 import Link from "next/link";
 
 const spotlightClubs = [
@@ -40,10 +40,7 @@ const clubCards = [
       "https://lh3.googleusercontent.com/aida-public/AB6AXuAw_Xv8hWpdYy2fAJ8I9evq8nybROQu14uCFeF7BZRZuOu0aVWOfVVcm2Z25TCZ7oGpOu_74XA8B5IvD31ynPpEdOMtxTy84zaPXwQkb7dsSgCMWdZtkiVoxdXAutvyPhdG7Jln2u7w3njLVqnhqEA0BhzXr5NxVBgRrhGbn6Lz_Q2gR5XfP9HvrAEuvSP_BzfVuIobWR_T_1XqkvX5yzQqQ-D715QeEUmsoOb-ieoHsfSOv2mIq6O3xyiWnrMnEMQFw1X9HbxMhEI",
     extraMembers: "+1.2k",
     extraMembersClass: "bg-primary-container text-white",
-    avatars: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuC-WwTQCkdpE0iRPPcHwXqTcfyY5Fs4C77N68viBF8Oh_U3gwrUxFJjkNUOfoIyPa-Xsbn47ai65k9a9bGuEWuoJSZuSaABD1tm4HQs4m2P1HaGhoouZ81g9VYawm3wErdQz3O6cRD7ULxEx9jW95lBa6WRk8MFRgjbZbX6gWqqu7g-XnMRobP9NdI52YflGaDNALe0CDMCZJwrc67RiYMShHLA8KbwR3sqIXB2ngTOdmy3VlE5EUkZt2cUX4HdGnIGjgPYA2otnpU",
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCCuIJA5ggaPFPILr85vI1UxbcaJxdmT783QwQqMNcf_lAHIBxmlOd3Pp9QYlm9SxQCb5ie3OHUZ2mS_ogeWK-WqwOdWlr83JJu_3nUSQMiLsZHHtfamEulI2n-k64pu9c3U5ag21KejUqn3twGYQK57iT-whIiQ8ECjIHm8pZ4APnUjz8HEPNVG7EP3NrXbIgjOhWbNLLsa1huxv_2pj_uJXmIMc5Oap_b4m-GLaC2Kh951hGPf6gB8_9zeUQ3Br2NzSBEC85jzto",
-    ],
+    avatars: [profileAvatar, profileAvatar],
     statusClass: "text-secondary",
   },
   {
@@ -58,10 +55,7 @@ const clubCards = [
       "https://lh3.googleusercontent.com/aida-public/AB6AXuCdOP8TLnf3ouBPsjSs_ssVQvpZ0RWrdFweagLGii4RfNUPToIewrWD2nkZZehZUYmJGgn961LgOT2ZKH9zzzwRXE5mN6wioVnUk-VIiiZExNKWh16XBSophAyCApQvsIsa2vTM9UqG8b6ILhJY9-biJqBMd5masncgCLEjBpoCaAh3BV-85hE4_ZkD0MkBOR_A3lU_1SfyV7etCc0lR8HDovh1dURUHyk78jRIAYH6m8_sVH4-tgVlYQytEQ_NAdgvp7tf07-VD-k",
     extraMembers: "842",
     extraMembersClass: "bg-surface-container-high text-on-surface",
-    avatars: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCi5BHyp_Dx_6JrJzUhJEY1pD1KrCNv2RzVc5gumYRc_MqNrhENi6dvdY_dZADNDn8aFEdQ938R5ENzfkmtvb5-w-anifDkcdsnssoAmBU_ZXi4FFhcw9QGxEEKLQIQ6_mmTKO-en1XKmgHXKU-7xefNx0XtLXrFRv1AJb9NaC1RFxs4y2AznWHJkDhD2EURJxB_4CdcMVLqFTmLRmJ-fC3aIjqqjaEMYd5wh2byKhjApJ4paNjbTbV0vr3eH8BsgH3Nem6dkAEv9g",
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuB7oIXwv6wjOlinwSUS6NpnKl2GI_s8542tQyjITWzfyufDIz4C-ODW47TnBN6xjTGgp74tUOSHJJM0SbZtjBlccobH6116onPuPS4HVTrV7umZUhLRVfDxO58GjcwG--mnHAvR2rqpE_K4AbNGDuI0BTgfGS2ssgtBM8KBeDhV-HELU41xQKw-17ZxmHV55CiIdTJAAcm3fBjjRfDyad8peDUiyRKOaXCBQZ9TPXdy86T9TLAn99G6jjnWMrgU7XUl5OFpFQTKuxw",
-    ],
+    avatars: [profileAvatar, profileAvatar],
     statusClass: "text-secondary",
   },
   {
@@ -76,10 +70,7 @@ const clubCards = [
       "https://lh3.googleusercontent.com/aida-public/AB6AXuArlOY04LgVaqnmSR9kzO_5AuMuxKl05_CI7NUqYv3sae_w0ppAi9P8D_xHCxxfpLrrAlsJzYYorWFIAa1mPvCX_-9TmNDymjb2tDEzjHEKMeU_Z-YJb4r7dCIZkLKUkmQ5jZuBoyNt08Dq5icFQ9dz_dkpyjVLqiwMUF2OnNqpAxvytTRsLzOBjqsS2NJ6SbilxGX9vzzSluX0SDG9afZcC6t_HYE2oXWbLlv1qQ4LB6_gzTbfjWndvFGhR6tCcplV-nqYCsDbTYI",
     extraMembers: "4.5k",
     extraMembersClass: "bg-tertiary-fixed text-on-tertiary-fixed",
-    avatars: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDFLcHDna3_Iq8jhDipMSzFJNI4MaUaXAjvOFk40XPqSvN5bgmhtKnRaZd4Dp7ptION_116QgMT5iPPv1TXxnMGQS6R8PwP4n9qBGWQ9FejW39xoHtCUXIP22ckN-XNWT5LIoLRa0i6LH989C4Q5YLvjiDi6rCi7ucB49EQSuF6kvwc72ZEV-ZLvT_T6rgRd-Lv_ok1XQfLTx4EDFeybyuwYGzF12DUL7t4T3d6CFzf9Eb5HLUGDw82GnRUGhzZh_A6xjbiz70DG7E",
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBiCpijwoFnWVx3RMsVOwTvNvSZ7bCuHoNzDk43W9VmrBDFZBTfrn75ypTMO8Uwz7kiKHlH9aZvIvvM_ZmVzkzZ3NBA5Hrleuh9fVhZU1gRaNuFFvIzPTRHWpMf4vBFj2tF34SwGY_h5KGiuI2jHwd0RIZFDASa0_mbYnjsQp2Z-PuJci_EtOdDH7R7UbS8Ifz2O_OVlfi9BVZv-szFYxdirMDtGP_WN3_RMTkCl1qW9IT8wzRm67r8OYRxIpUYASrLD6WRTaCirKk",
-    ],
+    avatars: [profileAvatar, profileAvatar],
     statusClass: "text-on-surface-variant",
   },
 ];
@@ -333,7 +324,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                 <img
                   alt="User avatar"
                   className="h-full w-full object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7NNioyD9stdKaYKBRFm6-N5pPXieBsUKPE8pOBaz5GtOkCQ3_SXsv8IhCqxoWr5uuQA2RtRqmlVkpNVlfAt5i_LROSbPfiN1ZQqoi4b21z-CeWoORPQLuucKGTMtI4j2PacnOU7oYn_aqb-pt8s5oeFGjYEZmOwHdlzsJqb5M-rgBLh4ZU_XhqvhbHcyNSHUq9eKwqQDxJEl_HYFdz77wyIDADnMvjSLIGV9fskCbZLGyMWHzQPtbsEmRbWssrb1Vau7GPwakXf0"
+                  src={profileAvatar}
                 />
               </div>
             </div>

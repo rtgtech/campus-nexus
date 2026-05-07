@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { profileAvatar } from "@/lib/demo-data";
 
-type NavKey = "feed" | "club" | "games" | "messages" | "profile";
+type NavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
 type NavItemKey = NavKey | "create-post";
 
 type CampusShellProps = {
@@ -14,8 +15,9 @@ const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: stri
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
   { key: "create-post", label: "Create post", href: "/?=createpost", icon: "add" },
   { key: "club", label: "Clubs", href: "/clubs", icon: "groups" },
+  { key: "marketplace", label: "Marketplace", href: "/marketplace", icon: "storefront" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
-  { key: "messages", label: "Chat", href: "/messages", icon: "forum" },
+  { key: "messages", label: "Chat", href: "/chat", icon: "forum" },
   { key: "profile", label: "Profile", href: "/aarav", icon: "person" },
 ];
 
@@ -89,7 +91,7 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
               <img
                 alt="Profile avatar"
                 className="h-10 w-10 rounded-full border-2 border-primary object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhDngMlYP4ueK1rG1n1YglyuSuKmiLwNG-IGppRVpb797E97d8FUPIs9VEvE16hsybk3Go6-T8GzOncJaTXlY7nPGsXxcTwHia2E_rH8uTXkZ9OSVohLz1qh9lf4sUWuSK4ytQiKdt8RKntmeCaNpWLo5qWyFIqjpC-erm324XgHDySw1tTQ4ATzhfggXDZ9l_FDNRcSZdQRAGSx2aQ6L08XDaDfkQk7PS5sxXWJBKvGGozrB47Ad76HIhmV3Ob2nr0kHSPiUWWDA"
+                src={profileAvatar}
               />
               <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-secondary shadow-[0_0_12px_rgba(236,32,36,0.45)]" />
             </Link>

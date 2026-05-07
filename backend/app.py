@@ -17,13 +17,11 @@ DEFAULT_CLUB_IMAGE = (
     "https://lh3.googleusercontent.com/aida-public/"
     "AB6AXuAw_Xv8hWpdYy2fAJ8I9evq8nybROQu14uCFeF7BZRZuOu0aVWOfVVcm2Z25TCZ7oGpOu_74XA8B5IvD31ynPpEdOMtxTy84zaPXwQkb7dsSgCMWdZtkiVoxdXAutvyPhdG7Jln2u7w3njLVqnhqEA0BhzXr5NxVBgRrhGbn6Lz_Q2gR5XfP9HvrAEuvSP_BzfVuIobWR_T_1XqkvX5yzQqQ-D715QeEUmsoOb-ieoHsfSOv2mIq6O3xyiWnrMnEMQFw1X9HbxMhEI"
 )
-PROFILE_AVATAR = (
-    "https://lh3.googleusercontent.com/aida-public/"
-    "AB6AXuDhDngMlYP4ueK1rG1n1YglyuSuKmiLwNG-IGppRVpb797E97d8FUPIs9VEvE16hsybk3Go6-T8GzOncJaTXlY7nPGsXxcTwHia2E_rH8uTXkZ9OSVohLz1qh9lf4sUWuSK4ytQiKdt8RKntmeCaNpWLo5qWyFIqjpC-erm324XgHDySw1tTQ4ATzhfggXDZ9l_FDNRcSZdQRAGSx2aQ6L08XDaDfkQk7PS5sxXWJBKvGGozrB47Ad76HIhmV3Ob2nr0kHSPiUWWDA"
-)
+PROFILE_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='64' fill='%23e9e7f3'/%3E%3Ccircle cx='64' cy='48' r='24' fill='%23777d86'/%3E%3Cpath d='M24 116c6-27 22-41 40-41s34 14 40 41' fill='%23777d86'/%3E%3C/svg%3E"
 
 post_ids = itertools.count(3)
 club_ids = itertools.count(4)
+marketplace_ids = itertools.count(5)
 
 feed_cards: list[dict[str, Any]] = [
     {
@@ -116,10 +114,94 @@ club_cards: list[dict[str, Any]] = [
     },
 ]
 
+marketplace_items: list[dict[str, Any]] = [
+    {
+        "id": 1,
+        "title": "Engineering Graphics Drafter Set",
+        "owner": "Meera Iyer",
+        "mode": "Sell",
+        "category": "Stationery",
+        "condition": "Gently used",
+        "price": "Rs. 450",
+        "location": "Jayanagar campus gate",
+        "description": "Full drafter set with mini-drafter, scale, clips, and spare sheets. Used for one semester.",
+        "image": DEFAULT_POST_IMAGE,
+        "tags": ["Drafting", "Architecture", "Semester kit"],
+        "contact": "@meera",
+        "preferredExchange": "",
+        "createdAt": "Just now",
+    },
+    {
+        "id": 2,
+        "title": "Introduction to Algorithms",
+        "owner": "Karthik Menon",
+        "mode": "Exchange",
+        "category": "Books",
+        "condition": "Marked pages",
+        "price": "Contact",
+        "location": "CSE block, Indiranagar",
+        "description": "CLRS copy with notes. Looking to exchange for DBMS, OS, or competitive programming books.",
+        "image": DEFAULT_CLUB_IMAGE,
+        "tags": ["CSE", "Algorithms", "Books"],
+        "contact": "@karthik",
+        "preferredExchange": "DBMS, OS, or competitive programming books",
+        "createdAt": "12m ago",
+    },
+    {
+        "id": 3,
+        "title": "Casio Scientific Calculator",
+        "owner": "Nisha Rao",
+        "mode": "Sell or exchange",
+        "category": "Electronics",
+        "condition": "Like new",
+        "price": "Rs. 700",
+        "location": "Koramangala library steps",
+        "description": "FX-991ES Plus with cover. Open to exchange for design markers or sell directly.",
+        "image": DEFAULT_POST_IMAGE,
+        "tags": ["Calculator", "Exam", "Electronics"],
+        "contact": "@nisha",
+        "preferredExchange": "Design markers",
+        "createdAt": "1h ago",
+    },
+    {
+        "id": 4,
+        "title": "Acoustic Guitar",
+        "owner": "Ananya Reddy",
+        "mode": "Sell",
+        "category": "Music",
+        "condition": "Used",
+        "price": "Contact",
+        "location": "Central lawn, Bengaluru",
+        "description": "Beginner guitar with soft case. One string needs replacement, otherwise solid for practice.",
+        "image": DEFAULT_CLUB_IMAGE,
+        "tags": ["Music", "Guitar", "Practice"],
+        "contact": "@ananya",
+        "preferredExchange": "",
+        "createdAt": "Yesterday",
+    },
+]
+
 
 def read_json() -> dict[str, Any]:
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else {}
+
+
+def read_tags(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(tag).strip() for tag in value if str(tag).strip()]
+
+    if isinstance(value, str):
+        return [tag.strip().lstrip("#") for tag in value.split(",") if tag.strip()]
+
+    return []
+
+
+def read_price(value: Any) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+
+    return "Contact"
 
 
 @app.after_request
@@ -276,21 +358,103 @@ def games():
     )
 
 
+@app.route("/api/marketplace")
+def marketplace():
+    return jsonify({"items": deepcopy(marketplace_items)})
+
+
+@app.route("/api/marketplace", methods=["POST", "OPTIONS"])
+@app.route("/api/marketplace/items", methods=["POST", "OPTIONS"])
+def create_marketplace_item():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    data = read_json()
+    item = {
+        "id": next(marketplace_ids),
+        "title": data.get("title") or data.get("itemName") or "Untitled marketplace item",
+        "owner": data.get("owner") or "Aarav Rao",
+        "mode": data.get("mode") or data.get("listingType") or "Sell",
+        "category": data.get("category") or "Books",
+        "condition": data.get("condition") or "Gently used",
+        "price": read_price(data.get("price")),
+        "location": data.get("location") or data.get("pickupLocation") or "Campus pickup",
+        "description": data.get("description") or "Student-listed item available on Campus Nexus.",
+        "image": data.get("image") or data.get("photoUrl") or DEFAULT_POST_IMAGE,
+        "tags": read_tags(data.get("tags")),
+        "contact": data.get("contact") or "Contact seller",
+        "preferredExchange": data.get("preferredExchange") or "",
+        "createdAt": "Just now",
+    }
+    marketplace_items.insert(0, item)
+    return jsonify(item), 201
+
+
 @app.route("/api/messages")
 def messages():
     return jsonify(
         {
             "conversations": [
-                {"name": "Nisha Rao", "preview": "Are you going to the Indiranagar mixer tonight?", "time": "Just now", "active": True},
-                {"name": "CSE Placement Prep", "preview": "Did anyone save the aptitude notes from...", "time": "12m ago"},
-                {"name": "Karthik Menon", "preview": "Sent a photo", "time": "1h ago"},
-                {"name": "Ananya Reddy", "preview": "That design sprint was intense, but it landed well.", "time": "Yesterday"},
+                {
+                    "name": "Nisha Rao",
+                    "preview": "I saved two passes. Can you reach by 6:30?",
+                    "time": "Just now",
+                    "active": True,
+                    "avatar": PROFILE_AVATAR,
+                    "role": "Design Society",
+                    "unread": 2,
+                    "typing": True,
+                },
+                {
+                    "name": "CSE Placement Prep",
+                    "preview": "Mock interview room is booked for Thursday.",
+                    "time": "12m ago",
+                    "avatar": PROFILE_AVATAR,
+                    "role": "Group chat",
+                },
+                {
+                    "name": "Karthik Menon",
+                    "preview": "Sent the poster draft",
+                    "time": "1h ago",
+                    "avatar": PROFILE_AVATAR,
+                    "role": "Events Core",
+                },
+                {
+                    "name": "Ananya Reddy",
+                    "preview": "That design sprint was intense, but it landed well.",
+                    "time": "Yesterday",
+                    "avatar": PROFILE_AVATAR,
+                    "role": "Architecture Dept",
+                },
             ],
             "messages": [
-                {"side": "left", "text": "Did you see the lineup for the Bengaluru student fest? The main stage set looks solid."},
-                {"side": "right", "text": "Yes. I am going if early access is still open for campus pass holders."},
-                {"side": "left", "text": "A few slots are left. I booked mine already, and the poster drop looks great too."},
-                {"side": "right", "text": "Send the link. I do not want to miss this one."},
+                {
+                    "side": "left",
+                    "text": "Did you see the final lineup for the Bengaluru student fest? The indie stage starts right after the design showcase.",
+                    "time": "5:42 PM",
+                },
+                {
+                    "side": "right",
+                    "text": "Yes. I can come after lab review. Is early access still open for campus pass holders?",
+                    "time": "5:44 PM",
+                    "status": "Seen",
+                },
+                {
+                    "side": "left",
+                    "text": "A few slots are left. I booked two because the QR check-in queue is usually painful after 7.",
+                    "time": "5:45 PM",
+                },
+                {
+                    "side": "right",
+                    "text": "Perfect. Send the link and I will pay now.",
+                    "time": "5:46 PM",
+                    "status": "Seen",
+                },
+                {
+                    "side": "left",
+                    "text": "Sent. Also, bring your college ID. Security is checking it at the main gate.",
+                    "time": "5:47 PM",
+                },
             ],
         }
     )
@@ -302,9 +466,7 @@ def profile(user: str):
         {
             "avatar": PROFILE_AVATAR,
             "major": "Computer Science & Product Design, Bengaluru",
-            "badge": "Senior",
-            "stats": [["42", "Posts"], ["892", "Friends"], ["2.4k", "Nexus Score"]],
-            "postImages": [DEFAULT_POST_IMAGE, DEFAULT_CLUB_IMAGE, DEFAULT_POST_IMAGE, DEFAULT_CLUB_IMAGE, DEFAULT_POST_IMAGE, DEFAULT_CLUB_IMAGE],
+            "bio": "New to Campus Nexus.",
         }
     )
 

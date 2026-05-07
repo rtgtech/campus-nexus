@@ -40,13 +40,9 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             </div>
 
             <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="font-['Space_Grotesk'] text-4xl font-bold tracking-tight text-primary">{displayName}</h1>
-                <span className="rounded-full bg-secondary px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
-                  {profile.badge}
-                </span>
-              </div>
+              <h1 className="font-['Space_Grotesk'] text-4xl font-bold tracking-tight text-primary">{displayName}</h1>
               <p className="mt-3 text-lg text-on-surface-variant">{profile.major}</p>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">{profile.bio}</p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <button className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-on-primary">Edit Profile</button>
                 <button className="rounded-full border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface">
@@ -57,43 +53,19 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           </div>
         </section>
 
-        <section className="grid gap-5 sm:grid-cols-3">
-          {profile.stats.map(([value, label], index) => (
-            <div
-              key={label}
-              className={[
-                "rounded-[28px] border border-outline-variant/60 p-6 text-center shadow-[0_12px_30px_rgba(27,27,35,0.06)]",
-                index === 2 ? "bg-primary text-white" : "bg-white",
-              ].join(" ")}
-            >
-              <p className="font-['Space_Grotesk'] text-4xl font-bold tracking-tight">{value}</p>
-              <p
-                className={[
-                  "mt-2 text-[11px] font-semibold uppercase tracking-[0.24em]",
-                  index === 2 ? "text-white/75" : "text-on-surface-variant",
-                ].join(" ")}
-              >
-                {label}
-              </p>
-            </div>
-          ))}
-        </section>
-
         <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
           <SectionTitle
-            title="My Posts"
-            description="Snapshots, project drops, and student moments shared across Bengaluru campus life."
+            title="Posts"
+            description="Aarav has not shared anything yet."
           />
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
-            {profile.postImages.map((image, index) => (
-              <div key={image} className="group relative aspect-square overflow-hidden rounded-[22px]">
-                <img alt={`Post ${index + 1}`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" src={image} />
-                <div className="absolute inset-0 bg-[rgba(34,29,92,0.58)]" />
-                <div className="absolute bottom-3 left-3 rounded-full bg-white/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur">
-                  {index + 54} likes
-                </div>
-              </div>
-            ))}
+          <div className="mt-6 rounded-[24px] border border-dashed border-outline-variant/80 bg-surface-container-low p-10 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-fixed text-primary">
+              <span className="material-symbols-outlined">photo_camera</span>
+            </div>
+            <h2 className="mt-4 font-['Space_Grotesk'] text-xl font-bold text-on-background">No posts yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
+              When Aarav shares photos or campus updates, they will appear here.
+            </p>
           </div>
         </section>
       </div>

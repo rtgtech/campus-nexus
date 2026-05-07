@@ -1,6 +1,6 @@
 import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { getDemoData } from "@/lib/campus-api";
-import { fallbackGames, type GamesData } from "@/lib/demo-data";
+import { fallbackGames, profileAvatar, type GamesData } from "@/lib/demo-data";
 
 const gameCards = [
   {
@@ -105,7 +105,7 @@ export default async function GamesPage() {
                 <img
                   alt="User avatar"
                   className="h-10 w-10 rounded-full border-2 border-primary"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDO2bR3gKDwaVwXAXzVloFcBN9opAJpN3ZBR51qUmVFYHEAdSzlTAmDSHslnVX72B2Mpkd4GQTx-jWDjK4CVJoFiq91gJnefkOCATczeafCVp2Ol79-Gf0GmwG-sOsH_23InP8uyD7AcWIvbJcflNt5xsM2EGg1EFCXUjk0A-nLf-M2Fg3bsSfY_onZVku88dnHgA5vL3abIQJYR75qPLzacIDnJ_Drj_vMeK8qB4bjsooGSMpSREKkjRCNEvlWvx4EkhPZswqBNPs"
+                  src={profileAvatar}
                 />
                 <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-secondary shadow-[0_0_15px_rgba(236,32,36,0.5)]" />
               </div>

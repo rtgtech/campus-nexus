@@ -98,11 +98,17 @@ export type Conversation = {
   preview: string;
   time: string;
   active?: boolean;
+  avatar?: string;
+  role?: string;
+  unread?: number;
+  typing?: boolean;
 };
 
 export type Message = {
   side: "left" | "right";
   text: string;
+  time?: string;
+  status?: string;
 };
 
 export type MessagesData = {
@@ -113,13 +119,11 @@ export type MessagesData = {
 export type ProfileData = {
   avatar: string;
   major: string;
-  badge: string;
-  stats: Array<[string, string]>;
-  postImages: string[];
+  bio: string;
 };
 
 export const profileAvatar =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDhDngMlYP4ueK1rG1n1YglyuSuKmiLwNG-IGppRVpb797E97d8FUPIs9VEvE16hsybk3Go6-T8GzOncJaTXlY7nPGsXxcTwHia2E_rH8uTXkZ9OSVohLz1qh9lf4sUWuSK4ytQiKdt8RKntmeCaNpWLo5qWyFIqjpC-erm324XgHDySw1tTQ4ATzhfggXDZ9l_FDNRcSZdQRAGSx2aQ6L08XDaDfkQk7PS5sxXWJBKvGGozrB47Ad76HIhmV3Ob2nr0kHSPiUWWDA";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='64' fill='%23e9e7f3'/%3E%3Ccircle cx='64' cy='48' r='24' fill='%23777d86'/%3E%3Cpath d='M24 116c6-27 22-41 40-41s34 14 40 41' fill='%23777d86'/%3E%3C/svg%3E";
 
 export const fallbackFeed: FeedData = {
   feedCards: [
@@ -193,10 +197,7 @@ export const fallbackClubs: ClubsData = {
         "https://lh3.googleusercontent.com/aida-public/AB6AXuAw_Xv8hWpdYy2fAJ8I9evq8nybROQu14uCFeF7BZRZuOu0aVWOfVVcm2Z25TCZ7oGpOu_74XA8B5IvD31ynPpEdOMtxTy84zaPXwQkb7dsSgCMWdZtkiVoxdXAutvyPhdG7Jln2u7w3njLVqnhqEA0BhzXr5NxVBgRrhGbn6Lz_Q2gR5XfP9HvrAEuvSP_BzfVuIobWR_T_1XqkvX5yzQqQ-D715QeEUmsoOb-ieoHsfSOv2mIq6O3xyiWnrMnEMQFw1X9HbxMhEI",
       extraMembers: "+1.2k",
       extraMembersClass: "bg-primary-container text-white",
-      avatars: [
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuC-WwTQCkdpE0iRPPcHwXqTcfyY5Fs4C77N68viBF8Oh_U3gwrUxFJjkNUOfoIyPa-Xsbn47ai65k9a9bGuEWuoJSZuSaABD1tm4HQs4m2P1HaGhoouZ81g9VYawm3wErdQz3O6cRD7ULxEx9jW95lBa6WRk8MFRgjbZbX6gWqqu7g-XnMRobP9NdI52YflGaDNALe0CDMCZJwrc67RiYMShHLA8KbwR3sqIXB2ngTOdmy3VlE5EUkZt2cUX4HdGnIGjgPYA2otnpU",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuCCuIJA5ggaPFPILr85vI1UxbcaJxdmT783QwQqMNcf_lAHIBxmlOd3Pp9QYlm9SxQCb5ie3OHUZ2mS_ogeWK-WqwOdWlr83JJu_3nUSQMiLsZHHtfamEulI2n-k64pu9c3U5ag21KejUqn3twGYQK57iT-whIiQ8ECjIHm8pZ4APnUjz8HEPNVG7EP3NrXbIgjOhWbNLLsa1huxv_2pj_uJXmIMc5Oap_b4m-GLaC2Kh951hGPf6gB8_9zeUQ3Br2NzSBEC85jzto",
-      ],
+      avatars: [profileAvatar, profileAvatar],
       statusClass: "text-secondary",
     },
     {
@@ -211,10 +212,7 @@ export const fallbackClubs: ClubsData = {
         "https://lh3.googleusercontent.com/aida-public/AB6AXuCdOP8TLnf3ouBPsjSs_ssVQvpZ0RWrdFweagLGii4RfNUPToIewrWD2nkZZehZUYmJGgn961LgOT2ZKH9zzzwRXE5mN6wioVnUk-VIiiZExNKWh16XBSophAyCApQvsIsa2vTM9UqG8b6ILhJY9-biJqBMd5masncgCLEjBpoCaAh3BV-85hE4_ZkD0MkBOR_A3lU_1SfyV7etCc0lR8HDovh1dURUHyk78jRIAYH6m8_sVH4-tgVlYQytEQ_NAdgvp7tf07-VD-k",
       extraMembers: "842",
       extraMembersClass: "bg-surface-container-high text-on-surface",
-      avatars: [
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuCi5BHyp_Dx_6JrJzUhJEY1pD1KrCNv2RzVc5gumYRc_MqNrhENi6dvdY_dZADNDn8aFEdQ938R5ENzfkmtvb5-w-anifDkcdsnssoAmBU_ZXi4FFhcw9QGxEEKLQIQ6_mmTKO-en1XKmgHXKU-7xefNx0XtLXrFRv1AJb9NaC1RFxs4y2AznWHJkDhD2EURJxB_4CdcMVLqFTmLRmJ-fC3aIjqqjaEMYd5wh2byKhjApJ4paNjbTbV0vr3eH8BsgH3Nem6dkAEv9g",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuB7oIXwv6wjOlinwSUS6NpnKl2GI_s8542tQyjITWzfyufDIz4C-ODW47TnBN6xjTGgp74tUOSHJJM0SbZtjBlccobH6116onPuPS4HVTrV7umZUhLRVfDxO58GjcwG--mnHAvR2rqpE_K4AbNGDuI0BTgfGS2ssgtBM8KBeDhV-HELU41xQKw-17ZxmHV55CiIdTJAAcm3fBjjRfDyad8peDUiyRKOaXCBQZ9TPXdy86T9TLAn99G6jjnWMrgU7XUl5OFpFQTKuxw",
-      ],
+      avatars: [profileAvatar, profileAvatar],
       statusClass: "text-secondary",
     },
     {
@@ -229,10 +227,7 @@ export const fallbackClubs: ClubsData = {
         "https://lh3.googleusercontent.com/aida-public/AB6AXuArlOY04LgVaqnmSR9kzO_5AuMuxKl05_CI7NUqYv3sae_w0ppAi9P8D_xHCxxfpLrrAlsJzYYorWFIAa1mPvCX_-9TmNDymjb2tDEzjHEKMeU_Z-YJb4r7dCIZkLKUkmQ5jZuBoyNt08Dq5icFQ9dz_dkpyjVLqiwMUF2OnNqpAxvytTRsLzOBjqsS2NJ6SbilxGX9vzzSluX0SDG9afZcC6t_HYE2oXWbLlv1qQ4LB6_gzTbfjWndvFGhR6tCcplV-nqYCsDbTYI",
       extraMembers: "4.5k",
       extraMembersClass: "bg-tertiary-fixed text-on-tertiary-fixed",
-      avatars: [
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDFLcHDna3_Iq8jhDipMSzFJNI4MaUaXAjvOFk40XPqSvN5bgmhtKnRaZd4Dp7ptION_116QgMT5iPPv1TXxnMGQS6R8PwP4n9qBGWQ9FejW39xoHtCUXIP22ckN-XNWT5LIoLRa0i6LH989C4Q5YLvjiDi6rCi7ucB49EQSuF6kvwc72ZEV-ZLvT_T6rgRd-Lv_ok1XQfLTx4EDFeybyuwYGzF12DUL7t4T3d6CFzf9Eb5HLUGDw82GnRUGhzZh_A6xjbiz70DG7E",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuBiCpijwoFnWVx3RMsVOwTvNvSZ7bCuHoNzDk43W9VmrBDFZBTfrn75ypTMO8Uwz7kiKHlH9aZvIvvM_ZmVzkzZ3NBA5Hrleuh9fVhZU1gRaNuFFvIzPTRHWpMf4vBFj2tF34SwGY_h5KGiuI2jHwd0RIZFDASa0_mbYnjsQp2Z-PuJci_EtOdDH7R7UbS8Ifz2O_OVlfi9BVZv-szFYxdirMDtGP_WN3_RMTkCl1qW9IT8wzRm67r8OYRxIpUYASrLD6WRTaCirKk",
-      ],
+      avatars: [profileAvatar, profileAvatar],
       statusClass: "text-on-surface-variant",
     },
   ],
@@ -341,34 +336,71 @@ export const fallbackGames: GamesData = {
 
 export const fallbackMessages: MessagesData = {
   conversations: [
-    { name: "Nisha Rao", preview: "Are you going to the Indiranagar mixer tonight?", time: "Just now", active: true },
-    { name: "CSE Placement Prep", preview: "Did anyone save the aptitude notes from...", time: "12m ago" },
-    { name: "Karthik Menon", preview: "Sent a photo", time: "1h ago" },
-    { name: "Ananya Reddy", preview: "That design sprint was intense, but it landed well.", time: "Yesterday" },
+    {
+      name: "Nisha Rao",
+      preview: "I saved two passes. Can you reach by 6:30?",
+      time: "Just now",
+      active: true,
+      avatar: profileAvatar,
+      role: "Design Society",
+      unread: 2,
+      typing: true,
+    },
+    {
+      name: "CSE Placement Prep",
+      preview: "Mock interview room is booked for Thursday.",
+      time: "12m ago",
+      avatar: profileAvatar,
+      role: "Group chat",
+    },
+    {
+      name: "Karthik Menon",
+      preview: "Sent the poster draft",
+      time: "1h ago",
+      avatar: profileAvatar,
+      role: "Events Core",
+    },
+    {
+      name: "Ananya Reddy",
+      preview: "That design sprint was intense, but it landed well.",
+      time: "Yesterday",
+      avatar: profileAvatar,
+      role: "Architecture Dept",
+    },
   ],
   messages: [
-    { side: "left", text: "Did you see the lineup for the Bengaluru student fest? The main stage set looks solid." },
-    { side: "right", text: "Yes. I am going if early access is still open for campus pass holders." },
-    { side: "left", text: "A few slots are left. I booked mine already, and the poster drop looks great too." },
-    { side: "right", text: "Send the link. I do not want to miss this one." },
+    {
+      side: "left",
+      text: "Did you see the final lineup for the Bengaluru student fest? The indie stage starts right after the design showcase.",
+      time: "5:42 PM",
+    },
+    {
+      side: "right",
+      text: "Yes. I can come after lab review. Is early access still open for campus pass holders?",
+      time: "5:44 PM",
+      status: "Seen",
+    },
+    {
+      side: "left",
+      text: "A few slots are left. I booked two because the QR check-in queue is usually painful after 7.",
+      time: "5:45 PM",
+    },
+    {
+      side: "right",
+      text: "Perfect. Send the link and I will pay now.",
+      time: "5:46 PM",
+      status: "Seen",
+    },
+    {
+      side: "left",
+      text: "Sent. Also, bring your college ID. Security is checking it at the main gate.",
+      time: "5:47 PM",
+    },
   ],
 };
 
 export const fallbackProfile: ProfileData = {
   avatar: profileAvatar,
   major: "Computer Science & Product Design, Bengaluru",
-  badge: "Senior",
-  stats: [
-    ["42", "Posts"],
-    ["892", "Friends"],
-    ["2.4k", "Nexus Score"],
-  ],
-  postImages: [
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuC8C_RuYjQtvq8vWOiPC31iK9YmUALvdAYd9OXqdJsWGOD-U93opfFPBsgt371HwB-2r35WH_A4NHnEaNRSRjQ2Wce2h6CDMQ1cTwhttvzs4IndZUr7y8P3U-h10GWlvAFwVrB-C8-JcbfvPBK7X34gpxJkZHJWYgM1fhSFAF8RobAhL-tkShKrfFltWndo5uSyOUW7ErqbxNQAjxQvdbsTnmvA0wiVPs5tqwUACswtLYp4H5I5aAQvr_WweccPC8WLZATJifBfovQ",
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCIofFh-dajUK-0sl5sUHIQJQYuTDk_bPQg3YnL3F7cYXHgMiWVovzm-mWnekRobEBqRL9dsLlpc1ao3Swhe8-6kdhpC6bliKbI4cqY9q6SbHkcTvYbU6NnkEwS2G808QCyzWfZVN02kMr6FSpw0m98dUXacurlAj7MbYJwok2o7TyQglNc0_hw-JiJC0Kf8KcWwUtqwgWxY27f154FydHRNeRQWuRIVrD4j7YnHi7LnzCHRtk4x7m-s6yGAQg9dDgWjFPyLhUrEsM",
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCnysQcbBBZIvPHRbREH7eBhJDH9lDE-HPdLqBu-20t8WVaKhobI29o8PQ7JkyuD-UtpojVZLngf3IAz8HVEoNysbjR1WFfFn1EGHZGpLj0vi0fWspKb0daq5Vxu984gEJtaYCQyLVyCU__YjNwp8Jc8KlNEEUmzz85KdrXaUeXdzqVjKG9ejDb1KmlajLl-H0_nk-8idU5lv6SXMPaHZhrFoUzvX1CwSqEEdxATsdDUDTwunsp3saT06HMVY0JNyWagJgj-YbJSPA",
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCvAZU8JA3PN0Kqdin3dnLpkKWC6IjvWzOOkWGuPueQEESdcf32NejvlG35DzbYs1REgQgArjOfwLqSkTt9yjYVg-mCkbRqB90Xv4LjORLInUQPRYBjNa_6zUxcaFTkpUGik3h18ARG0SEByh2U6aGB6j949BdmJ3Orl40VYnyrPAMNbfvpdkG4fSema84XY850PRumsTU3IMkEEyKwXuul285txDUbFpW5RauNGSR9MzSsLyy1oPxrscSTI_IuZLiOI2TaZyH1GoI",
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuAnpk4Tjh3saj1ncoN4r62vzqR84MocbQma9zPNZuGP8k7PTayFJi1e1rLtN2PRh6Y06vQ-GwqPAhSYjEkhA8Sy0WxLxF_7ZA4yuOMiPUFkYQQR3rAvv-k4_PqzRzvulCrfet3A-517TWyt-c00xMz1UWzUewuQ2tVE5nM5CeXbhETZeDvzvQlrAtH-ju5Wc_R_0Eiq9CKvKmJHaSkO7IBOsyinQSw3KVXtiWirwTY9Fxb-7NkZTA9f5tox-W7c90d3JIHjXW_qRTc",
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCYeFyk5HUgZox96VMGMgZi3nK5MnT-JYFQgGOuBB8GdbJo11wjPJ8qrXd1zi49J5b8lln7PnHeI1pItEmPqZb0GxHhjS8bl9j5-7kammKir0BRWn3kTGkFgXGiOB1iHmlou7gy6e-hAXfFieVyigXPf8C6X76DHj1pxGj954l9WV8u8cNvnC-sJ8z8VIiKjTi0Qx3vgDIT-pDs8wkaHrnQKurMFpdc7jM7j8NUfoHM14QTP5ra9Dxl7sHfYUTvPABm_cMZSnEMUPU",
-  ],
+  bio: "New to Campus Nexus.",
 };

@@ -2,7 +2,7 @@ import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { CreatePostOverlay } from "@/components/create-post-overlay";
 import { DismissibleCampusPulse } from "@/components/dismissible-campus-pulse";
 import { getDemoData } from "@/lib/campus-api";
-import { fallbackFeed, type FeedData } from "@/lib/demo-data";
+import { fallbackFeed, profileAvatar, type FeedData } from "@/lib/demo-data";
 import Link from "next/link";
 
 type HomePageProps = {
@@ -36,7 +36,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <img
                 alt="Profile"
                 className="h-12 w-12 rounded-full border border-outline-variant/60 object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2HG1xSJvAC-LTLuTgDj6ca7MKCl9pIhFHyow3UmQz2W4VnYd03tR47VxcwUR9KtWVt_AAtjU72yn00Fw3I1Uzoi08AanNjKwrZCDNzEY-8PnA19oa8SAbeWhNz14nkzGSrivl0FRKgrU60m_gnegiE-EufB6-vvjOZ9h2xlI8tAXtg4_o9OB28r0Y3O5tR6pGVS6nzBPuQl4e7T5uUr_koUHDIs_9qiQnQB6PAAKzCYzjfDHTewf0YaPXOd_hrTRZ_THoAcfdCSU"
+                src={profileAvatar}
               />
               <div className="flex-1">
                 <Link
@@ -78,7 +78,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <img
                     alt={card.author}
                     className="h-11 w-11 rounded-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUIgw-r8lL-hQJpHTVbQRmQ6qexraJJDerNbpw2ljWMfpSLTGKAIRxd4yUPs0fmC-via-dSqavbkXp8uAl3oqTMk773qE0y5G8Z1_esNWsCe0bbJpbFeZpprT_uLBcz8PPGAMa3jEaqDT5apX5CUNerWaLjtYr0-HajSZ9qoci5iIa-y3w8UTQwtNQ2VO9mYM4QrIb6IFW52n5VfoaLqSBb_zvSSvIVa6b7oyeL7bFBYzRk3zV0RnafvUCR05h25YzrduCREHXINU"
+                    src={profileAvatar}
                   />
                   <div>
                     <h3 className="font-semibold text-on-surface">{card.author}</h3>
@@ -151,7 +151,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     <img
                       alt={name}
                       className="h-10 w-10 rounded-full object-cover"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmohnLH22aDgcO0HiQ_1BDFiNvP0g07KqJ3Hd7NnA1aWg5d5Jnlok7-NI18bm3jdM6mSlPfagAoExGl5BoYjNfQC27_QIhQ5VIu1pD8cvAg3MDCpWhEEPkDpF4YDxFTZpNiE1M8fSukSm6DULHLqteYb_WSasjwcZD3Nh4DErTIAk9FuMgB0V-Z-Ao6BGC-KgM19m6JlGrUvrP_2BG9RpZMVBmPoQYnawA9iI9CuYm97YjIiDwrrPyPmOgPVZs162o-pUJigTtfeA"
+                      src={profileAvatar}
                     />
                     <div>
                       <p className="font-semibold text-on-surface">{name}</p>
