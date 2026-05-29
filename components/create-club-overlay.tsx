@@ -26,7 +26,7 @@ export function CreateClubOverlay() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: readForm(form, "name") || "New Bengaluru Club",
+          title: readForm(form, "name") || "New Campus Club",
           category: readForm(form, "category"),
           description: readForm(form, "shortDescription") || readForm(form, "fullDescription"),
           fullDescription: readForm(form, "fullDescription"),
@@ -60,7 +60,7 @@ export function CreateClubOverlay() {
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Create Club</p>
             <h1 className="mt-2 font-headline-lg text-3xl text-on-background">
-              Start a Bengaluru campus community.
+              Start a campus community.
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-on-surface-variant">
               Add the essentials students need to discover, join, and contribute to the club.
@@ -75,7 +75,7 @@ export function CreateClubOverlay() {
           <div className="grid gap-5 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Club name</span>
-              <input name="name" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="e.g. Bengaluru Builders Guild" type="text" />
+              <input name="name" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="e.g. Campus Builders Guild" type="text" />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Category</span>
@@ -132,7 +132,7 @@ export function CreateClubOverlay() {
 
           <label className="space-y-2">
             <span className="text-sm font-semibold text-on-surface">Tags</span>
-            <input name="tags" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="#builders #ai #bengaluru" type="text" />
+            <input name="tags" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="#builders #ai #campus" type="text" />
           </label>
 
           <div className="grid gap-5 md:grid-cols-2">

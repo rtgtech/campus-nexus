@@ -16,10 +16,10 @@ export function DismissibleCampusPulse() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/75">Campus Pulse</p>
           <h1 className="mt-3 max-w-2xl font-['Space_Grotesk'] text-4xl font-bold tracking-tight md:text-5xl">
-            One feed for Bengaluru campuses, student clubs, matches, and city life.
+            One feed for campus spaces, student clubs, matches, and city life.
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-7 text-white/85 md:text-base">
-            Track Koramangala hackathons, college fest lineups, league tables, and the student communities building across Bengaluru.
+            Track hackathons, college fest lineups, league tables, and the student communities building across campus.
           </p>
         </div>
         <button

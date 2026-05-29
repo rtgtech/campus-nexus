@@ -74,7 +74,7 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
               <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
               <input
                 className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant"
-                placeholder="Search Bengaluru campus spaces..."
+                placeholder="Search campus spaces..."
                 type="text"
               />
             </div>
@@ -126,9 +126,9 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
 
             <div className="mt-8 overflow-hidden rounded-[28px] bg-primary p-6 text-white shadow-[0_24px_60px_rgba(34,29,92,0.24)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">Live on Campus</p>
-              <h3 className="mt-3 font-['Space_Grotesk'] text-xl font-bold">Bengaluru Indie Night</h3>
+              <h3 className="mt-3 font-['Space_Grotesk'] text-xl font-bold">Campus Indie Night</h3>
               <p className="mt-2 text-sm leading-6 text-white/80">
-                Open mic sets, filter coffee stalls, and student DJs are taking over the central lawn in Bengaluru tonight.
+                Open mic sets, filter coffee stalls, and student DJs are taking over the central lawn tonight.
               </p>
               <button className="mt-5 rounded-full bg-white px-5 py-3 text-sm font-semibold text-primary transition hover:scale-[1.02]">
                 Book Pass

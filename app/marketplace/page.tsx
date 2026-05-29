@@ -49,7 +49,7 @@ const marketItems = [
     category: "Music",
     condition: "Used",
     price: "",
-    location: "Central lawn, Bengaluru",
+    location: "Central lawn",
     description: "Beginner guitar with soft case. One string needs replacement, otherwise solid for practice.",
     image:
       "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=900&q=80",
@@ -214,7 +214,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Student Marketplace</p>
               <h1 className="mt-3 font-headline-lg text-4xl text-primary md:text-5xl">Exchange, sell, or find campus essentials.</h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant md:text-base">
-                Browse student-listed books, electronics, stationery, hostel items, and creative gear around Bengaluru campuses.
+                Browse student-listed books, electronics, stationery, hostel items, and creative gear around campus.
               </p>
             </div>
             <Link

@@ -137,7 +137,7 @@ export default async function GamesPage() {
                 Nexus Arena: Cyber Drift
               </h1>
               <p className="max-w-lg font-body-lg text-white/80">
-                Beat the Bengaluru high score of 42,500 and earn the &apos;Speed Demon&apos; digital badge +
+                Beat the campus high score of 42,500 and earn the &apos;Speed Demon&apos; digital badge +
                 500 Nexus Credits.
               </p>
               <div className="flex gap-4 pt-4">
@@ -176,7 +176,7 @@ export default async function GamesPage() {
             <div className="mb-6 flex items-end justify-between">
               <div>
                 <h2 className="font-headline-lg text-headline-lg">Nexus Originals</h2>
-                <p className="text-on-surface-variant">Hand-picked mini-games for hostel breaks and Bengaluru downtime.</p>
+                <p className="text-on-surface-variant">Hand-picked mini-games for hostel breaks and campus downtime.</p>
               </div>
               <button className="flex items-center gap-1 font-label-md text-label-md text-secondary hover:underline">
                 View All <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -283,7 +283,7 @@ export default async function GamesPage() {
               </div>
               <div className="mt-8 rounded-2xl bg-primary-container p-6 text-white">
                 <h5 className="mb-1 text-sm font-bold">Nexus Pro Tip</h5>
-                <p className="text-xs opacity-90">Multiplayer games earn 2x Credits on Fridays after 6 PM in Bengaluru!</p>
+                <p className="text-xs opacity-90">Multiplayer games earn 2x Credits on Fridays after 6 PM!</p>
               </div>
             </div>
           </section>

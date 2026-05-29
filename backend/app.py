@@ -28,10 +28,10 @@ feed_cards: list[dict[str, Any]] = [
         "id": 1,
         "author": "Ananya Reddy",
         "meta": "2h ago - Architecture Dept",
-        "title": "Rainy Bengaluru morning, full studio energy.",
+        "title": "Rainy campus morning, full studio energy.",
         "body": "The design block lit up after the drizzle, so we stayed back to pin up prototypes and turn critique hour into a mini showcase.",
         "image": DEFAULT_POST_IMAGE,
-        "tag": "#bengalurudesign",
+        "tag": "#campusdesign",
         "likes": "1.2k",
         "comments": "42",
     },
@@ -39,7 +39,7 @@ feed_cards: list[dict[str, Any]] = [
         "id": 2,
         "author": "Rohit Nair",
         "meta": "5h ago - Sports Club",
-        "title": "Golden hour after practice in Bengaluru.",
+        "title": "Golden hour after practice.",
         "body": "Placements are close, but the floodlights, chai break, and one last net session made the evening feel worth slowing down for.",
         "image": "https://lh3.googleusercontent.com/aida-public/AB6AXuBwzpgmmiYF6RpJki5O0MBK3WD9yR4DhZsm4Fz7u0d1P203pGFKhis03MIUEN38icmvVItSo9XQhl9GGTMq3TMnRYjn5ckju4V6uii53IkzkHsZbQb2zV9qpiL_Q5hFKqtr7Hq7_csF5O3aaIoVmPUAIFdTuEPGVzYDAv-hloE7Kd6EynVr09EimJqdGWXdk9WBuNQYAgHWK6dDpqbuebxRRHoOG6DQ340iObPfIi2edREqK5fLiSwN-3THx82p7S7oHUp2xiZiln8",
         "tag": "#nammacampus",
@@ -53,7 +53,7 @@ spotlight_clubs: list[dict[str, Any]] = [
         "badge": "Trending",
         "badgeFill": True,
         "badgeClass": "bg-secondary",
-        "title": "Bengaluru AI Collective",
+        "title": "Campus AI Collective",
         "description": "Building practical AI projects, campus tools, and responsible automation.",
         "image": "https://lh3.googleusercontent.com/aida-public/AB6AXuB6gUvJTAIpwVMBX00dvhyPDuLb28fwbb_9D_py3kC_yYRDk1rlKioyZEST8bg59TxgdhzUHUwYRHxv5e7YvIGt7JAMWG1zQqWEhO_QU2qaVnnAxwrv6SWMZBiDOVHLtoU_4t75BsqQ_YIVav3jJSmgLSf_LQgcD7UpAt8Lrw7T8QpoYvsuifAYM27JpUyq4AAT1ewSEDRmXVg-ER5GhacBMp3ye2GzEPXqujtuEv2NdF4yX6D9y2JCmjaH_BYuCwp94IfV88U_JsA",
         "icon": "bolt",
@@ -63,7 +63,7 @@ spotlight_clubs: list[dict[str, Any]] = [
         "badgeFill": False,
         "badgeClass": "bg-primary-container",
         "title": "Namma Creators Collective",
-        "description": "A collaboration hub for Bengaluru storytellers, filmmakers, and digital artists.",
+        "description": "A collaboration hub for local storytellers, filmmakers, and digital artists.",
         "image": "https://lh3.googleusercontent.com/aida-public/AB6AXuAT_Vk-jXlajrhtywbAPlc92j2juwHwrgFArbzjs51cAB8nZ-Y_R-uYevZhe4n_9I4ssF_-ShnTi03D-v5knHJl_STP21NI4B3M1ddoY8Ofq9oY9K9v35FIsijDtjW97-UwDlbhsgWcAiG7thMnb5dMeEUTWrUDj0ynYxihwMTXX4kco5CDNrqHdmS9JzsxdFfmjjpgZQT5zDqbzJ5nXqevL15ICN4y4C-FKDo-yLinqSrsXCGau-c9buyFssKWEJaoPAPYzEfa43g",
         "icon": "celebration",
     },
@@ -72,8 +72,8 @@ spotlight_clubs: list[dict[str, Any]] = [
 club_cards: list[dict[str, Any]] = [
     {
         "id": 1,
-        "title": "Bengaluru Builders Guild",
-        "description": "A student builder community for hack nights, product sprints, and demo days across Bengaluru.",
+        "title": "Campus Builders Guild",
+        "description": "A student builder community for hack nights, product sprints, and demo days across campus.",
         "status": "5 active projects",
         "icon": "code",
         "iconBg": "bg-primary",
@@ -101,7 +101,7 @@ club_cards: list[dict[str, Any]] = [
     {
         "id": 3,
         "title": "Filter Coffee Collective",
-        "description": "Exploring Bengaluru cafes, dosa spots, and late-night student food trails every week.",
+        "description": "Exploring nearby cafes, dosa spots, and late-night student food trails every week.",
         "status": "Active daily",
         "icon": "restaurant",
         "iconBg": "bg-tertiary",
@@ -171,7 +171,7 @@ marketplace_items: list[dict[str, Any]] = [
         "category": "Music",
         "condition": "Used",
         "price": "Contact",
-        "location": "Central lawn, Bengaluru",
+        "location": "Central lawn",
         "description": "Beginner guitar with soft case. One string needs replacement, otherwise solid for practice.",
         "image": DEFAULT_CLUB_IMAGE,
         "tags": ["Music", "Guitar", "Practice"],
@@ -223,7 +223,7 @@ def feed():
         {
             "feedCards": deepcopy(feed_cards),
             "trending": [
-                {"label": "Placements", "tag": "#BengaluruHiring", "posts": "126 posts today"},
+                {"label": "Placements", "tag": "#CampusHiring", "posts": "126 posts today"},
                 {"label": "College Fest", "tag": "#NammaUtsav", "posts": "1.8k posts this week"},
             ],
             "suggestedPeople": [
@@ -245,7 +245,7 @@ def create_post():
         "id": next(post_ids),
         "author": data.get("author") or "Aarav Rao",
         "meta": data.get("meta") or "Just now - Campus Nexus",
-        "title": data.get("title") or "New Bengaluru campus update",
+        "title": data.get("title") or "New campus update",
         "body": data.get("body") or "A fresh update from the Campus Nexus demo flow.",
         "image": data.get("image") or DEFAULT_POST_IMAGE,
         "tag": data.get("tag") or "#campusnexus",
@@ -304,7 +304,7 @@ def create_club():
     data = read_json()
     club = {
         "id": next(club_ids),
-        "title": data.get("title") or "New Bengaluru Club",
+        "title": data.get("title") or "New Campus Club",
         "description": data.get("description") or "A new student community for the Campus Nexus demo.",
         "status": "New today",
         "icon": "groups",
@@ -430,7 +430,7 @@ def messages():
             "messages": [
                 {
                     "side": "left",
-                    "text": "Did you see the final lineup for the Bengaluru student fest? The indie stage starts right after the design showcase.",
+                    "text": "Did you see the final lineup for the student fest? The indie stage starts right after the design showcase.",
                     "time": "5:42 PM",
                 },
                 {
@@ -465,7 +465,7 @@ def profile(user: str):
     return jsonify(
         {
             "avatar": PROFILE_AVATAR,
-            "major": "Computer Science & Product Design, Bengaluru",
+            "major": "Computer Science & Product Design",
             "bio": "New to Campus Nexus.",
         }
     )

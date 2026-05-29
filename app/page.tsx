@@ -43,7 +43,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   href="/?=createpost"
                   className="block w-full rounded-[20px] bg-surface-container px-4 py-4 text-left text-sm text-on-surface-variant transition hover:bg-surface-container-high"
                 >
-                  What is happening in Bengaluru today, Aarav?
+                  What is happening on campus today, Aarav?
                 </Link>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap gap-3 text-sm font-semibold text-on-surface-variant">
@@ -130,7 +130,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
         <aside className="space-y-6">
           <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-6 shadow-[0_12px_30px_rgba(27,27,35,0.06)]">
-            <SectionTitle title="Trending" description="Signals moving fastest across Bengaluru campuses." />
+            <SectionTitle title="Trending" description="Signals moving fastest across campus." />
             <div className="mt-5 space-y-4">
               {feedData.trending.map((item) => (
                 <div key={item.tag} className="rounded-2xl bg-surface-container-low p-4">

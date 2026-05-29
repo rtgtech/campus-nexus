@@ -9,7 +9,7 @@ const spotlightClubs = [
     badge: "Trending",
     badgeFill: true,
     badgeClass: "bg-secondary",
-    title: "Bengaluru AI Collective",
+    title: "Campus AI Collective",
     description: "Building practical AI projects, campus tools, and responsible automation.",
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuB6gUvJTAIpwVMBX00dvhyPDuLb28fwbb_9D_py3kC_yYRDk1rlKioyZEST8bg59TxgdhzUHUwYRHxv5e7YvIGt7JAMWG1zQqWEhO_QU2qaVnnAxwrv6SWMZBiDOVHLtoU_4t75BsqQ_YIVav3jJSmgLSf_LQgcD7UpAt8Lrw7T8QpoYvsuifAYM27JpUyq4AAT1ewSEDRmXVg-ER5GhacBMp3ye2GzEPXqujtuEv2NdF4yX6D9y2JCmjaH_BYuCwp94IfV88U_JsA",
@@ -20,7 +20,7 @@ const spotlightClubs = [
     badgeFill: false,
     badgeClass: "bg-primary-container",
     title: "Namma Creators Collective",
-    description: "A collaboration hub for Bengaluru storytellers, filmmakers, and digital artists.",
+    description: "A collaboration hub for local storytellers, filmmakers, and digital artists.",
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuAT_Vk-jXlajrhtywbAPlc92j2juwHwrgFArbzjs51cAB8nZ-Y_R-uYevZhe4n_9I4ssF_-ShnTi03D-v5knHJl_STP21NI4B3M1ddoY8Ofq9oY9K9v35FIsijDtjW97-UwDlbhsgWcAiG7thMnb5dMeEUTWrUDj0ynYxihwMTXX4kco5CDNrqHdmS9JzsxdFfmjjpgZQT5zDqbzJ5nXqevL15ICN4y4C-FKDo-yLinqSrsXCGau-c9buyFssKWEJaoPAPYzEfa43g",
     icon: "celebration",
@@ -29,9 +29,9 @@ const spotlightClubs = [
 
 const clubCards = [
   {
-    title: "Bengaluru Builders Guild",
+    title: "Campus Builders Guild",
     description:
-      "A student builder community for hack nights, product sprints, and demo days across Bengaluru.",
+      "A student builder community for hack nights, product sprints, and demo days across campus.",
     status: "5 active projects",
     icon: "code",
     iconBg: "bg-primary",
@@ -61,7 +61,7 @@ const clubCards = [
   {
     title: "Filter Coffee Collective",
     description:
-      "Exploring Bengaluru cafes, dosa spots, and late-night student food trails every week.",
+      "Exploring nearby cafes, dosa spots, and late-night student food trails every week.",
     status: "Active daily",
     icon: "restaurant",
     iconBg: "bg-tertiary",
@@ -134,7 +134,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Create Club</p>
                 <h1 className="mt-2 font-headline-lg text-3xl text-on-background">
-                  Start a Bengaluru campus community.
+                  Start a campus community.
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-on-surface-variant">
                   Add the essentials students need to discover, join, and contribute to the club.
@@ -154,7 +154,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                   <span className="text-sm font-semibold text-on-surface">Club name</span>
                   <input
                     className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-                    placeholder="e.g. Bengaluru Builders Guild"
+                    placeholder="e.g. Campus Builders Guild"
                     type="text"
                   />
                 </label>
@@ -238,7 +238,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                 <span className="text-sm font-semibold text-on-surface">Tags</span>
                 <input
                   className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-                  placeholder="#builders #ai #bengaluru"
+                  placeholder="#builders #ai #campus"
                   type="text"
                 />
               </label>
@@ -310,7 +310,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                 <span className="material-symbols-outlined text-xl text-outline">search</span>
                 <input
                   className="w-64 border-none bg-transparent text-sm font-label-md focus:ring-0"
-                  placeholder="Search Bengaluru clubs..."
+                  placeholder="Search campus clubs..."
                   type="text"
                 />
               </div>
@@ -336,7 +336,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
             <div className="flex items-end justify-between">
               <div>
                 <h2 className="font-headline-lg text-headline-lg text-on-background">Spotlight Clubs</h2>
-                <p className="font-body-md text-on-surface-variant">Rising student communities across Bengaluru</p>
+                <p className="font-body-md text-on-surface-variant">Rising student communities across campus</p>
               </div>
               <div className="flex gap-2">
                 <button className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface transition-colors hover:bg-surface-container-highest">

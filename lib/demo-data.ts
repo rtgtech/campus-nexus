@@ -130,18 +130,18 @@ export const fallbackFeed: FeedData = {
     {
       author: "Ananya Reddy",
       meta: "2h ago • Architecture Dept",
-      title: "Rainy Bengaluru morning, full studio energy.",
+      title: "Rainy campus morning, full studio energy.",
       body: "The design block lit up after the drizzle, so we stayed back to pin up prototypes and turn critique hour into a mini showcase.",
       image:
         "https://lh3.googleusercontent.com/aida-public/AB6AXuDDbsQFosHW6vZSMffXbQjy-PzN-BoaByAnK_Sl_YFURfiMtKtThcON-b8DL2IDTKvMvU2NSqBHTN4XsURfSGSR8GYCacBCydrBdvSTc7o23v0F6RGvbsURQm5wt8ucXJM6CoPUd2hDx0Iwox_MfNZ85RjfPkecyZKOLXF9C_gJPF8v1hUdOF8eYEtpR2VYogWMBuM-2uovf2-Y8g_3OU5CBblw-bVGxFqGe9LMS1UeaRklI_oARDPiX34Z5Qk1F55QLV7lTJS87k0",
-      tag: "#bengalurudesign",
+      tag: "#campusdesign",
       likes: "1.2k",
       comments: "42",
     },
     {
       author: "Rohit Nair",
       meta: "5h ago • Sports Club",
-      title: "Golden hour after practice in Bengaluru.",
+      title: "Golden hour after practice.",
       body: "Placements are close, but the floodlights, chai break, and one last net session made the evening feel worth slowing down for.",
       image:
         "https://lh3.googleusercontent.com/aida-public/AB6AXuBwzpgmmiYF6RpJki5O0MBK3WD9yR4DhZsm4Fz7u0d1P203pGFKhis03MIUEN38icmvVItSo9XQhl9GGTMq3TMnRYjn5ckju4V6uii53IkzkHsZbQb2zV9qpiL_Q5hFKqtr7Hq7_csF5O3aaIoVmPUAIFdTuEPGVzYDAv-hloE7Kd6EynVr09EimJqdGWXdk9WBuNQYAgHWK6dDpqbuebxRRHoOG6DQ340iObPfIi2edREqK5fLiSwN-3THx82p7S7oHUp2xiZiln8",
@@ -151,7 +151,7 @@ export const fallbackFeed: FeedData = {
     },
   ],
   trending: [
-    { label: "Placements", tag: "#BengaluruHiring", posts: "126 posts today" },
+    { label: "Placements", tag: "#CampusHiring", posts: "126 posts today" },
     { label: "College Fest", tag: "#NammaUtsav", posts: "1.8k posts this week" },
   ],
   suggestedPeople: [
@@ -167,7 +167,7 @@ export const fallbackClubs: ClubsData = {
       badge: "Trending",
       badgeFill: true,
       badgeClass: "bg-secondary",
-      title: "Bengaluru AI Collective",
+      title: "Campus AI Collective",
       description: "Building practical AI projects, campus tools, and responsible automation.",
       image:
         "https://lh3.googleusercontent.com/aida-public/AB6AXuB6gUvJTAIpwVMBX00dvhyPDuLb28fwbb_9D_py3kC_yYRDk1rlKioyZEST8bg59TxgdhzUHUwYRHxv5e7YvIGt7JAMWG1zQqWEhO_QU2qaVnnAxwrv6SWMZBiDOVHLtoU_4t75BsqQ_YIVav3jJSmgLSf_LQgcD7UpAt8Lrw7T8QpoYvsuifAYM27JpUyq4AAT1ewSEDRmXVg-ER5GhacBMp3ye2GzEPXqujtuEv2NdF4yX6D9y2JCmjaH_BYuCwp94IfV88U_JsA",
@@ -178,7 +178,7 @@ export const fallbackClubs: ClubsData = {
       badgeFill: false,
       badgeClass: "bg-primary-container",
       title: "Namma Creators Collective",
-      description: "A collaboration hub for Bengaluru storytellers, filmmakers, and digital artists.",
+      description: "A collaboration hub for local storytellers, filmmakers, and digital artists.",
       image:
         "https://lh3.googleusercontent.com/aida-public/AB6AXuAT_Vk-jXlajrhtywbAPlc92j2juwHwrgFArbzjs51cAB8nZ-Y_R-uYevZhe4n_9I4ssF_-ShnTi03D-v5knHJl_STP21NI4B3M1ddoY8Ofq9oY9K9v35FIsijDtjW97-UwDlbhsgWcAiG7thMnb5dMeEUTWrUDj0ynYxihwMTXX4kco5CDNrqHdmS9JzsxdFfmjjpgZQT5zDqbzJ5nXqevL15ICN4y4C-FKDo-yLinqSrsXCGau-c9buyFssKWEJaoPAPYzEfa43g",
       icon: "celebration",
@@ -186,9 +186,9 @@ export const fallbackClubs: ClubsData = {
   ],
   clubCards: [
     {
-      title: "Bengaluru Builders Guild",
+      title: "Campus Builders Guild",
       description:
-        "A student builder community for hack nights, product sprints, and demo days across Bengaluru.",
+        "A student builder community for hack nights, product sprints, and demo days across campus.",
       status: "5 active projects",
       icon: "code",
       iconBg: "bg-primary",
@@ -218,7 +218,7 @@ export const fallbackClubs: ClubsData = {
     {
       title: "Filter Coffee Collective",
       description:
-        "Exploring Bengaluru cafes, dosa spots, and late-night student food trails every week.",
+        "Exploring nearby cafes, dosa spots, and late-night student food trails every week.",
       status: "Active daily",
       icon: "restaurant",
       iconBg: "bg-tertiary",
@@ -371,7 +371,7 @@ export const fallbackMessages: MessagesData = {
   messages: [
     {
       side: "left",
-      text: "Did you see the final lineup for the Bengaluru student fest? The indie stage starts right after the design showcase.",
+      text: "Did you see the final lineup for the student fest? The indie stage starts right after the design showcase.",
       time: "5:42 PM",
     },
     {
@@ -401,6 +401,6 @@ export const fallbackMessages: MessagesData = {
 
 export const fallbackProfile: ProfileData = {
   avatar: profileAvatar,
-  major: "Computer Science & Product Design, Bengaluru",
+  major: "Computer Science & Product Design",
   bio: "New to Campus Nexus.",
 };

@@ -110,7 +110,7 @@ export function CreatePostOverlay() {
             <input
               name="hashtags"
               className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-              placeholder="#bengaluru #campus"
+              placeholder="#campus #fest"
               type="text"
             />
           </label>
