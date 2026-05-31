@@ -31,43 +31,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <section className="space-y-6">
           <DismissibleCampusPulse />
 
-          <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-5 shadow-[0_12px_30px_rgba(27,27,35,0.06)] backdrop-blur-xl md:p-6">
-            <div className="flex gap-4">
-              <img
-                alt="Profile"
-                className="h-12 w-12 rounded-full border border-outline-variant/60 object-cover"
-                src={profileAvatar}
-              />
-              <div className="flex-1">
-                <Link
-                  href="/?=createpost"
-                  className="block w-full rounded-[20px] bg-surface-container px-4 py-4 text-left text-sm text-on-surface-variant transition hover:bg-surface-container-high"
-                >
-                  What is happening on campus today, Aarav?
-                </Link>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-3 text-sm font-semibold text-on-surface-variant">
-                    <Link href="/?=createpost" className="rounded-full bg-primary-fixed px-4 py-2 text-primary">
-                      Photo
-                    </Link>
-                    <Link href="/?=createpost" className="rounded-full bg-surface-container px-4 py-2 hover:text-primary">
-                      Video
-                    </Link>
-                    <Link href="/?=createpost" className="rounded-full bg-surface-container px-4 py-2 hover:text-primary">
-                      Event
-                    </Link>
-                  </div>
-                  <Link
-                    href="/?=createpost"
-                    className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition hover:bg-primary-container"
-                  >
-                    Post
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {feedData.feedCards.map((card) => (
             <article
               key={card.title}

@@ -132,14 +132,14 @@ The backend is a Flask app in `backend/app.py`. It exposes JSON endpoints for th
 Start with these files:
 
 1. `FUNCTIONAL_NON_FUNCTIONAL_REQUIREMENTS.md` for product scope and expected behavior.
-2. `app/layout.tsx` for global fonts, Tailwind CDN setup, and design tokens.
+2. `app/layout.tsx` for global fonts and app metadata.
 3. `app/page.tsx` for the main feed page pattern.
 4. `lib/campus-api.ts` for server-side backend calls and fallback behavior.
 5. `backend/app.py` for API payload shapes and demo data.
 
 Important implementation details:
 
-- The project currently uses Tailwind through the CDN configured in `app/layout.tsx`, not a local Tailwind config file.
+- Tailwind is compiled locally through `tailwind.config.js`, `postcss.config.js`, and `app/globals.css`.
 - The backend has no database. New posts, clubs, and marketplace items disappear after restart.
 - The backend CORS policy defaults to `*` for local demo convenience.
 - Images in the demo data mostly reference remote URLs.
@@ -190,4 +190,3 @@ Check that `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` points to the Flask backend and th
 ### Backend changes disappear
 
 That is expected for created records. The backend stores demo data in memory only.
-
