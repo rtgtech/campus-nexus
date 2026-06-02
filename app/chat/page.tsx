@@ -1,10 +1,19 @@
 import { CampusShell } from "@/components/campus-shell";
-import { getDemoData } from "@/lib/campus-api";
-import { fallbackMessages, profileAvatar, type MessagesData } from "@/lib/demo-data";
+import { EmptyState } from "@/components/empty-state";
+import { getCampusData } from "@/lib/campus-api";
+import { fallbackMessages, profileAvatar, type MessagesData } from "@/lib/app-data";
 
 export default async function ChatPage() {
-  const messagesData = await getDemoData<MessagesData>("/api/messages", fallbackMessages);
+  const messagesData = await getCampusData<MessagesData>("/api/messages", fallbackMessages);
   const activeConversation = messagesData.conversations.find((conversation) => conversation.active) ?? messagesData.conversations[0];
+
+  if (messagesData.conversations.length === 0) {
+    return (
+      <CampusShell active="messages">
+        <EmptyState title="No conversations yet" description="Messages will appear here when real conversations are created." />
+      </CampusShell>
+    );
+  }
 
   return (
     <CampusShell active="messages">
@@ -15,7 +24,7 @@ export default async function ChatPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-on-background">Chat</h1>
-                  <p className="mt-1 text-sm text-on-surface-variant">4 conversations • 2 unread</p>
+                  <p className="mt-1 text-sm text-on-surface-variant">{messagesData.conversations.length} conversations</p>
                 </div>
                 <button className="rounded-2xl bg-primary p-2 text-on-primary">
                   <span className="material-symbols-outlined">edit_square</span>
@@ -180,7 +189,7 @@ export default async function ChatPage() {
                 </button>
                 <input
                   className="h-14 flex-1 rounded-2xl border border-outline-variant/50 bg-surface-container-low px-5 text-sm outline-none focus:border-primary"
-                  placeholder="Message Nisha..."
+                  placeholder="Write a message"
                   type="text"
                 />
                 <button className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary">
@@ -194,3 +203,5 @@ export default async function ChatPage() {
     </CampusShell>
   );
 }
+
+

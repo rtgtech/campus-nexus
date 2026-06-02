@@ -1,61 +1,9 @@
 import { SourceBottomNav } from "@/components/source-bottom-nav";
-import { profileAvatar } from "@/lib/demo-data";
+import { AuthSessionControl } from "@/components/auth-session-control";
+import { EmptyState } from "@/components/empty-state";
+import { getCampusData } from "@/lib/campus-api";
+import { fallbackMarketplace, type MarketplaceData } from "@/lib/app-data";
 import Link from "next/link";
-
-const marketItems = [
-  {
-    title: "Engineering Graphics Drafter Set",
-    owner: "Meera Iyer",
-    mode: "Sell",
-    category: "Stationery",
-    condition: "Gently used",
-    price: "Rs. 450",
-    location: "Jayanagar campus gate",
-    description: "Full drafter set with mini-drafter, scale, clips, and spare sheets. Used for one semester.",
-    image:
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80",
-    tags: ["Drafting", "Architecture", "Semester kit"],
-  },
-  {
-    title: "Introduction to Algorithms",
-    owner: "Karthik Menon",
-    mode: "Exchange",
-    category: "Books",
-    condition: "Marked pages",
-    price: "",
-    location: "CSE block, Indiranagar",
-    description: "CLRS copy with notes. Looking to exchange for DBMS, OS, or competitive programming books.",
-    image:
-      "https://images.unsplash.com/photo-1519682337058-a94d519337bc?auto=format&fit=crop&w=900&q=80",
-    tags: ["CSE", "Algorithms", "Books"],
-  },
-  {
-    title: "Casio Scientific Calculator",
-    owner: "Nisha Rao",
-    mode: "Sell or exchange",
-    category: "Electronics",
-    condition: "Like new",
-    price: "Rs. 700",
-    location: "Koramangala library steps",
-    description: "FX-991ES Plus with cover. Open to exchange for design markers or sell directly.",
-    image:
-      "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?auto=format&fit=crop&w=900&q=80",
-    tags: ["Calculator", "Exam", "Electronics"],
-  },
-  {
-    title: "Acoustic Guitar",
-    owner: "Ananya Reddy",
-    mode: "Sell",
-    category: "Music",
-    condition: "Used",
-    price: "",
-    location: "Central lawn",
-    description: "Beginner guitar with soft case. One string needs replacement, otherwise solid for practice.",
-    image:
-      "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=900&q=80",
-    tags: ["Music", "Guitar", "Practice"],
-  },
-];
 
 type MarketplacePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -69,6 +17,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
   const resolvedSearchParams = (await searchParams) ?? {};
   const mode = getSearchValue(resolvedSearchParams.mode);
   const showListingForm = mode === "listitem";
+  const marketplaceData = await getCampusData<MarketplaceData>("/api/marketplace", fallbackMarketplace);
 
   return (
     <>
@@ -97,7 +46,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-on-surface">Item name</span>
-                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="e.g. Scientific calculator" type="text" />
+                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
                 </label>
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-on-surface">Listing type</span>
@@ -133,44 +82,44 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                 </label>
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-on-surface">Price</span>
-                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="Leave empty to show Contact" type="text" />
+                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
                 </label>
               </div>
 
               <label className="space-y-2">
                 <span className="text-sm font-semibold text-on-surface">Description</span>
-                <textarea className="min-h-32 w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="Mention what is included, defects, warranty, and why you are selling or exchanging." />
+                <textarea className="min-h-32 w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" />
               </label>
 
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-on-surface">Preferred exchange</span>
-                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="Books, lab coat, art supplies, cash, etc." type="text" />
+                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
                 </label>
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-on-surface">Pickup location</span>
-                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="Library steps, hostel gate, CSE block" type="text" />
+                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
                 </label>
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-on-surface">Contact</span>
-                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="Phone, email, or campus handle" type="text" />
+                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
                 </label>
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-on-surface">Photo URL</span>
-                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="https://example.com/item-photo.jpg" type="url" />
+                  <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="url" />
                 </label>
               </div>
 
               <label className="space-y-2">
                 <span className="text-sm font-semibold text-on-surface">Tags</span>
-                <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="#books #calculator #hostel" type="text" />
+                <input className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
               </label>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/60 pt-5">
-                <p className="text-sm text-on-surface-variant">Demo form only. Listings can be wired to the backend next.</p>
+                <p className="text-sm text-on-surface-variant">Listings will be saved when this workflow is connected.</p>
                 <div className="flex flex-wrap gap-3">
                   <button className="rounded-full border border-outline-variant/70 px-5 py-3 text-sm font-semibold text-on-surface transition hover:border-primary hover:text-primary" type="button">
                     Save Draft
@@ -195,7 +144,6 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
               <span className="material-symbols-outlined text-xl text-outline">search</span>
               <input
                 className="w-72 border-none bg-transparent text-sm font-label-md focus:ring-0"
-                placeholder="Search books, calculators, hostel items..."
                 type="text"
               />
             </div>
@@ -203,7 +151,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
               <button className="material-symbols-outlined rounded-full p-2 text-primary transition hover:bg-surface-container">
                 notifications
               </button>
-              <img alt="User avatar" className="h-10 w-10 rounded-full border-2 border-primary object-cover" src={profileAvatar} />
+              <AuthSessionControl compact />
             </div>
           </div>
         </header>
@@ -214,7 +162,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Student Marketplace</p>
               <h1 className="mt-3 font-headline-lg text-4xl text-primary md:text-5xl">Exchange, sell, or find campus essentials.</h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant md:text-base">
-                Browse student-listed books, electronics, stationery, hostel items, and creative gear around campus.
+                Marketplace listings will appear here when real items are added.
               </p>
             </div>
             <Link
@@ -226,26 +174,26 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
             </Link>
           </section>
 
-          <section className="flex gap-3 overflow-x-auto pb-1">
-            {["All", "Books", "Electronics", "Stationery", "Hostel", "Exchange only", "Contact price"].map((filter, index) => (
-              <button
-                key={filter}
-                className={
-                  index === 0
-                    ? "whitespace-nowrap rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary"
-                    : "whitespace-nowrap rounded-full border border-outline-variant bg-white px-5 py-2.5 text-sm font-semibold text-primary transition hover:bg-surface-container-low"
-                }
-              >
-                {filter}
-              </button>
-            ))}
-          </section>
-
-          <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {marketItems.map((item) => (
+          {marketplaceData.items.length === 0 ? (
+            <EmptyState
+              title="No marketplace listings yet"
+              description="This section is ready for real listings once item creation is connected."
+              action={
+                <Link
+                  href="/marketplace?mode=listitem"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary"
+                >
+                  <span className="material-symbols-outlined text-base">add</span>
+                  List item
+                </Link>
+              }
+            />
+          ) : (
+            <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {marketplaceData.items.map((item) => (
               <article key={item.title} className="overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition hover:shadow-xl">
                 <div className="relative h-44 overflow-hidden bg-primary-fixed">
-                  <img alt={item.title} className="h-full w-full object-cover transition duration-500 hover:scale-105" src={item.image} />
+                  {item.image ? <img alt={item.title} className="h-full w-full object-cover transition duration-500 hover:scale-105" src={item.image} /> : null}
                   <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary backdrop-blur">
                     {item.mode}
                   </span>
@@ -270,7 +218,6 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                   </div>
                   <div className="flex items-center justify-between border-t border-surface-container-highest pt-4">
                     <div className="flex items-center gap-3">
-                      <img alt={`${item.owner} avatar`} className="h-9 w-9 rounded-full object-cover" src={profileAvatar} />
                       <div>
                         <p className="text-sm font-semibold text-on-surface">{item.owner}</p>
                         <p className="text-xs text-on-surface-variant">{item.location}</p>
@@ -282,8 +229,9 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
                   </div>
                 </div>
               </article>
-            ))}
-          </section>
+              ))}
+            </section>
+          )}
         </main>
 
         <Link href="/marketplace?mode=listitem" className="group fixed bottom-24 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all hover:scale-110 active:scale-90">
@@ -298,3 +246,5 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
     </>
   );
 }
+
+

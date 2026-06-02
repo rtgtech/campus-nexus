@@ -26,7 +26,7 @@ export function CreateClubOverlay() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: readForm(form, "name") || "New Campus Club",
+          title: readForm(form, "name"),
           category: readForm(form, "category"),
           description: readForm(form, "shortDescription") || readForm(form, "fullDescription"),
           fullDescription: readForm(form, "fullDescription"),
@@ -75,7 +75,7 @@ export function CreateClubOverlay() {
           <div className="grid gap-5 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Club name</span>
-              <input name="name" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="e.g. Campus Builders Guild" type="text" />
+              <input name="name" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Category</span>
@@ -92,18 +92,18 @@ export function CreateClubOverlay() {
 
           <label className="space-y-2">
             <span className="text-sm font-semibold text-on-surface">Short description</span>
-            <input name="shortDescription" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="A one-line pitch for the clubs directory" type="text" />
+            <input name="shortDescription" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
           </label>
 
           <label className="space-y-2">
             <span className="text-sm font-semibold text-on-surface">Full description</span>
-            <textarea name="fullDescription" className="min-h-32 w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="What the club does, who should join, and what members can expect." />
+            <textarea name="fullDescription" className="min-h-32 w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" />
           </label>
 
           <div className="grid gap-5 md:grid-cols-3">
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Campus or area</span>
-              <input name="campusArea" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="Indiranagar, Jayanagar, Whitefield" type="text" />
+              <input name="campusArea" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Meeting mode</span>
@@ -115,24 +115,24 @@ export function CreateClubOverlay() {
             </label>
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Meeting schedule</span>
-              <input name="meetingSchedule" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="Saturdays, 5 PM" type="text" />
+              <input name="meetingSchedule" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
             </label>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Contact email</span>
-              <input name="contactEmail" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="club@campus.edu" type="email" />
+              <input name="contactEmail" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="email" />
             </label>
             <label className="space-y-2">
               <span className="text-sm font-semibold text-on-surface">Banner or media URL</span>
-              <input name="bannerUrl" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="https://example.com/banner.jpg" type="url" />
+              <input name="bannerUrl" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="url" />
             </label>
           </div>
 
           <label className="space-y-2">
             <span className="text-sm font-semibold text-on-surface">Tags</span>
-            <input name="tags" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" placeholder="#builders #ai #campus" type="text" />
+            <input name="tags" className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary" type="text" />
           </label>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -168,12 +168,12 @@ export function CreateClubOverlay() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/60 pt-5">
             <p className={status === "error" ? "text-sm font-semibold text-secondary" : "text-sm text-on-surface-variant"}>
               {status === "saving"
-                ? "Creating in the demo backend..."
+                ? "Creating..."
                 : status === "success"
                 ? "Club created."
                 : status === "error"
-                ? "Backend is not reachable. Start Flask and try again."
-                : "Clubs are saved to the in-memory Flask demo backend."}
+                ? "Backend is not reachable. Start the API and try again."
+                : "Clubs are saved to the backend."}
             </p>
             <div className="flex flex-wrap gap-3">
               <button className="rounded-full border border-outline-variant/70 px-5 py-3 text-sm font-semibold text-on-surface transition hover:border-primary hover:text-primary" type="button">

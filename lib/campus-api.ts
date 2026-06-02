@@ -1,7 +1,7 @@
 export const API_BASE_URL =
   process.env.CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:5000";
 
-export async function getDemoData<T>(path: string, fallback: T): Promise<T> {
+export async function getCampusData<T>(path: string, fallback: T): Promise<T> {
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       cache: "no-store",

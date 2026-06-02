@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { profileAvatar } from "@/lib/demo-data";
+import { AuthSessionControl } from "@/components/auth-session-control";
 
 type NavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
 type NavItemKey = NavKey | "create-post";
@@ -87,14 +87,7 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
               <span className="material-symbols-outlined">notifications</span>
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-secondary" />
             </button>
-            <Link href={userHref} className="relative block">
-              <img
-                alt="Profile avatar"
-                className="h-10 w-10 rounded-full border-2 border-primary object-cover"
-                src={profileAvatar}
-              />
-              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-secondary shadow-[0_0_12px_rgba(236,32,36,0.45)]" />
-            </Link>
+            <AuthSessionControl compact />
           </div>
         </div>
       </header>
@@ -123,17 +116,6 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
                 </Link>
               );
             })}
-
-            <div className="mt-8 overflow-hidden rounded-[28px] bg-primary p-6 text-white shadow-[0_24px_60px_rgba(34,29,92,0.24)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/80">Live on Campus</p>
-              <h3 className="mt-3 font-['Space_Grotesk'] text-xl font-bold">Campus Indie Night</h3>
-              <p className="mt-2 text-sm leading-6 text-white/80">
-                Open mic sets, filter coffee stalls, and student DJs are taking over the central lawn tonight.
-              </p>
-              <button className="mt-5 rounded-full bg-white px-5 py-3 text-sm font-semibold text-primary transition hover:scale-[1.02]">
-                Book Pass
-              </button>
-            </div>
           </nav>
         </aside>
 

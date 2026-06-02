@@ -45,10 +45,10 @@ export function CreatePostOverlay() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          author: "Aarav Rao",
+          author: "",
           meta: "Just now - Campus Nexus",
-          title: caption ? caption.slice(0, 72) : "New photo from campus",
-          body: taggedPeople ? `${caption || "Shared a new campus photo."} Tagged: ${taggedPeople}` : caption,
+          title: caption.slice(0, 72),
+          body: taggedPeople ? `${caption || ""} Tagged: ${taggedPeople}`.trim() : caption,
           image,
           tag: hashtags || "#campusnexus",
           taggedPeople,
@@ -110,7 +110,7 @@ export function CreatePostOverlay() {
             <input
               name="hashtags"
               className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-              placeholder="#campus #fest"
+              placeholder="#tag"
               type="text"
             />
           </label>
@@ -120,7 +120,7 @@ export function CreatePostOverlay() {
             <input
               name="taggedPeople"
               className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-              placeholder="@ananya @rohit"
+              placeholder="@user"
               type="text"
             />
           </label>
@@ -128,12 +128,12 @@ export function CreatePostOverlay() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/60 pt-5">
             <p className={status === "error" ? "text-sm font-semibold text-secondary" : "text-sm text-on-surface-variant"}>
               {status === "saving"
-                ? "Publishing to the demo backend..."
+                ? "Publishing..."
                 : status === "success"
                 ? "Post created."
                 : status === "error"
-                ? "Backend is not reachable. Start Flask and try again."
-                : "Photo posts are saved to the in-memory Flask demo backend."}
+                ? "Backend is not reachable. Start the API and try again."
+                : "Photo posts are saved to the backend."}
             </p>
             <button
               disabled={status === "saving"}

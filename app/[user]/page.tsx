@@ -1,6 +1,7 @@
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
-import { getDemoData } from "@/lib/campus-api";
-import { fallbackProfile, type ProfileData } from "@/lib/demo-data";
+import { EmptyState } from "@/components/empty-state";
+import { getCampusData } from "@/lib/campus-api";
+import { fallbackProfile, type ProfileData } from "@/lib/app-data";
 
 type ProfilePageProps = {
   params: Promise<{
@@ -18,8 +19,8 @@ function formatName(user: string) {
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { user } = await params;
-  const displayName = formatName(user) || "Aarav Rao";
-  const profile = await getDemoData<ProfileData>(`/api/profile/${encodeURIComponent(user)}`, fallbackProfile);
+  const displayName = formatName(user) || "Profile";
+  const profile = await getCampusData<ProfileData>(`/api/profile/${encodeURIComponent(user)}`, fallbackProfile);
 
   return (
     <CampusShell active="profile" userHref={`/${user}`}>
@@ -56,16 +57,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
           <SectionTitle
             title="Posts"
-            description="Aarav has not shared anything yet."
+            description="Posts for this profile will appear here."
           />
-          <div className="mt-6 rounded-[24px] border border-dashed border-outline-variant/80 bg-surface-container-low p-10 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-fixed text-primary">
-              <span className="material-symbols-outlined">photo_camera</span>
-            </div>
-            <h2 className="mt-4 font-['Space_Grotesk'] text-xl font-bold text-on-background">No posts yet</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
-              When Aarav shares photos or campus updates, they will appear here.
-            </p>
+          <div className="mt-6">
+            <EmptyState title="No posts yet" description="Profile posts will appear here when real content exists." />
           </div>
         </section>
       </div>
