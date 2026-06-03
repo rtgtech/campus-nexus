@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { SourceBottomNav } from "@/components/source-bottom-nav";
+import { API_BASE_URL, isAdminUser, readAuthSession } from "@/lib/auth-client";
 
 type Phase = "ready" | "flashing" | "selecting" | "feedback" | "finished";
+type XpSaveStatus = "idle" | "saving" | "saved" | "skipped" | "error";
 
 type RoundResult = {
   correct: number;
@@ -54,6 +56,10 @@ export default function MindSnapPage() {
   const [targets, setTargets] = useState<Set<number>>(() => new Set());
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [result, setResult] = useState<RoundResult | null>(null);
+  const [xpSaveStatus, setXpSaveStatus] = useState<XpSaveStatus>("idle");
+  const [xpSaveMessage, setXpSaveMessage] = useState("");
+  const [finalXp, setFinalXp] = useState<number | null>(null);
+  const hasSubmittedXpRef = useRef(false);
 
   const config = useMemo(() => levelConfig(level), [level]);
   const progress = (timeLeft / GAME_SECONDS) * 100;
@@ -71,7 +77,21 @@ export default function MindSnapPage() {
     setScore(0);
     setTimeLeft(GAME_SECONDS);
     setNextLevel(1);
+    setXpSaveStatus("idle");
+    setXpSaveMessage("");
+    hasSubmittedXpRef.current = false;
+    setFinalXp(null);
     startRound(1);
+  }
+
+  function correctSelectedCount() {
+    let correct = 0;
+    selected.forEach((index) => {
+      if (targets.has(index)) {
+        correct += 1;
+      }
+    });
+    return correct;
   }
 
   function toggleCell(index: number) {
@@ -100,13 +120,7 @@ export default function MindSnapPage() {
       return;
     }
 
-    let correct = 0;
-    selected.forEach((index) => {
-      if (targets.has(index)) {
-        correct += 1;
-      }
-    });
-
+    const correct = correctSelectedCount();
     const wrong = selected.size - correct;
     const solved = correct === targets.size && wrong === 0;
     const roundResult = {
@@ -120,6 +134,63 @@ export default function MindSnapPage() {
     setResult(roundResult);
     setNextLevel(solved ? level + 1 : level);
     setPhase("feedback");
+  }
+
+  async function saveEarnedXp(earnedXp: number) {
+    if (hasSubmittedXpRef.current) {
+      return;
+    }
+
+    hasSubmittedXpRef.current = true;
+
+    if (earnedXp <= 0) {
+      setXpSaveStatus("idle");
+      setXpSaveMessage("No XP earned this run.");
+      return;
+    }
+
+    const session = readAuthSession();
+    if (!session) {
+      setXpSaveStatus("error");
+      setXpSaveMessage("Sign in to save XP.");
+      return;
+    }
+
+    if (isAdminUser(session.user)) {
+      setXpSaveStatus("skipped");
+      setXpSaveMessage("Admin XP is not ranked.");
+      return;
+    }
+
+    setXpSaveStatus("saving");
+    setXpSaveMessage("Saving XP...");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/games/xp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          game: "mind-snap",
+          xp: earnedXp,
+        }),
+        keepalive: true,
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "XP save failed");
+      }
+
+      setXpSaveStatus("saved");
+      setXpSaveMessage(`${earnedXp} XP saved. Total XP: ${data.totalXp ?? earnedXp}`);
+    } catch (error) {
+      hasSubmittedXpRef.current = false;
+      setXpSaveStatus("error");
+      setXpSaveMessage(error instanceof Error ? error.message : "XP save failed");
+    }
   }
 
   useEffect(() => {
@@ -148,9 +219,15 @@ export default function MindSnapPage() {
 
   useEffect(() => {
     if (timeLeft === 0 && phase !== "ready" && phase !== "finished") {
+      const finalRoundCorrect = phase === "selecting" ? correctSelectedCount() : 0;
+      const earnedXp = score + finalRoundCorrect;
+
+      setScore(earnedXp);
+      setFinalXp(earnedXp);
       setPhase("finished");
+      void saveEarnedXp(earnedXp);
     }
-  }, [phase, timeLeft]);
+  }, [phase, score, selected, targets, timeLeft]);
 
   useEffect(() => {
     if (phase !== "feedback") {
@@ -277,6 +354,26 @@ export default function MindSnapPage() {
               <div className="mt-3 rounded-xl bg-surface-container-low p-3 text-xs text-on-surface-variant">
                 Grid {config.rows} x {config.cols}. Selected {selected.size}/{config.targetCount} squares.
               </div>
+              {phase === "finished" && finalXp !== null ? (
+                <div className="mt-3 rounded-xl border border-secondary/20 bg-secondary-fixed p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary">XP earned</p>
+                  <p className="mt-1 font-['Space_Grotesk'] text-3xl font-black tracking-normal text-secondary">{finalXp}</p>
+                </div>
+              ) : null}
+              {xpSaveMessage ? (
+                <div
+                  className={[
+                    "mt-3 rounded-xl p-3 text-xs font-semibold",
+                    xpSaveStatus === "saved"
+                      ? "bg-primary-fixed text-primary"
+                      : xpSaveStatus === "error"
+                        ? "bg-secondary-fixed text-secondary"
+                        : "bg-surface-container-low text-on-surface-variant",
+                  ].join(" ")}
+                >
+                  {xpSaveMessage}
+                </div>
+              ) : null}
             </section>
 
             {result ? (
@@ -329,7 +426,7 @@ export default function MindSnapPage() {
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-outline-variant px-4 py-2.5 text-xs font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary"
                 >
                   <span className="material-symbols-outlined text-base">leaderboard</span>
-                  Leaderboard
+                  {phase === "finished" ? "View leaderboard" : "Leaderboard"}
                 </Link>
               </div>
             </section>

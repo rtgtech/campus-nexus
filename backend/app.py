@@ -403,6 +403,34 @@ class User(Base):
 AuthUser = User
 
 
+class UserXp(Base):
+    __tablename__ = "user_xp"
+
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), primary_key=True)
+    total_xp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def to_dict(self, user: Optional[User] = None, rank: Optional[int] = None) -> dict[str, Any]:
+        name = user.name if user is not None else self.user_id
+        acronym = initials_for_name(name)
+        return omit_none(
+            {
+                "rank": rank,
+                "user_id": self.user_id,
+                "userId": self.user_id,
+                "id": self.user_id,
+                "name": name,
+                "username": user.username if user is not None else "",
+                "acronym": acronym,
+                "initials": acronym,
+                "total_xp": self.total_xp,
+                "totalXp": self.total_xp,
+                "updatedAt": self.updated_at.isoformat(),
+            }
+        )
+
+
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
 
@@ -1318,6 +1346,35 @@ def serialize_club_detail(club: ClubCard) -> dict[str, Any]:
     }
 
 
+def leaderboard_entries() -> list[dict[str, Any]]:
+    admin_username = normalize_username(DEFAULT_ADMIN_USER["username"])
+    admin_mail = normalize_email(DEFAULT_ADMIN_USER["mail"])
+    rows = db().execute(
+        select(User, UserXp)
+        .join(UserXp, UserXp.user_id == User.user_id)
+        .where(UserXp.total_xp > 0)
+        .where(User.username != admin_username)
+        .where(User.mail != admin_mail)
+        .order_by(UserXp.total_xp.desc(), User.username.asc())
+    ).all()
+    return [xp.to_dict(user, rank=index + 1) for index, (user, xp) in enumerate(rows)]
+
+
+def award_user_xp(user: User, xp: int) -> UserXp:
+    row = db().get(UserXp, user.user_id)
+    now = datetime.utcnow()
+
+    if row is None:
+        row = UserXp(user_id=user.user_id, total_xp=0, created_at=now, updated_at=now)
+        db().add(row)
+
+    row.total_xp += xp
+    row.updated_at = now
+    db().commit()
+    db().refresh(row)
+    return row
+
+
 def resolve_member_user(data: dict[str, Any]) -> Optional[User]:
     user_id = text_value(get_first(data, "user_id", "userId"))
     if user_id:
@@ -1900,6 +1957,44 @@ def games():
             "gameCards": serialize_all(GameCard),
             "topRated": serialize_all(TopRatedGame),
             "recentActivity": serialize_all(RecentGameActivity),
+        }
+    )
+
+
+@app.route("/api/games/leaderboards")
+def game_leaderboards():
+    entries = leaderboard_entries()
+    return jsonify(
+        {
+            "entries": entries,
+            "totalPlayers": len(entries),
+            "generatedAt": datetime.utcnow().isoformat(),
+        }
+    )
+
+
+@app.route("/api/games/xp", methods=["POST"])
+def award_game_xp():
+    user = current_auth_user()
+    if user is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    if is_admin_user(user):
+        return jsonify({"error": "admin is not ranked"}), 403
+
+    xp = optional_int(get_first(read_json(), "xp", "score", "points"))
+    if xp is None or xp <= 0:
+        return jsonify({"error": "xp must be a positive integer"}), 400
+
+    row = award_user_xp(user, xp)
+    return jsonify(
+        {
+            "userId": user.user_id,
+            "user_id": user.user_id,
+            "awardedXp": xp,
+            "awarded_xp": xp,
+            "totalXp": row.total_xp,
+            "total_xp": row.total_xp,
         }
     )
 

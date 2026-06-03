@@ -159,6 +159,8 @@ export type LeaderboardEntry = {
 
 export type LeaderboardData = {
   entries: LeaderboardEntry[];
+  totalPlayers?: number;
+  generatedAt?: string;
 };
 
 export type Conversation = {
@@ -265,48 +267,7 @@ export const fallbackGames: GamesData = {
 };
 
 export const fallbackLeaderboard: LeaderboardData = {
-  entries: [
-    {
-      rank: 1,
-      acronym: "RZ",
-      name: "Rumaan Zameer",
-      user_id: "usr_rumaan_zameer",
-      userId: "usr_rumaan_zameer",
-      totalXp: 12840,
-    },
-    {
-      rank: 2,
-      acronym: "AP",
-      name: "Aarav Patel",
-      user_id: "usr_aarav_patel",
-      userId: "usr_aarav_patel",
-      totalXp: 11620,
-    },
-    {
-      rank: 3,
-      acronym: "NS",
-      name: "Nisha Sharma",
-      user_id: "usr_nisha_sharma",
-      userId: "usr_nisha_sharma",
-      totalXp: 10910,
-    },
-    {
-      rank: 4,
-      acronym: "KV",
-      name: "Kabir Verma",
-      user_id: "usr_kabir_verma",
-      userId: "usr_kabir_verma",
-      totalXp: 9425,
-    },
-    {
-      rank: 5,
-      acronym: "MS",
-      name: "Meera Srinivasan",
-      user_id: "usr_meera_srinivasan",
-      userId: "usr_meera_srinivasan",
-      totalXp: 8810,
-    },
-  ],
+  entries: [],
 };
 
 export const fallbackMessages: MessagesData = {
