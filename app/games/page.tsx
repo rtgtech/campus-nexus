@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { AuthSessionControl } from "@/components/auth-session-control";
-import { EmptyState } from "@/components/empty-state";
 import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackGames, type GamesData } from "@/lib/app-data";
@@ -45,9 +44,54 @@ export default async function GamesPage() {
             </div>
           </section>
 
-          {gamesData.gameCards.length === 0 ? (
-            <EmptyState title="No games yet" description="The catalog is ready for production game records." />
-          ) : (
+          <section className="space-y-5">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Available now</p>
+              <h2 className="mt-2 font-headline-lg text-headline-lg">Play Mind Snap</h2>
+            </div>
+
+            <Link
+              href="/games/mind-snap"
+              className="group grid overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,1fr)_320px]"
+            >
+              <div className="space-y-4 p-6 md:p-8">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_14px_34px_rgba(34,29,92,0.18)]">
+                  <span className="material-symbols-outlined text-3xl">grid_view</span>
+                </div>
+                <div>
+                  <h2 className="font-headline-lg text-3xl text-primary">Mind Snap</h2>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-on-surface-variant md:text-base">
+                    Memorize the flashed squares, then select them before the 45 second timer runs out.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)]">
+                  <span className="material-symbols-outlined text-lg">play_arrow</span>
+                  Play
+                </div>
+              </div>
+
+              <div className="bg-[#090817] p-6">
+                <div className="grid aspect-square grid-cols-3 gap-2 rounded-[24px] border border-[#14f1df]/20 bg-[#050511] p-3 shadow-[inset_0_0_34px_rgba(20,241,223,0.08)]">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((cell) => {
+                    const isLit = [0, 2, 4, 7].includes(cell);
+                    return (
+                      <span
+                        key={cell}
+                        className={[
+                          "rounded-2xl border transition duration-200",
+                          isLit
+                            ? "border-[#14f1df] bg-[#9657f5] shadow-[0_0_18px_rgba(20,241,223,0.62)] group-hover:shadow-[0_0_28px_rgba(20,241,223,0.82)]"
+                            : "border-[#1b1740] bg-[#100d24]",
+                        ].join(" ")}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </Link>
+          </section>
+
+          {gamesData.gameCards.length > 0 ? (
             <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
               {gamesData.gameCards.map((card) => (
                 <article
@@ -67,7 +111,7 @@ export default async function GamesPage() {
                 </article>
               ))}
             </section>
-          )}
+          ) : null}
 
           {gamesData.topRated.length > 0 ? (
             <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm">

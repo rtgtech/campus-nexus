@@ -28,9 +28,14 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds }: ClubMemberAd
 
   useEffect(() => {
     const normalizedQuery = query.trim();
-    setSelectedUser(null);
 
     if (!canManageMembers || normalizedQuery.length < 2) {
+      setResults([]);
+      setStatus("idle");
+      return;
+    }
+
+    if (selectedUser?.username === normalizedQuery) {
       setResults([]);
       setStatus("idle");
       return;
@@ -66,7 +71,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds }: ClubMemberAd
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [canManageMembers, existingUserIds, query]);
+  }, [canManageMembers, existingUserIds, query, selectedUser]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,6 +107,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds }: ClubMemberAd
       setQuery("");
       setSelectedUser(null);
       setResults([]);
+      setTitle("Member");
       router.refresh();
     } catch (error) {
       setStatus("error");
@@ -128,9 +134,36 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds }: ClubMemberAd
             placeholder="Search username"
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSelectedUser(null);
+              setMessage("");
+            }}
           />
         </label>
+
+        {selectedUser ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary-fixed/70 p-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-on-primary">
+              {selectedUser.initials || selectedUser.acronym || getInitials(selectedUser.name)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-on-surface">{selectedUser.name}</p>
+              <p className="truncate text-xs text-on-surface-variant">@{selectedUser.username}</p>
+            </div>
+            <button
+              className="rounded-full p-2 text-on-surface-variant transition hover:bg-white hover:text-secondary"
+              type="button"
+              onClick={() => {
+                setSelectedUser(null);
+                setQuery("");
+                setMessage("");
+              }}
+            >
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
+          </div>
+        ) : null}
 
         {results.length > 0 ? (
           <div className="space-y-2">
@@ -147,6 +180,9 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds }: ClubMemberAd
                 onClick={() => {
                   setSelectedUser(user);
                   setQuery(user.username);
+                  setResults([]);
+                  setMessage("");
+                  setStatus("idle");
                 }}
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 text-xs font-bold text-primary">
