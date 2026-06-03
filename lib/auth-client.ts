@@ -1,12 +1,18 @@
 export type CampusAuthUser = {
-  id: number;
+  user_id: string;
+  userId: string;
+  id: string;
+  mail: string;
   email: string;
   username?: string | null;
   name: string;
-  profilePhoto: string;
+  DOB: string;
   dateOfBirth: string;
+  year: number;
   department: string;
   yearOfStudy: number;
+  acronym: string;
+  initials: string;
 };
 
 export type CampusAuthSession = {
@@ -44,4 +50,8 @@ export function readAuthSession(): CampusAuthSession | null {
 export function clearAuthSession() {
   localStorage.removeItem(AUTH_STORAGE_KEY);
   document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+export function isAdminUser(user: CampusAuthUser | null | undefined) {
+  return user?.username === "admin" && user.mail === "admin@cn.nhce";
 }

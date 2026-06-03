@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { EmptyState } from "@/components/empty-state";
 import { SourceBottomNav } from "@/components/source-bottom-nav";
@@ -26,11 +27,22 @@ export default async function GamesPage() {
 
         <main className="mx-auto max-w-7xl space-y-10 px-4 pt-8 md:px-10">
           <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm md:p-8">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Games</p>
-            <h1 className="mt-3 font-headline-lg text-4xl text-primary md:text-5xl">Game catalog</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant md:text-base">
-              Real games, leaderboards, and recent activity will appear here as the product is built.
-            </p>
+            <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Games</p>
+                <h1 className="mt-3 font-headline-lg text-4xl text-primary md:text-5xl">Game catalog</h1>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant md:text-base">
+                  Real games, leaderboards, and recent activity will appear here as the product is built.
+                </p>
+              </div>
+              <Link
+                href="/games/leaderboards"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(56,72,96,0.18)] transition hover:scale-[1.02] md:w-auto"
+              >
+                <span className="material-symbols-outlined text-lg">leaderboard</span>
+                Leaderboard
+              </Link>
+            </div>
           </section>
 
           {gamesData.gameCards.length === 0 ? (

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { API_BASE_URL, CampusAuthSession, clearAuthSession, readAuthSession } from "@/lib/auth-client";
-import { profileAvatar } from "@/lib/app-data";
+import { getInitials } from "@/lib/app-data";
 
 type AuthSessionControlProps = {
   compact?: boolean;
@@ -50,14 +50,17 @@ export function AuthSessionControl({ compact = false }: AuthSessionControlProps)
     );
   }
 
+  const profileSlug = session.user.username || session.user.user_id || session.user.id;
+
   return (
     <div className="flex items-center gap-2">
-      <Link href="/aarav" className="flex min-w-0 items-center gap-2 rounded-full bg-surface-container-low py-1 pl-1 pr-3">
-        <img
-          alt={`${session.user.name} profile`}
-          className="h-9 w-9 rounded-full border-2 border-primary object-cover"
-          src={session.user.profilePhoto || profileAvatar}
-        />
+      <Link href={`/${profileSlug}`} className="flex min-w-0 items-center gap-2 rounded-full bg-surface-container-low py-1 pl-1 pr-3">
+        <span
+          aria-label={`${session.user.name} profile`}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-primary-fixed text-xs font-bold text-primary"
+        >
+          {session.user.acronym || session.user.initials || getInitials(session.user.name)}
+        </span>
         <span className={compact ? "hidden max-w-28 truncate text-sm font-semibold text-on-surface md:inline" : "max-w-32 truncate text-sm font-semibold text-on-surface"}>
           {session.user.name}
         </span>

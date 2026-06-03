@@ -1,8 +1,9 @@
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { CreatePostOverlay } from "@/components/create-post-overlay";
 import { EmptyState } from "@/components/empty-state";
+import { FeedPostCard } from "@/components/feed-post-card";
 import { getCampusData } from "@/lib/campus-api";
-import { fallbackFeed, profileAvatar, type FeedData } from "@/lib/app-data";
+import { fallbackFeed, getInitials, type FeedData } from "@/lib/app-data";
 import Link from "next/link";
 
 type HomePageProps = {
@@ -45,62 +46,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             />
           ) : (
             feedData.feedCards.map((card) => (
-            <article
-              key={card.title}
-              className="overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white/85 shadow-[0_12px_30px_rgba(27,27,35,0.06)] backdrop-blur-xl"
-            >
-              <div className="flex items-center justify-between px-5 py-4 md:px-6">
-                <div className="flex items-center gap-3">
-                  <img
-                    alt={card.author}
-                    className="h-11 w-11 rounded-full object-cover"
-                    src={profileAvatar}
-                  />
-                  <div>
-                    <h3 className="font-semibold text-on-surface">{card.author}</h3>
-                    <p className="text-xs uppercase tracking-[0.18em] text-on-surface-variant">{card.meta}</p>
-                  </div>
-                </div>
-                <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
-                  <span className="material-symbols-outlined">more_horiz</span>
-                </button>
-              </div>
-
-              <div className="relative aspect-[4/3] overflow-hidden bg-primary md:aspect-[16/10]">
-                <img alt={card.title} className="h-full w-full object-cover" src={card.image} />
-                <div className="absolute inset-x-0 bottom-0 bg-[rgba(34,29,92,0.72)] px-6 pb-6 pt-20 text-white">
-                  <div className="flex items-end justify-between gap-4">
-                    <div>
-                      <h4 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight">{card.title}</h4>
-                      <p className="mt-2 max-w-xl text-sm text-white/82">{card.body}</p>
-                    </div>
-                    <span className="rounded-full bg-white/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur">
-                      {card.tag}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between px-5 py-4 md:px-6">
-                <div className="flex gap-5 text-sm font-semibold text-on-surface-variant">
-                  <button className="flex items-center gap-2 hover:text-primary">
-                    <span className="material-symbols-outlined text-secondary">favorite</span>
-                    {card.likes}
-                  </button>
-                  <button className="flex items-center gap-2 hover:text-primary">
-                    <span className="material-symbols-outlined">chat_bubble</span>
-                    {card.comments}
-                  </button>
-                  <button className="flex items-center gap-2 hover:text-primary">
-                    <span className="material-symbols-outlined">share</span>
-                    Share
-                  </button>
-                </div>
-                <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
-                  <span className="material-symbols-outlined">bookmark</span>
-                </button>
-              </div>
-            </article>
+            <FeedPostCard
+              key={card.post_id ?? card.title}
+              post={card}
+            />
             ))
           )}
         </section>
@@ -136,11 +85,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 {feedData.suggestedPeople.map(({ name, subtitle }) => (
                 <div key={name} className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <img
-                      alt={name}
-                      className="h-10 w-10 rounded-full object-cover"
-                      src={profileAvatar}
-                    />
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-xs font-bold text-primary">
+                      {getInitials(name)}
+                    </span>
                     <div>
                       <p className="font-semibold text-on-surface">{name}</p>
                       <p className="text-sm text-on-surface-variant">{subtitle}</p>

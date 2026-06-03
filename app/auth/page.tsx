@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   API_BASE_URL,
   CampusAuthSession,
@@ -19,27 +19,11 @@ function readForm(form: HTMLFormElement, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function readProfilePhoto(form: HTMLFormElement) {
-  const file = new FormData(form).get("profilePhoto");
-
-  if (!(file instanceof File) || file.size === 0) {
-    return Promise.resolve("");
-  }
-
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [message, setMessage] = useState("");
-  const [preview, setPreview] = useState("");
 
   useEffect(() => {
     const storedSession = readAuthSession();
@@ -84,17 +68,16 @@ export default function AuthPage() {
     setMessage("");
 
     try {
-      const profilePhoto = mode === "signup" ? await readProfilePhoto(form) : "";
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const payload =
         mode === "signup"
           ? {
-              email: readForm(form, "email"),
               name: readForm(form, "name"),
-              profilePhoto,
-              dateOfBirth: readForm(form, "dateOfBirth"),
+              username: readForm(form, "username"),
+              mail: readForm(form, "mail"),
+              DOB: readForm(form, "dateOfBirth"),
               department: readForm(form, "department"),
-              yearOfStudy: Number(readForm(form, "yearOfStudy")),
+              year: Number(readForm(form, "yearOfStudy")),
               password: readForm(form, "password"),
             }
           : {
@@ -123,18 +106,6 @@ export default function AuthPage() {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Authentication failed");
     }
-  }
-
-  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    if (!file) {
-      setPreview("");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => setPreview(typeof reader.result === "string" ? reader.result : "");
-    reader.readAsDataURL(file);
   }
 
   return (
@@ -217,34 +188,24 @@ export default function AuthPage() {
             <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
               {mode === "signup" ? (
                 <>
-                  <div className="flex items-center gap-4 rounded-[24px] bg-surface-container-low p-4">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary-fixed text-primary">
-                      {preview ? (
-                        <img alt="Profile preview" className="h-full w-full object-cover" src={preview} />
-                      ) : (
-                        <span className="material-symbols-outlined text-4xl">person</span>
-                      )}
-                    </div>
-                    <label className="min-w-0 flex-1 space-y-2">
-                      <span className="text-sm font-semibold text-on-surface">Profile photo</span>
-                      <input
-                        required
-                        accept="image/*"
-                        className="w-full rounded-2xl border border-dashed border-outline-variant/80 bg-white px-4 py-3 text-sm text-on-surface outline-none file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-on-primary"
-                        name="profilePhoto"
-                        type="file"
-                        onChange={handlePhotoChange}
-                      />
-                    </label>
-                  </div>
-
                   <label className="block space-y-2">
                     <span className="text-sm font-semibold text-on-surface">Name</span>
                     <input
                       required
                       className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
                       name="name"
-                  type="text"
+                      type="text"
+                    />
+                  </label>
+
+                  <label className="block space-y-2">
+                    <span className="text-sm font-semibold text-on-surface">Username</span>
+                    <input
+                      required
+                      autoComplete="username"
+                      className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                      name="username"
+                      type="text"
                     />
                   </label>
                 </>
@@ -252,13 +213,13 @@ export default function AuthPage() {
 
               <label className="block space-y-2">
                 <span className="text-sm font-semibold text-on-surface">
-                  {mode === "login" ? "Email or username" : "Email"}
+                  {mode === "login" ? "Mail or username" : "Mail"}
                 </span>
                 <input
                   required
                   autoComplete={mode === "login" ? "username" : "email"}
                   className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-                  name={mode === "login" ? "login" : "email"}
+                  name={mode === "login" ? "login" : "mail"}
                   type={mode === "login" ? "text" : "email"}
                 />
               </label>

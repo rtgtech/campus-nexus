@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { CampusAuthSession, isAdminUser, readAuthSession } from "@/lib/auth-client";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:5000";
@@ -15,16 +16,33 @@ function readForm(form: HTMLFormElement, name: string) {
 export function CreateClubOverlay() {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
+  const [session, setSession] = useState<CampusAuthSession | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
+  useEffect(() => {
+    setSession(readAuthSession());
+    setSessionLoaded(true);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     setStatus("saving");
+    setMessage("");
 
     try {
+      const activeSession = session;
+      if (!activeSession || !isAdminUser(activeSession.user)) {
+        throw new Error("Admin access required");
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/clubs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${activeSession.token}`,
+        },
         body: JSON.stringify({
           title: readForm(form, "name"),
           category: readForm(form, "category"),
@@ -42,15 +60,48 @@ export function CreateClubOverlay() {
       });
 
       if (!response.ok) {
-        throw new Error("Create club failed");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(typeof data.error === "string" ? data.error : "Create club failed");
       }
 
       setStatus("success");
       router.push("/clubs");
       router.refresh();
-    } catch {
+    } catch (error) {
       setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Create club failed");
     }
+  }
+
+  if (!sessionLoaded) {
+    return (
+      <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-[rgba(15,18,33,0.55)] px-4 py-8 backdrop-blur-sm md:px-6 md:py-12">
+        <div className="w-full max-w-xl rounded-[28px] border border-primary/20 bg-white/95 p-6 shadow-[0_24px_80px_rgba(15,18,33,0.28)]">
+          <p className="text-sm font-semibold text-on-surface-variant">Checking admin access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdminUser(session?.user)) {
+    return (
+      <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-[rgba(15,18,33,0.55)] px-4 py-8 backdrop-blur-sm md:px-6 md:py-12">
+        <div className="w-full max-w-xl rounded-[28px] border border-primary/20 bg-white/95 p-6 shadow-[0_24px_80px_rgba(15,18,33,0.28)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Admin Only</p>
+              <h1 className="mt-2 font-headline-lg text-2xl text-on-background">Club creation is restricted.</h1>
+              <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+                Sign in with the admin service account to create or manage clubs.
+              </p>
+            </div>
+            <Link href="/clubs" className="rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary">
+              Close
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -172,7 +223,7 @@ export function CreateClubOverlay() {
                 : status === "success"
                 ? "Club created."
                 : status === "error"
-                ? "Backend is not reachable. Start the API and try again."
+                ? message || "Create club failed."
                 : "Clubs are saved to the backend."}
             </p>
             <div className="flex flex-wrap gap-3">

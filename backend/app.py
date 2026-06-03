@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from datetime import datetime
 from pathlib import Path
@@ -8,7 +9,20 @@ from threading import Lock
 from typing import Any, Callable, Optional, Sequence, TypeVar
 
 from flask import Flask, g, jsonify, request
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, select, text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+    func,
+    select,
+    text,
+)
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -42,30 +56,59 @@ class OrderedResourceMixin:
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
-class FeedPost(OrderedResourceMixin, Base):
-    __tablename__ = "feed_posts"
+class Post(Base):
+    __tablename__ = "posts"
 
-    author: Mapped[str] = mapped_column(String(160), nullable=False)
-    meta: Mapped[str] = mapped_column(String(240), nullable=False)
-    title: Mapped[str] = mapped_column(String(240), nullable=False)
-    body: Mapped[str] = mapped_column(Text, nullable=False)
-    image: Mapped[str] = mapped_column(Text, nullable=False)
-    tag: Mapped[str] = mapped_column(String(120), nullable=False)
-    likes: Mapped[str] = mapped_column(String(40), default="0", nullable=False)
-    comments: Mapped[str] = mapped_column(String(40), default="0", nullable=False)
+    post_id: Mapped[str] = mapped_column(String(32), primary_key=True, unique=True)
+    author_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), index=True, nullable=False)
+    club_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("club_cards.id"), index=True, nullable=True)
+    post_type: Mapped[int] = mapped_column("type", Integer, default=0, nullable=False)
+    media_url: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    caption: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    likes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    shares: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    hashtags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    mentions: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    price: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, author_name: Optional[str] = None, club_slug: Optional[str] = None) -> dict[str, Any]:
+        created_at = self.created_at.isoformat()
+        tags = self.hashtags or []
+        caption = self.caption or ""
+        title = caption[:72] or ("Marketplace listing" if self.post_type == 2 else "Untitled post")
+
         return {
-            "id": self.id,
-            "author": self.author,
-            "meta": self.meta,
-            "title": self.title,
-            "body": self.body,
-            "image": self.image,
-            "tag": self.tag,
+            "post_id": self.post_id,
+            "id": self.post_id,
+            "author_id": self.author_id,
+            "authorId": self.author_id,
+            "author": author_name or self.author_id,
+            "club_id": self.club_id,
+            "clubId": self.club_id,
+            "clubSlug": club_slug,
+            "type": self.post_type,
+            "media_url": self.media_url,
+            "mediaUrl": self.media_url,
+            "caption": caption,
             "likes": self.likes,
-            "comments": self.comments,
+            "shares": self.shares,
+            "hashtags": tags,
+            "mentions": self.mentions or [],
+            "price": self.price,
+            "description": self.description,
+            "created_at": created_at,
+            "createdAt": created_at,
+            "meta": created_at,
+            "title": title,
+            "body": self.description if self.post_type == 2 and self.description else caption,
+            "image": self.media_url,
+            "tag": tags[0] if tags else "#campusnexus",
+            "comments": "0",
         }
+
 
 
 class TrendingTopic(OrderedResourceMixin, Base):
@@ -93,6 +136,7 @@ class ClubCard(OrderedResourceMixin, Base):
     __tablename__ = "club_cards"
 
     title: Mapped[str] = mapped_column(String(180), nullable=False)
+    slug: Mapped[str] = mapped_column(String(220), unique=True, index=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(120), nullable=False)
     icon: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -108,6 +152,7 @@ class ClubCard(OrderedResourceMixin, Base):
         return {
             "id": self.id,
             "title": self.title,
+            "slug": self.slug,
             "description": self.description,
             "status": self.status,
             "icon": self.icon,
@@ -119,6 +164,17 @@ class ClubCard(OrderedResourceMixin, Base):
             "avatars": self.avatars or [],
             "statusClass": self.status_class,
         }
+
+
+class ClubMember(Base):
+    __tablename__ = "club_members"
+    __table_args__ = (UniqueConstraint("club_id", "user_id", name="uq_club_members_club_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    club_id: Mapped[int] = mapped_column(Integer, ForeignKey("club_cards.id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class SpotlightClub(OrderedResourceMixin, Base):
@@ -311,38 +367,47 @@ class Profile(Base):
         return payload
 
 
-class AuthUser(Base):
-    __tablename__ = "auth_users"
+class User(Base):
+    __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    username: Mapped[Optional[str]] = mapped_column(String(80), unique=True, index=True, nullable=True)
+    user_id: Mapped[str] = mapped_column(String(32), primary_key=True, unique=True)
     name: Mapped[str] = mapped_column(String(180), nullable=False)
-    profile_photo: Mapped[str] = mapped_column(Text, nullable=False)
-    date_of_birth: Mapped[str] = mapped_column(String(20), nullable=False)
+    username: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
+    mail: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    dob: Mapped[str] = mapped_column(String(20), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
     department: Mapped[str] = mapped_column(String(80), nullable=False)
-    year_of_study: Mapped[int] = mapped_column(Integer, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     def to_dict(self) -> dict[str, Any]:
+        acronym = initials_for_name(self.name)
         return {
-            "id": self.id,
-            "email": self.email,
-            "username": self.username,
+            "user_id": self.user_id,
+            "userId": self.user_id,
+            "id": self.user_id,
             "name": self.name,
-            "profilePhoto": self.profile_photo,
-            "dateOfBirth": self.date_of_birth,
+            "username": self.username,
+            "mail": self.mail,
+            "email": self.mail,
+            "DOB": self.dob,
+            "dateOfBirth": self.dob,
+            "year": self.year,
+            "yearOfStudy": self.year,
             "department": self.department,
-            "yearOfStudy": self.year_of_study,
+            "acronym": acronym,
+            "initials": acronym,
         }
+
+
+AuthUser = User
 
 
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
 
     token: Mapped[str] = mapped_column(String(120), primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("auth_users.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
@@ -385,13 +450,12 @@ SEED_PROFILES: list[dict[str, Any]] = []
 
 DEFAULT_PROFILE = {"avatar": PROFILE_AVATAR, "major": "", "bio": ""}
 DEFAULT_ADMIN_USER = {
-    "email": "admin@campus.local",
+    "mail": "admin@cn.nhce",
     "username": "admin",
     "name": "Admin",
-    "profilePhoto": PROFILE_AVATAR,
-    "dateOfBirth": "2000-01-01",
+    "DOB": "2000-01-01",
     "department": "CS",
-    "yearOfStudy": 1,
+    "year": 1,
     "password": "12345678",
 }
 
@@ -473,12 +537,52 @@ def get_first(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
     return default
 
 
+def generate_backend_id(prefix: str) -> str:
+    return f"{prefix}_{secrets.token_urlsafe(12).replace('-', '').replace('_', '')[:16].lower()}"
+
+
+def initials_for_name(name: str) -> str:
+    parts = [part for part in re.split(r"\s+", text_value(name)) if part]
+    if not parts:
+        return "CN"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return "".join(part[0] for part in parts[:2]).upper()
+
+
+def slugify(value: Any, fallback: str = "club") -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text_value(value).lower()).strip("-")
+    return slug or fallback
+
+
+def unique_backend_id(model: type[Any], field_name: str, prefix: str) -> str:
+    field = getattr(model, field_name)
+    for _ in range(10):
+        candidate = generate_backend_id(prefix)
+        if db().scalar(select(model).where(field == candidate)) is None:
+            return candidate
+    raise RuntimeError("could not generate unique id")
+
+
+def unique_club_slug(value: Any, current_club_id: Optional[int] = None) -> str:
+    base_slug = slugify(value)
+    candidate = base_slug
+    suffix = 2
+
+    while True:
+        existing = db().scalar(select(ClubCard).where(ClubCard.slug == candidate))
+        if existing is None or existing.id == current_club_id:
+            return candidate
+        candidate = f"{base_slug}-{suffix}"
+        suffix += 1
+
+
 def normalize_email(value: Any) -> str:
     return text_value(value).lower()
 
 
 def normalize_username(value: Any) -> Optional[str]:
-    username = text_value(value).lower()
+    username = re.sub(r"[^a-z0-9_.-]", "", text_value(value).lower())
     return username or None
 
 
@@ -497,14 +601,101 @@ def read_year_of_study(value: Any) -> Optional[int]:
     return year
 
 
+HASHTAG_RE = re.compile(r"(?<![\w])#([A-Za-z0-9_]+)")
+MENTION_RE = re.compile(r"(?<![\w])@([A-Za-z0-9_.-]+)")
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")
+VIDEO_EXTENSIONS = (".mp4",)
+
+
+def unique_preserving_order(values: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    unique_values: list[str] = []
+    for value in values:
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_values.append(value)
+    return unique_values
+
+
+def normalize_hashtag(value: Any) -> Optional[str]:
+    tag = text_value(value).lstrip("#")
+    if not tag:
+        return None
+    return f"#{tag}"
+
+
+def normalize_mention(value: Any) -> Optional[str]:
+    mention = text_value(value).lstrip("@")
+    if not mention:
+        return None
+    return f"@{mention}"
+
+
+def read_hashtags(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [tag for tag in (normalize_hashtag(item) for item in value) if tag]
+    if isinstance(value, str):
+        return [tag for tag in (normalize_hashtag(item) for item in re.split(r"[\s,]+", value)) if tag]
+    return []
+
+
+def read_mentions(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [mention for mention in (normalize_mention(item) for item in value) if mention]
+    if isinstance(value, str):
+        return [mention for mention in (normalize_mention(item) for item in re.split(r"[\s,]+", value)) if mention]
+    return []
+
+
+def extract_hashtags(caption: str) -> list[str]:
+    return unique_preserving_order(f"#{match.group(1)}" for match in HASHTAG_RE.finditer(caption))
+
+
+def extract_mentions(caption: str) -> list[str]:
+    return unique_preserving_order(f"@{match.group(1)}" for match in MENTION_RE.finditer(caption))
+
+
+def read_post_type(value: Any, default: int = 0) -> Optional[int]:
+    if value is None or value == "":
+        return default
+    post_type = optional_int(value)
+    if post_type is None or post_type not in {0, 1, 2, 3}:
+        return None
+    return post_type
+
+
+def media_kind(media_url: str) -> Optional[str]:
+    url = media_url.strip().lower().split("?", 1)[0].split("#", 1)[0]
+    if not url:
+        return None
+    if url.startswith("data:image/") or url.endswith(IMAGE_EXTENSIONS):
+        return "image"
+    if url.startswith("data:video/mp4") or url.endswith(VIDEO_EXTENSIONS):
+        return "video"
+    return "unknown"
+
+
+def media_error(media_url: str, post_type: int) -> Optional[str]:
+    kind = media_kind(media_url)
+    if kind is None:
+        return None
+    if kind == "unknown":
+        return "media url must be an image or mp4"
+    if post_type == 2 and kind != "image":
+        return "marketplace posts only allow image media"
+    return None
+
+
 def create_auth_session(user: AuthUser) -> str:
     token = secrets.token_urlsafe(32)
-    db().add(AuthSession(token=token, user_id=user.id))
+    db().add(AuthSession(token=token, user_id=user.user_id))
     return token
 
 
 def find_auth_user_by_login(login: str) -> Optional[AuthUser]:
-    return db().scalar(select(AuthUser).where((AuthUser.email == login) | (AuthUser.username == login)))
+    return db().scalar(select(AuthUser).where((AuthUser.mail == login) | (AuthUser.username == login)))
 
 
 def auth_payload(user: AuthUser, token: str) -> dict[str, Any]:
@@ -529,16 +720,83 @@ def current_auth_user() -> Optional[AuthUser]:
     return db().get(AuthUser, session.user_id)
 
 
-def make_post(data: dict[str, Any], sort_order: int = 0) -> FeedPost:
-    return FeedPost(
-        author=text_value(data.get("author")),
-        meta=text_value(data.get("meta")),
-        title=text_value(data.get("title")),
-        body=text_value(data.get("body")),
-        image=text_value(data.get("image"), DEFAULT_POST_IMAGE),
-        tag=text_value(data.get("tag")),
-        likes=text_value(data.get("likes"), "0"),
-        comments=text_value(data.get("comments"), "0"),
+def is_admin_user(user: Optional[AuthUser]) -> bool:
+    return (
+        user is not None
+        and user.username == normalize_username(DEFAULT_ADMIN_USER["username"])
+        and user.mail == normalize_email(DEFAULT_ADMIN_USER["mail"])
+    )
+
+
+def require_admin_user():
+    user = current_auth_user()
+    if user is None:
+        return jsonify({"error": "unauthorized"}), 401
+    if not is_admin_user(user):
+        return jsonify({"error": "admin access required"}), 403
+    return None
+
+
+def serialize_post(post: Post) -> dict[str, Any]:
+    author = db().get(User, post.author_id)
+    club = db().get(ClubCard, post.club_id) if post.club_id is not None else None
+    return post.to_dict(author.name if author is not None else None, club.slug if club is not None else None)
+
+
+def post_caption_from_data(data: dict[str, Any]) -> str:
+    return text_value(get_first(data, "caption", "body", "title"))
+
+
+def resolve_post_author_id(data: dict[str, Any]) -> str:
+    explicit_author_id = text_value(get_first(data, "author_id", "authorId"))
+    if explicit_author_id:
+        return explicit_author_id
+
+    current_user = current_auth_user()
+    if current_user is not None:
+        return current_user.user_id
+
+    username = normalize_username(data.get("author"))
+    if username:
+        user = db().scalar(select(User).where(User.username == username))
+        if user is not None:
+            return user.user_id
+
+    return ""
+
+
+def resolve_post_club_id(data: dict[str, Any]) -> Optional[int]:
+    explicit_club_id = optional_int(get_first(data, "club_id", "clubId"))
+    if explicit_club_id is not None:
+        return explicit_club_id
+
+    club_slug = optional_text(get_first(data, "clubSlug", "club_slug"))
+    if club_slug is None:
+        return None
+
+    club = db().scalar(select(ClubCard).where(ClubCard.slug == slugify(club_slug)))
+    return club.id if club is not None else None
+
+
+def make_post(data: dict[str, Any], sort_order: int = 0) -> Post:
+    caption = post_caption_from_data(data)
+    post_type = read_post_type(get_first(data, "type", "postType", "post_type"), default=0) or 0
+    explicit_hashtags = read_hashtags(get_first(data, "hashtags", "tag"))
+    explicit_mentions = read_mentions(get_first(data, "mentions", "taggedPeople", "tagged_people"))
+
+    return Post(
+        post_id=unique_backend_id(Post, "post_id", "post"),
+        author_id=resolve_post_author_id(data),
+        club_id=resolve_post_club_id(data),
+        post_type=post_type,
+        media_url=text_value(get_first(data, "media_url", "mediaUrl", "image"), DEFAULT_POST_IMAGE),
+        caption=caption,
+        likes=optional_int(data.get("likes")) or 0,
+        shares=optional_int(data.get("shares")) or 0,
+        hashtags=unique_preserving_order([*explicit_hashtags, *extract_hashtags(caption)]),
+        mentions=unique_preserving_order([*explicit_mentions, *extract_mentions(caption)]),
+        price=optional_text(data.get("price")),
+        description=optional_text(data.get("description")),
         sort_order=sort_order,
     )
 
@@ -561,8 +819,10 @@ def make_suggested_person(data: dict[str, Any], sort_order: int = 0) -> Suggeste
 
 
 def make_club_card(data: dict[str, Any], sort_order: int = 0) -> ClubCard:
+    title = text_value(data.get("title"))
     return ClubCard(
-        title=text_value(data.get("title")),
+        title=title,
+        slug=slugify(get_first(data, "slug", default=title)),
         description=text_value(data.get("description")),
         status=text_value(data.get("status")),
         icon=text_value(data.get("icon"), "groups"),
@@ -688,14 +948,17 @@ def make_profile(data: dict[str, Any]) -> Profile:
 
 
 POST_UPDATE_FIELDS: list[FieldSpec] = [
-    (("author",), "author", text_value),
-    (("meta",), "meta", text_value),
-    (("title",), "title", text_value),
-    (("body",), "body", text_value),
-    (("image",), "image", text_value),
-    (("tag",), "tag", text_value),
-    (("likes",), "likes", text_value),
-    (("comments",), "comments", text_value),
+    (("author_id", "authorId"), "author_id", text_value),
+    (("club_id", "clubId"), "club_id", optional_int),
+    (("type", "postType", "post_type"), "post_type", lambda value: read_post_type(value, default=0) or 0),
+    (("media_url", "mediaUrl", "image"), "media_url", text_value),
+    (("caption", "body", "title"), "caption", text_value),
+    (("likes",), "likes", lambda value: optional_int(value) or 0),
+    (("shares",), "shares", lambda value: optional_int(value) or 0),
+    (("hashtags", "tag"), "hashtags", read_hashtags),
+    (("mentions", "taggedPeople", "tagged_people"), "mentions", read_mentions),
+    (("price",), "price", optional_text),
+    (("description",), "description", optional_text),
 ]
 
 TRENDING_UPDATE_FIELDS: list[FieldSpec] = [
@@ -830,53 +1093,87 @@ def seed_profiles(session: Session) -> None:
         session.add(make_profile(row))
 
 
-def ensure_auth_schema() -> None:
+def ensure_app_schema() -> None:
     if engine.dialect.name == "postgresql":
         with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS username VARCHAR(80)"))
-            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_auth_users_username ON auth_users (username)"))
+            connection.execute(text("ALTER TABLE club_cards ADD COLUMN IF NOT EXISTS slug VARCHAR(220)"))
+            connection.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS club_id INTEGER"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_posts_club_id ON posts (club_id)"))
         return
 
     if engine.dialect.name == "sqlite":
         with engine.begin() as connection:
-            columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(auth_users)").all()}
-            if "username" not in columns:
-                connection.execute(text("ALTER TABLE auth_users ADD COLUMN username VARCHAR(80)"))
-            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_auth_users_username ON auth_users (username)"))
+            club_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(club_cards)").all()}
+            if "slug" not in club_columns:
+                connection.execute(text("ALTER TABLE club_cards ADD COLUMN slug VARCHAR(220)"))
+
+            post_columns = {row[1] for row in connection.exec_driver_sql("PRAGMA table_info(posts)").all()}
+            if "club_id" not in post_columns:
+                connection.execute(text("ALTER TABLE posts ADD COLUMN club_id INTEGER"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_posts_club_id ON posts (club_id)"))
+
+
+def ensure_app_indexes() -> None:
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as connection:
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_club_cards_slug ON club_cards (slug)"))
+        return
+
+    if engine.dialect.name == "sqlite":
+        with engine.begin() as connection:
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_club_cards_slug ON club_cards (slug)"))
+
+
+def unique_club_slug_for_session(session: Session, value: Any, current_club_id: Optional[int] = None) -> str:
+    base_slug = slugify(value)
+    candidate = base_slug
+    suffix = 2
+
+    while True:
+        existing = session.scalar(select(ClubCard).where(ClubCard.slug == candidate))
+        if existing is None or existing.id == current_club_id:
+            return candidate
+        candidate = f"{base_slug}-{suffix}"
+        suffix += 1
+
+
+def backfill_club_slugs(session: Session) -> None:
+    for club in session.scalars(select(ClubCard).order_by(ClubCard.id.asc())).all():
+        if not club.slug:
+            club.slug = unique_club_slug_for_session(session, club.title, club.id)
 
 
 def seed_admin_user(session: Session) -> None:
-    email = normalize_email(DEFAULT_ADMIN_USER["email"])
+    mail = normalize_email(DEFAULT_ADMIN_USER["mail"])
     username = normalize_username(DEFAULT_ADMIN_USER["username"])
-    user = session.scalar(select(AuthUser).where((AuthUser.email == email) | (AuthUser.username == username)))
+    user = session.scalar(select(AuthUser).where((AuthUser.mail == mail) | (AuthUser.username == username)))
 
     if user is None:
         session.add(
             AuthUser(
-                email=email,
-                username=username,
+                user_id=generate_backend_id("user"),
+                mail=mail,
+                username=username or "admin",
                 name=text_value(DEFAULT_ADMIN_USER["name"], "Admin"),
-                profile_photo=text_value(DEFAULT_ADMIN_USER["profilePhoto"], PROFILE_AVATAR),
-                date_of_birth=text_value(DEFAULT_ADMIN_USER["dateOfBirth"], "2000-01-01"),
+                dob=text_value(DEFAULT_ADMIN_USER["DOB"], "2000-01-01"),
                 department=text_value(DEFAULT_ADMIN_USER["department"], "CS"),
-                year_of_study=read_year_of_study(DEFAULT_ADMIN_USER["yearOfStudy"]) or 1,
+                year=read_year_of_study(DEFAULT_ADMIN_USER["year"]) or 1,
                 password_hash=generate_password_hash(text_value(DEFAULT_ADMIN_USER["password"], "12345678")),
             )
         )
         return
 
-    user.username = username
-    user.email = email
+    user.username = username or user.username
+    user.mail = mail
     user.name = text_value(user.name, text_value(DEFAULT_ADMIN_USER["name"], "Admin"))
-    user.profile_photo = text_value(user.profile_photo, text_value(DEFAULT_ADMIN_USER["profilePhoto"], PROFILE_AVATAR))
-    user.date_of_birth = text_value(user.date_of_birth, text_value(DEFAULT_ADMIN_USER["dateOfBirth"], "2000-01-01"))
+    user.dob = text_value(user.dob, text_value(DEFAULT_ADMIN_USER["DOB"], "2000-01-01"))
     user.department = text_value(user.department, text_value(DEFAULT_ADMIN_USER["department"], "CS"))
-    user.year_of_study = user.year_of_study or read_year_of_study(DEFAULT_ADMIN_USER["yearOfStudy"]) or 1
+    user.year = user.year or read_year_of_study(DEFAULT_ADMIN_USER["year"]) or 1
     user.password_hash = generate_password_hash(text_value(DEFAULT_ADMIN_USER["password"], "12345678"))
 
 
 def seed_database(session: Session) -> None:
-    seed_collection(session, FeedPost, SEED_FEED_CARDS, make_post)
+    seed_collection(session, Post, SEED_FEED_CARDS, make_post)
     seed_collection(session, TrendingTopic, SEED_TRENDING, make_trending_topic)
     seed_collection(session, SuggestedPerson, SEED_SUGGESTED_PEOPLE, make_suggested_person)
     seed_collection(session, ClubCard, SEED_CLUB_CARDS, make_club_card)
@@ -901,15 +1198,20 @@ def ensure_database_initialized() -> None:
         if _database_initialized:
             return
         Base.metadata.create_all(engine)
-        ensure_auth_schema()
+        ensure_app_schema()
         with SessionLocal() as session:
+            backfill_club_slugs(session)
             seed_database(session)
+            backfill_club_slugs(session)
             session.commit()
+        ensure_app_indexes()
         _database_initialized = True
 
 
 def ordered_statement(model: type[T]):
     statement = select(model)
+    if model is Post:
+        return statement.order_by(Post.created_at.desc(), Post.post_id.asc())
     if hasattr(model, "sort_order") and hasattr(model, "id"):
         return statement.order_by(model.sort_order.asc(), model.id.desc())
     if hasattr(model, "user"):
@@ -930,6 +1232,16 @@ def create_resource(factory: Factory, serializer: Optional[Serializer] = None):
     db().commit()
     db().refresh(item)
     return jsonify((serializer or (lambda model: model.to_dict()))(item)), 201
+
+
+def create_club_card_resource():
+    data = read_json()
+    item = make_club_card(data)
+    item.slug = unique_club_slug(get_first(data, "slug", default=item.slug or item.title))
+    db().add(item)
+    db().commit()
+    db().refresh(item)
+    return jsonify(item.to_dict()), 201
 
 
 def apply_updates(item: Any, data: dict[str, Any], fields: list[FieldSpec]) -> None:
@@ -960,6 +1272,339 @@ def resource_detail(model: type[Any], item_id: int, fields: list[FieldSpec], ser
     db().commit()
     db().refresh(item)
     return jsonify(to_payload(item))
+
+
+def club_by_slug(slug: str) -> Optional[ClubCard]:
+    return db().scalar(select(ClubCard).where(ClubCard.slug == slugify(slug)))
+
+
+def club_members_for_club(club: ClubCard) -> list[ClubMember]:
+    return db().scalars(select(ClubMember).where(ClubMember.club_id == club.id).order_by(ClubMember.id.asc())).all()
+
+
+def club_posts_for_club(club: ClubCard) -> list[Post]:
+    return db().scalars(
+        select(Post)
+        .where((Post.club_id == club.id) & (Post.post_type == 1))
+        .order_by(Post.created_at.desc(), Post.post_id.asc())
+    ).all()
+
+
+def serialize_club_member(member: ClubMember) -> dict[str, Any]:
+    user = db().get(User, member.user_id)
+    created_at = member.created_at.isoformat()
+    return {
+        "id": member.id,
+        "club_id": member.club_id,
+        "clubId": member.club_id,
+        "user_id": member.user_id,
+        "userId": member.user_id,
+        "title": member.title,
+        "created_at": created_at,
+        "createdAt": created_at,
+        "user": user.to_dict() if user is not None else None,
+        "name": user.name if user is not None else member.user_id,
+        "username": user.username if user is not None else "",
+        "mail": user.mail if user is not None else "",
+        "initials": initials_for_name(user.name if user is not None else member.user_id),
+    }
+
+
+def serialize_club_detail(club: ClubCard) -> dict[str, Any]:
+    return {
+        "club": club.to_dict(),
+        "members": [serialize_club_member(member) for member in club_members_for_club(club)],
+        "posts": [serialize_post(post) for post in club_posts_for_club(club)],
+    }
+
+
+def resolve_member_user(data: dict[str, Any]) -> Optional[User]:
+    user_id = text_value(get_first(data, "user_id", "userId"))
+    if user_id:
+        return db().get(User, user_id)
+
+    username = normalize_username(data.get("username"))
+    if username:
+        return db().scalar(select(User).where(User.username == username))
+
+    mail = normalize_email(get_first(data, "mail", "email"))
+    if mail:
+        return db().scalar(select(User).where(User.mail == mail))
+
+    return None
+
+
+def create_club_member_resource(club: ClubCard):
+    data = read_json()
+    user = resolve_member_user(data)
+    if user is None:
+        return jsonify({"error": "user_id, username, or mail must reference an existing user"}), 400
+
+    existing = db().scalar(select(ClubMember).where((ClubMember.club_id == club.id) & (ClubMember.user_id == user.user_id)))
+    if existing is not None:
+        return jsonify({"error": "user is already a club member"}), 409
+
+    member = ClubMember(
+        club_id=club.id,
+        user_id=user.user_id,
+        title=text_value(data.get("title"), "Member"),
+    )
+    db().add(member)
+    db().commit()
+    db().refresh(member)
+    return jsonify(serialize_club_member(member)), 201
+
+
+def user_values(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": text_value(data.get("name")),
+        "username": normalize_username(data.get("username")),
+        "mail": normalize_email(get_first(data, "mail", "email")),
+        "dob": text_value(get_first(data, "DOB", "dob", "dateOfBirth", "date_of_birth")),
+        "year": read_year_of_study(get_first(data, "year", "yearOfStudy", "year_of_study")),
+        "department": text_value(data.get("department")),
+    }
+
+
+def validate_user_values(values: dict[str, Any]) -> Optional[str]:
+    if not values["name"]:
+        return "name is required"
+    if not values["username"]:
+        return "username is required"
+    if not values["mail"] or not valid_email(values["mail"]):
+        return "valid mail is required"
+    if not values["dob"]:
+        return "DOB is required"
+    if values["year"] is None:
+        return "year is required"
+    if not values["department"]:
+        return "department is required"
+    return None
+
+
+def validate_unique_user(username: str, mail: str, current_user_id: Optional[str] = None):
+    existing_username = db().scalar(select(User).where(User.username == username))
+    if existing_username is not None and existing_username.user_id != current_user_id:
+        return jsonify({"error": "username already exists"}), 409
+
+    existing_mail = db().scalar(select(User).where(User.mail == mail))
+    if existing_mail is not None and existing_mail.user_id != current_user_id:
+        return jsonify({"error": "mail already exists"}), 409
+
+    return None
+
+
+def create_user_from_payload(data: dict[str, Any], require_password: bool = False):
+    values = user_values(data)
+    validation_error = validate_user_values(values)
+    if validation_error is not None:
+        return None, jsonify({"error": validation_error}), 400
+
+    unique_error = validate_unique_user(values["username"], values["mail"])
+    if unique_error is not None:
+        return None, *unique_error
+
+    password = text_value(data.get("password"))
+    if require_password and len(password) < 6:
+        return None, jsonify({"error": "password must be at least 6 characters"}), 400
+
+    user = User(
+        user_id=unique_backend_id(User, "user_id", "user"),
+        name=values["name"],
+        username=values["username"],
+        mail=values["mail"],
+        dob=values["dob"],
+        year=values["year"],
+        department=values["department"],
+        password_hash=generate_password_hash(password or secrets.token_urlsafe(32)),
+    )
+    return user, None, None
+
+
+def update_user_from_payload(user: User, data: dict[str, Any]):
+    values = user_values(
+        {
+            "name": get_first(data, "name", default=user.name),
+            "username": get_first(data, "username", default=user.username),
+            "mail": get_first(data, "mail", "email", default=user.mail),
+            "DOB": get_first(data, "DOB", "dob", "dateOfBirth", "date_of_birth", default=user.dob),
+            "year": get_first(data, "year", "yearOfStudy", "year_of_study", default=user.year),
+            "department": get_first(data, "department", default=user.department),
+        }
+    )
+    validation_error = validate_user_values(values)
+    if validation_error is not None:
+        return jsonify({"error": validation_error}), 400
+
+    unique_error = validate_unique_user(values["username"], values["mail"], current_user_id=user.user_id)
+    if unique_error is not None:
+        return unique_error
+
+    if "password" in data:
+        password = text_value(data.get("password"))
+        if len(password) < 6:
+            return jsonify({"error": "password must be at least 6 characters"}), 400
+        user.password_hash = generate_password_hash(password)
+
+    user.name = values["name"]
+    user.username = values["username"]
+    user.mail = values["mail"]
+    user.dob = values["dob"]
+    user.year = values["year"]
+    user.department = values["department"]
+    return None
+
+
+def requested_post_type(data: dict[str, Any], default: int) -> Optional[int]:
+    value = get_first(data, "type", "postType", "post_type", default=MISSING)
+    if value is MISSING:
+        return default
+    return read_post_type(value, default=default)
+
+
+def is_club_member(club_id: int, user_id: str) -> bool:
+    return (
+        db().scalar(
+            select(ClubMember).where((ClubMember.club_id == club_id) & (ClubMember.user_id == user_id))
+        )
+        is not None
+    )
+
+
+def validate_post(post: Post):
+    if post.post_type not in {0, 1, 2, 3}:
+        return jsonify({"error": "type must be 0, 1, 2, or 3"}), 400
+    if not post.author_id or db().get(User, post.author_id) is None:
+        return jsonify({"error": "author_id must reference an existing user"}), 400
+
+    if post.post_type == 1:
+        if post.club_id is None or db().get(ClubCard, post.club_id) is None:
+            return jsonify({"error": "club_id or clubSlug must reference an existing club for club posts"}), 400
+        if not is_club_member(post.club_id, post.author_id):
+            return jsonify({"error": "club posts require club membership"}), 403
+    else:
+        post.club_id = None
+
+    error = media_error(post.media_url, post.post_type)
+    if error is not None:
+        return jsonify({"error": error}), 400
+
+    if post.post_type == 2:
+        if not post.price:
+            return jsonify({"error": "price is required for marketplace posts"}), 400
+        if not post.description:
+            return jsonify({"error": "description is required for marketplace posts"}), 400
+    else:
+        post.price = None
+        post.description = None
+
+    return None
+
+
+def create_post_from_payload(data: dict[str, Any]):
+    post_type = requested_post_type(data, default=0)
+    if post_type is None:
+        return jsonify({"error": "type must be 0, 1, 2, or 3"}), 400
+
+    post_data = {**data, "type": post_type}
+    post = make_post(post_data)
+    validation_error = validate_post(post)
+    if validation_error is not None:
+        return validation_error
+
+    db().add(post)
+    db().commit()
+    db().refresh(post)
+    return jsonify(serialize_post(post)), 201
+
+
+def update_post_from_payload(post: Post, data: dict[str, Any]):
+    post_type = requested_post_type(data, default=post.post_type)
+    if post_type is None:
+        return jsonify({"error": "type must be 0, 1, 2, or 3"}), 400
+    post.post_type = post_type
+
+    if "author_id" in data or "authorId" in data:
+        post.author_id = text_value(get_first(data, "author_id", "authorId"))
+
+    if "club_id" in data or "clubId" in data or "clubSlug" in data or "club_slug" in data:
+        post.club_id = resolve_post_club_id(data)
+
+    if "media_url" in data or "mediaUrl" in data or "image" in data:
+        post.media_url = text_value(get_first(data, "media_url", "mediaUrl", "image"))
+
+    caption_changed = any(key in data for key in ("caption", "body", "title"))
+    if caption_changed:
+        post.caption = post_caption_from_data(data)
+
+    if "likes" in data:
+        likes = optional_int(data.get("likes"))
+        if likes is None or likes < 0:
+            return jsonify({"error": "likes must be a non-negative integer"}), 400
+        post.likes = likes
+
+    if "shares" in data:
+        shares = optional_int(data.get("shares"))
+        if shares is None or shares < 0:
+            return jsonify({"error": "shares must be a non-negative integer"}), 400
+        post.shares = shares
+
+    if "price" in data:
+        post.price = optional_text(data.get("price"))
+    if "description" in data:
+        post.description = optional_text(data.get("description"))
+
+    if caption_changed or "hashtags" in data or "tag" in data:
+        explicit_hashtags = read_hashtags(get_first(data, "hashtags", "tag", default=[]))
+        post.hashtags = unique_preserving_order([*explicit_hashtags, *extract_hashtags(post.caption)])
+
+    if caption_changed or "mentions" in data or "taggedPeople" in data or "tagged_people" in data:
+        explicit_mentions = read_mentions(get_first(data, "mentions", "taggedPeople", "tagged_people", default=[]))
+        post.mentions = unique_preserving_order([*explicit_mentions, *extract_mentions(post.caption)])
+
+    validation_error = validate_post(post)
+    if validation_error is not None:
+        return validation_error
+
+    db().commit()
+    db().refresh(post)
+    return jsonify(serialize_post(post))
+
+
+def marketplace_post_payload(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **data,
+        "type": 2,
+        "caption": text_value(get_first(data, "caption", "title", "itemName")),
+        "mediaUrl": text_value(get_first(data, "mediaUrl", "media_url", "image", "photoUrl")),
+        "hashtags": get_first(data, "hashtags", "tags", default=[]),
+    }
+
+
+def marketplace_posts() -> list[Post]:
+    return db().scalars(select(Post).where(Post.post_type == 2).order_by(Post.created_at.desc(), Post.post_id.asc())).all()
+
+
+def serialize_marketplace_post(post: Post) -> dict[str, Any]:
+    user = db().get(User, post.author_id)
+    created_at = post.created_at.isoformat()
+    return {
+        "id": post.post_id,
+        "post_id": post.post_id,
+        "title": post.caption or "Marketplace listing",
+        "owner": user.name if user is not None else post.author_id,
+        "mode": "Sell",
+        "category": "Marketplace",
+        "condition": "",
+        "price": post.price or "",
+        "location": "",
+        "description": post.description or "",
+        "image": post.media_url,
+        "tags": [tag.lstrip("#") for tag in post.hashtags or []],
+        "contact": user.mail if user is not None else "",
+        "preferredExchange": "",
+        "createdAt": created_at,
+    }
 
 
 @app.before_request
@@ -1013,23 +1658,86 @@ def health():
 def feed():
     return jsonify(
         {
-            "feedCards": serialize_all(FeedPost),
+            "feedCards": serialize_all(Post, serialize_post),
             "trending": serialize_all(TrendingTopic),
             "suggestedPeople": serialize_all(SuggestedPerson),
         }
     )
 
 
+@app.route("/api/users", methods=["GET", "POST"])
+def users_collection():
+    if request.method == "GET":
+        username_query = normalize_username(request.args.get("username"))
+        if username_query:
+            users = db().scalars(
+                select(User)
+                .where(User.username.contains(username_query))
+                .order_by(User.username.asc())
+                .limit(10)
+            ).all()
+            return jsonify([user.to_dict() for user in users])
+
+        return jsonify(serialize_all(User))
+
+    user, error_response, status = create_user_from_payload(read_json())
+    if error_response is not None:
+        return error_response, status
+
+    db().add(user)
+    db().commit()
+    db().refresh(user)
+    return jsonify(user.to_dict()), 201
+
+
+@app.route("/api/users/<user_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def users_item(user_id: str):
+    user = db().get(User, user_id)
+    if user is None:
+        return jsonify({"error": "not found"}), 404
+
+    if request.method == "GET":
+        return jsonify(user.to_dict())
+
+    if request.method == "DELETE":
+        for session in db().scalars(select(AuthSession).where(AuthSession.user_id == user.user_id)).all():
+            db().delete(session)
+        for post in db().scalars(select(Post).where(Post.author_id == user.user_id)).all():
+            db().delete(post)
+        db().delete(user)
+        db().commit()
+        return ("", 204)
+
+    update_error = update_user_from_payload(user, read_json())
+    if update_error is not None:
+        return update_error
+
+    db().commit()
+    db().refresh(user)
+    return jsonify(user.to_dict())
+
+
 @app.route("/api/posts", methods=["GET", "POST"])
 def posts_collection():
     if request.method == "POST":
-        return create_resource(make_post)
-    return jsonify(serialize_all(FeedPost))
+        return create_post_from_payload(read_json())
+    return jsonify(serialize_all(Post, serialize_post))
 
 
-@app.route("/api/posts/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def posts_item(item_id: int):
-    return resource_detail(FeedPost, item_id, POST_UPDATE_FIELDS)
+@app.route("/api/posts/<post_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def posts_item(post_id: str):
+    post = db().get(Post, post_id)
+    if post is None:
+        return jsonify({"error": "not found"}), 404
+
+    if request.method == "GET":
+        return jsonify(serialize_post(post))
+    if request.method == "DELETE":
+        db().delete(post)
+        db().commit()
+        return ("", 204)
+
+    return update_post_from_payload(post, read_json())
 
 
 @app.route("/api/feed/trending", methods=["GET", "POST"])
@@ -1069,42 +1777,119 @@ def clubs():
 
 @app.route("/api/clubs", methods=["POST"])
 def create_club_alias():
-    return create_resource(make_club_card)
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
+    return create_club_card_resource()
 
 
 @app.route("/api/clubs/items", methods=["GET", "POST"])
 def club_items_collection():
     if request.method == "POST":
-        return create_resource(make_club_card)
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
+        return create_club_card_resource()
     return jsonify(serialize_all(ClubCard))
 
 
 @app.route("/api/clubs/items/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def club_item(item_id: int):
+    if request.method != "GET":
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
     return resource_detail(ClubCard, item_id, CLUB_UPDATE_FIELDS)
+
+
+@app.route("/api/clubs/<slug>", methods=["GET"])
+def club_detail(slug: str):
+    club = club_by_slug(slug)
+    if club is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(serialize_club_detail(club))
+
+
+@app.route("/api/clubs/<slug>/members", methods=["GET", "POST"])
+def club_members_collection(slug: str):
+    club = club_by_slug(slug)
+    if club is None:
+        return jsonify({"error": "not found"}), 404
+
+    if request.method == "POST":
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
+        return create_club_member_resource(club)
+
+    return jsonify([serialize_club_member(member) for member in club_members_for_club(club)])
+
+
+@app.route("/api/clubs/<slug>/members/<int:member_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def club_member_item(slug: str, member_id: int):
+    club = club_by_slug(slug)
+    if club is None:
+        return jsonify({"error": "not found"}), 404
+
+    member = db().get(ClubMember, member_id)
+    if member is None or member.club_id != club.id:
+        return jsonify({"error": "not found"}), 404
+
+    if request.method == "GET":
+        return jsonify(serialize_club_member(member))
+
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
+
+    if request.method == "DELETE":
+        db().delete(member)
+        db().commit()
+        return ("", 204)
+
+    data = read_json()
+    if "title" in data:
+        member.title = text_value(data.get("title"), "Member")
+    db().commit()
+    db().refresh(member)
+    return jsonify(serialize_club_member(member))
 
 
 @app.route("/api/clubs/spotlight", methods=["GET", "POST"])
 def spotlight_collection():
     if request.method == "POST":
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
         return create_resource(make_spotlight_club)
     return jsonify(serialize_all(SpotlightClub))
 
 
 @app.route("/api/clubs/spotlight/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def spotlight_item(item_id: int):
+    if request.method != "GET":
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
     return resource_detail(SpotlightClub, item_id, SPOTLIGHT_UPDATE_FIELDS)
 
 
 @app.route("/api/clubs/stats", methods=["GET", "POST"])
 def club_stats_collection():
     if request.method == "POST":
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
         return create_resource(make_club_stat)
     return jsonify(serialize_all(ClubStat))
 
 
 @app.route("/api/clubs/stats/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def club_stats_item(item_id: int):
+    if request.method != "GET":
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
     return resource_detail(ClubStat, item_id, CLUB_STAT_UPDATE_FIELDS)
 
 
@@ -1157,23 +1942,34 @@ def recent_game_activity_item(item_id: int):
 
 @app.route("/api/marketplace")
 def marketplace():
-    return jsonify({"items": serialize_all(MarketplaceItem)})
+    return jsonify({"items": [serialize_marketplace_post(post) for post in marketplace_posts()]})
 
 
 @app.route("/api/marketplace", methods=["POST"])
 @app.route("/api/marketplace/items", methods=["POST"])
 def create_marketplace_item():
-    return create_resource(make_marketplace_item)
+    return create_post_from_payload(marketplace_post_payload(read_json()))
 
 
 @app.route("/api/marketplace/items", methods=["GET"])
 def marketplace_items_collection():
-    return jsonify(serialize_all(MarketplaceItem))
+    return jsonify([serialize_marketplace_post(post) for post in marketplace_posts()])
 
 
-@app.route("/api/marketplace/items/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def marketplace_item(item_id: int):
-    return resource_detail(MarketplaceItem, item_id, MARKETPLACE_UPDATE_FIELDS)
+@app.route("/api/marketplace/items/<post_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def marketplace_item(post_id: str):
+    post = db().get(Post, post_id)
+    if post is None or post.post_type != 2:
+        return jsonify({"error": "not found"}), 404
+
+    if request.method == "GET":
+        return jsonify(serialize_marketplace_post(post))
+    if request.method == "DELETE":
+        db().delete(post)
+        db().commit()
+        return ("", 204)
+
+    return update_post_from_payload(post, marketplace_post_payload(read_json()))
 
 
 @app.route("/api/messages")
@@ -1208,47 +2004,10 @@ def message_item(item_id: int):
 @app.route("/api/auth/signup", methods=["POST"])
 def auth_signup():
     data = read_json()
-    email = normalize_email(data.get("email"))
-    username = normalize_username(data.get("username"))
-    password = text_value(data.get("password"))
-    name = text_value(data.get("name"))
-    profile_photo = text_value(get_first(data, "profilePhoto", "profile_photo"), PROFILE_AVATAR)
-    date_of_birth = text_value(get_first(data, "dateOfBirth", "date_of_birth"))
-    department = text_value(data.get("department"))
-    year_of_study = read_year_of_study(get_first(data, "yearOfStudy", "year_of_study", "year"))
+    user, error_response, status = create_user_from_payload(data, require_password=True)
+    if error_response is not None:
+        return error_response, status
 
-    if not valid_email(email):
-        return jsonify({"error": "valid email is required"}), 400
-    if not name:
-        return jsonify({"error": "name is required"}), 400
-    if not date_of_birth:
-        return jsonify({"error": "date of birth is required"}), 400
-    if not department:
-        return jsonify({"error": "department is required"}), 400
-    if year_of_study is None:
-        return jsonify({"error": "year of study is required"}), 400
-    if len(password) < 6:
-        return jsonify({"error": "password must be at least 6 characters"}), 400
-
-    if username is not None:
-        existing_username = db().scalar(select(AuthUser).where(AuthUser.username == username))
-        if existing_username is not None:
-            return jsonify({"error": "username already exists"}), 409
-
-    existing_user = db().scalar(select(AuthUser).where(AuthUser.email == email))
-    if existing_user is not None:
-        return jsonify({"error": "account already exists"}), 409
-
-    user = AuthUser(
-        email=email,
-        username=username,
-        name=name,
-        profile_photo=profile_photo,
-        date_of_birth=date_of_birth,
-        department=department,
-        year_of_study=year_of_study,
-        password_hash=generate_password_hash(password),
-    )
     db().add(user)
     db().flush()
     token = create_auth_session(user)

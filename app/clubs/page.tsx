@@ -1,5 +1,6 @@
 import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { AuthSessionControl } from "@/components/auth-session-control";
+import { AdminCreateClubAction } from "@/components/admin-create-club-action";
 import { CreateClubOverlay } from "@/components/create-club-overlay";
 import { EmptyState } from "@/components/empty-state";
 import { getCampusData } from "@/lib/campus-api";
@@ -106,21 +107,14 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
               <EmptyState
                 title="No clubs yet"
                 description="Club discovery is ready for real club records."
-                action={
-                  <Link
-                    href="/clubs?mode=createclub"
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary"
-                  >
-                    <span className="material-symbols-outlined text-base">group_add</span>
-                    Create club
-                  </Link>
-                }
+                action={<AdminCreateClubAction />}
               />
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {clubsData.clubCards.map((card) => (
-                <div
-                  key={card.title}
+                <Link
+                  key={card.slug}
+                  href={`/clubs/${card.slug}`}
                   className="group overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
                 >
                   <div className={`relative h-32 overflow-hidden ${card.bannerBg}`}>
@@ -134,9 +128,9 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                       <div className={`relative z-10 -mt-12 flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-white shadow-md ${card.iconBg}`}>
                         <span className="material-symbols-outlined text-3xl text-white">{card.icon}</span>
                       </div>
-                      <button className="rounded-xl bg-surface-container-low p-2 text-primary transition-all hover:bg-primary hover:text-white">
+                      <span className="rounded-xl bg-surface-container-low p-2 text-primary transition-all group-hover:bg-primary group-hover:text-white">
                         <span className="material-symbols-outlined">add</span>
-                      </button>
+                      </span>
                     </div>
                     <div>
                       <h4 className="font-headline-md text-on-background">{card.title}</h4>
@@ -163,7 +157,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                       </span>
                     </div>
                   </div>
-                </div>
+                </Link>
                 ))}
               </div>
             )}
@@ -181,12 +175,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
           ) : null}
         </main>
 
-        <Link href="/clubs?mode=createclub" className="group fixed bottom-24 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all hover:scale-110 active:scale-90">
-          <span className="material-symbols-outlined text-3xl">group_add</span>
-          <span className="absolute right-full mr-4 whitespace-nowrap rounded-2xl bg-primary px-4 py-2 text-sm font-label-md text-white opacity-0 transition-opacity group-hover:opacity-100">
-            Create Club
-          </span>
-        </Link>
+        <AdminCreateClubAction variant="floating" />
       </div>
 
       <SourceBottomNav active="club" variant="club" />

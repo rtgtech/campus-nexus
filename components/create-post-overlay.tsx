@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { readAuthSession } from "@/lib/auth-client";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:5000";
@@ -12,8 +13,8 @@ function readForm(form: HTMLFormElement, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function readPhoto(form: HTMLFormElement) {
-  const file = new FormData(form).get("photo");
+function readMedia(form: HTMLFormElement) {
+  const file = new FormData(form).get("media");
 
   if (!(file instanceof File) || file.size === 0) {
     return Promise.resolve("");
@@ -40,18 +41,20 @@ export function CreatePostOverlay() {
     setStatus("saving");
 
     try {
-      const image = await readPhoto(form);
+      const session = readAuthSession();
+      const mediaUrl = await readMedia(form);
       const response = await fetch(`${API_BASE_URL}/api/posts`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
         body: JSON.stringify({
-          author: "",
-          meta: "Just now - Campus Nexus",
-          title: caption.slice(0, 72),
-          body: taggedPeople ? `${caption || ""} Tagged: ${taggedPeople}`.trim() : caption,
-          image,
-          tag: hashtags || "#campusnexus",
-          taggedPeople,
+          type: Number(readForm(form, "type")),
+          caption,
+          mediaUrl,
+          hashtags,
+          mentions: taggedPeople,
         }),
       });
 
@@ -87,13 +90,25 @@ export function CreatePostOverlay() {
 
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
           <label className="block space-y-2">
-            <span className="text-sm font-semibold text-on-surface">Photo</span>
+            <span className="text-sm font-semibold text-on-surface">Media</span>
             <input
-              name="photo"
-              accept="image/*"
+              name="media"
+              accept="image/*,video/mp4"
               className="w-full rounded-2xl border border-dashed border-outline-variant/80 bg-surface-container-low px-4 py-5 text-sm text-on-surface outline-none file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-on-primary"
               type="file"
             />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="text-sm font-semibold text-on-surface">Post type</span>
+            <select
+              name="type"
+              className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+              defaultValue="0"
+            >
+              <option value="0">Normal post</option>
+              <option value="3">Admin post</option>
+            </select>
           </label>
 
           <label className="block space-y-2">
@@ -133,7 +148,7 @@ export function CreatePostOverlay() {
                 ? "Post created."
                 : status === "error"
                 ? "Backend is not reachable. Start the API and try again."
-                : "Photo posts are saved to the backend."}
+                : "Posts are saved to the backend."}
             </p>
             <button
               disabled={status === "saving"}

@@ -1,7 +1,7 @@
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { getCampusData } from "@/lib/campus-api";
-import { fallbackProfile, type ProfileData } from "@/lib/app-data";
+import { fallbackProfile, getInitials, type ProfileData } from "@/lib/app-data";
 
 type ProfilePageProps = {
   params: Promise<{
@@ -29,15 +29,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           <div className="flex flex-col gap-8 md:flex-row md:items-center">
             <div className="relative">
               <div className="h-36 w-36 rounded-full bg-primary p-1 md:h-40 md:w-40">
-                <img
-                  alt={displayName}
-                  className="h-full w-full rounded-full object-cover border-4 border-white"
-                  src={profile.avatar}
-                />
+                <div className="flex h-full w-full items-center justify-center rounded-full border-4 border-white bg-primary-fixed text-4xl font-bold text-primary md:text-5xl">
+                  {getInitials(displayName)}
+                </div>
               </div>
-              <button className="absolute bottom-1 right-1 rounded-full bg-secondary p-3 text-white shadow-lg">
-                <span className="material-symbols-outlined text-base">photo_camera</span>
-              </button>
             </div>
 
             <div className="flex-1">

@@ -47,10 +47,12 @@ npm run dev:backend
 | `GET` | `/health` | Health check. |
 | `GET` | `/api/feed` | Feed cards, trending topics, and suggested people. |
 | `GET` | `/api/clubs` | Spotlight clubs, club cards, and club stats. |
+| `GET` | `/api/clubs/<slug>` | Club detail with club info, members, and club posts. |
+| `GET` | `/api/clubs/<slug>/members` | Members for a club. |
 | `GET` | `/api/games` | Game cards, top-rated games, and recent activity. |
 | `GET` | `/api/marketplace` | Marketplace listings. |
 | `GET` | `/api/messages` | Conversations and chat messages. |
-| `POST` | `/api/auth/signup` | Create a student account with email, name, profile photo, date of birth, department, year, and password. |
+| `POST` | `/api/auth/signup` | Create a student account with mail, username, name, date of birth, department, year, and password. |
 | `POST` | `/api/auth/login` | Login with email or username and password. |
 | `GET` | `/api/auth/me` | Return the authenticated user for a bearer token. |
 | `POST` | `/api/auth/logout` | Delete the authenticated session token. |
@@ -58,12 +60,16 @@ npm run dev:backend
 
 The Next.js frontend stores the returned token in a `campusNexusToken` cookie for route middleware and in `localStorage` as `campusNexusAuth` for client-side header state.
 
-Startup also seeds a common development account when missing:
+Startup also seeds an admin service account when missing:
 
 ```text
 username: admin
+name: Admin
+mail: admin@cn.nhce
 password: 12345678
 ```
+
+Club creation and club management mutations require this admin account's bearer token. Regular users can read club data, but cannot create, update, or delete club records.
 
 ## CRUD Endpoints
 
@@ -75,6 +81,7 @@ Each collection supports `GET` and `POST`; each item endpoint supports `GET`, `P
 | `/api/feed/trending` | `/api/feed/trending/<id>` |
 | `/api/feed/suggested-people` | `/api/feed/suggested-people/<id>` |
 | `/api/clubs/items` | `/api/clubs/items/<id>` |
+| `/api/clubs/<slug>/members` | `/api/clubs/<slug>/members/<id>` |
 | `/api/clubs/spotlight` | `/api/clubs/spotlight/<id>` |
 | `/api/clubs/stats` | `/api/clubs/stats/<id>` |
 | `/api/games/items` | `/api/games/items/<id>` |
@@ -90,3 +97,7 @@ Compatibility aliases are preserved:
 - `POST /api/clubs` creates a club card.
 - `POST /api/marketplace` creates a marketplace item.
 - `POST /api/marketplace/items` also creates a marketplace item.
+
+`POST`, `PATCH`, `PUT`, and `DELETE` requests for `/api/clubs`, `/api/clubs/items`, `/api/clubs/spotlight`, and `/api/clubs/stats` require admin access.
+Club member create, update, and delete requests under `/api/clubs/<slug>/members` also require admin access.
+Club posts use normal `/api/posts` requests with `type: 1` plus `clubSlug` or `club_id`; the author must already be a member of that club.
