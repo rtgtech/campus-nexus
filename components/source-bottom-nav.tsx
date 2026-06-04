@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProfileNavLink } from "@/components/profile-nav-link";
 
 type BottomNavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
 
@@ -13,7 +14,7 @@ const items: Array<{ key: BottomNavKey; label: string; href: string; icon: strin
   { key: "marketplace", label: "Market", href: "/marketplace", icon: "storefront" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/chat", icon: "forum" },
-  { key: "profile", label: "Profile", href: "/aarav", icon: "person" },
+  { key: "profile", label: "Profile", href: "/auth", icon: "person" },
 ];
 
 export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
@@ -40,6 +41,18 @@ export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
           if (variant === "games") {
             className += " active:scale-90 duration-150";
           }
+        }
+
+        if (item.key === "profile") {
+          return (
+            <ProfileNavLink
+              key={item.key}
+              className={className}
+              icon={item.icon}
+              label={item.label}
+              labelClassName="mt-1 text-[10px] font-bold uppercase tracking-widest"
+            />
+          );
         }
 
         return (

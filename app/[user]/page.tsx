@@ -1,5 +1,6 @@
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
+import { FollowButton } from "@/components/follow-button";
 import { ProfilePostsGrid } from "@/components/profile-posts-grid";
 import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
 import { fallbackFeed, fallbackProfile, getInitials, type CampusUser, type FeedData, type ProfileData } from "@/lib/app-data";
@@ -47,6 +48,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const { user } = await params;
   const profileUser = await getProfileUser(user);
   const displayName = profileUser?.name || formatName(user) || "Profile";
+  const usernameLabel = profileUser?.username ? `@${profileUser.username}` : "";
   const profile = await getCampusData<ProfileData>(`/api/profile/${encodeURIComponent(user)}`, fallbackProfile);
   const feedData = await getCampusData<FeedData>("/api/feed", fallbackFeed);
   const userPosts = profileUser
@@ -54,7 +56,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     : [];
 
   return (
-    <CampusShell active="profile" userHref={`/${user}`}>
+    <CampusShell active="profile">
       <div className="space-y-8">
         <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)] md:p-8">
           <div className="flex flex-col gap-8 md:flex-row md:items-center">
@@ -68,10 +70,19 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
             <div className="flex-1">
               <h1 className="font-['Space_Grotesk'] text-4xl font-bold tracking-tight text-primary">{displayName}</h1>
+              {usernameLabel ? (
+                <p className="mt-2 text-sm font-semibold text-secondary">{usernameLabel}</p>
+              ) : null}
               <p className="mt-3 text-lg text-on-surface-variant">{profile.major}</p>
               <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">{profile.bio}</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <button className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-on-primary">Edit Profile</button>
+                {profileUser ? (
+                  <FollowButton targetUserId={profileUser.user_id} targetName={displayName} />
+                ) : (
+                  <button className="rounded-full bg-surface-container px-6 py-3 text-sm font-semibold text-on-surface-variant" disabled>
+                    Profile unavailable
+                  </button>
+                )}
                 <button className="rounded-full border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface">
                   Share
                 </button>
@@ -86,8 +97,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             description={userPosts.length > 0 ? `${userPosts.length} posts shared by ${displayName}.` : "Posts for this profile will appear here."}
           />
           <div className="mt-6">
-            {userPosts.length > 0 ? (
-              <ProfilePostsGrid posts={userPosts} />
+            {profileUser && userPosts.length > 0 ? (
+              <ProfilePostsGrid ownerUserId={profileUser.user_id} posts={userPosts} />
             ) : (
               <EmptyState title="No posts yet" description="Profile posts will appear here when this user publishes content." />
             )}

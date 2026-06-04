@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 
 type FeedPostCardProps = {
@@ -17,8 +18,61 @@ function readLikeCount(value: string | number) {
     return value;
   }
 
-  const numericValue = Number(value);
+  const numericValue = Number(String(value).replace(/,/g, ""));
   return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function formatLikeLabel(value: number) {
+  const formattedValue = new Intl.NumberFormat("en").format(Math.max(0, value));
+  return `${formattedValue} ${value === 1 ? "like" : "likes"}`;
+}
+
+function pluralize(value: number, unit: string) {
+  return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
+}
+
+function formatPostTime(value?: string) {
+  if (!value) {
+    return "";
+  }
+
+  const parsedTime = new Date(value).getTime();
+  if (!Number.isFinite(parsedTime)) {
+    return value;
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - parsedTime) / 1000));
+  if (elapsedSeconds < 60) {
+    return "Just now";
+  }
+
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  if (elapsedMinutes < 60) {
+    return pluralize(elapsedMinutes, "minute");
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) {
+    return pluralize(elapsedHours, "hour");
+  }
+
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  if (elapsedDays < 30) {
+    return pluralize(elapsedDays, "day");
+  }
+
+  const elapsedMonths = Math.floor(elapsedDays / 30);
+  if (elapsedMonths < 12) {
+    return pluralize(elapsedMonths, "month");
+  }
+
+  const elapsedYears = Math.floor(elapsedDays / 365);
+  return pluralize(elapsedYears, "year");
+}
+
+function profileHref(post: FeedCard) {
+  const authorKey = post.author_id || post.authorId || post.author.trim().toLowerCase().replace(/\s+/g, "-");
+  return `/${encodeURIComponent(authorKey)}`;
 }
 
 export function FeedPostCard({ post }: FeedPostCardProps) {
@@ -29,6 +83,8 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   const body = post.body || post.caption || "";
   const tag = post.hashtags?.[0] || post.tag;
   const hasMedia = Boolean(mediaUrl);
+  const authorHref = profileHref(post);
+  const postedAt = formatPostTime(post.createdAt || post.meta);
 
   function handleLike() {
     setLiked((current) => {
@@ -50,17 +106,24 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   }
 
   return (
-    <article className="overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white/85 shadow-[0_12px_30px_rgba(27,27,35,0.06)] backdrop-blur-xl">
+    <article
+      id={post.post_id}
+      className="scroll-mt-24 overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white/85 shadow-[0_12px_30px_rgba(27,27,35,0.06)] backdrop-blur-xl"
+    >
       <div className="flex items-center justify-between px-5 py-4 md:px-6">
-        <div className="flex min-w-0 items-center gap-3">
+        <Link
+          href={authorHref}
+          className="flex min-w-0 items-center gap-3 rounded-2xl outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-label={`View ${post.author}'s profile`}
+        >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary">
             {getInitials(post.author)}
           </span>
           <div className="min-w-0">
             <h3 className="truncate font-semibold text-on-surface">{post.author}</h3>
-            <p className="truncate text-xs uppercase tracking-[0.18em] text-on-surface-variant">{post.meta}</p>
+            {postedAt ? <p className="truncate text-xs font-semibold text-on-surface-variant">{postedAt}</p> : null}
           </div>
-        </div>
+        </Link>
         <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container" type="button">
           <span className="material-symbols-outlined">more_horiz</span>
         </button>
@@ -110,7 +173,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
             onClick={handleLike}
           >
             <span className="material-symbols-outlined text-secondary">{liked ? "favorite" : "favorite_border"}</span>
-            {likeCount}
+            {formatLikeLabel(likeCount)}
           </button>
           <button className="flex items-center gap-2 hover:text-primary" type="button" onClick={handleShare}>
             <span className="material-symbols-outlined">share</span>

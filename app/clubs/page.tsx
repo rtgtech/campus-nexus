@@ -3,6 +3,7 @@ import { AuthSessionControl } from "@/components/auth-session-control";
 import { AdminCreateClubAction } from "@/components/admin-create-club-action";
 import { CreateClubOverlay } from "@/components/create-club-overlay";
 import { EmptyState } from "@/components/empty-state";
+import { HeaderSearch } from "@/components/header-search";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackClubs, type ClubsData } from "@/lib/app-data";
 import Link from "next/link";
@@ -34,14 +35,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
               </span>
             </div>
             <div className="flex items-center gap-4">
-              <div className="hidden items-center rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 md:flex">
-                <span className="material-symbols-outlined text-xl text-outline">search</span>
-                <input
-                  className="w-64 border-none bg-transparent text-sm font-label-md focus:ring-0"
-                  placeholder="Search campus clubs..."
-                  type="text"
-                />
-              </div>
+              <HeaderSearch className="hidden w-72 md:block" placeholder="Search campus clubs..." />
               <button className="material-symbols-outlined rounded-full p-2 text-primary transition-all duration-200 ease-out hover:bg-surface-container active:scale-95">
                 notifications
               </button>

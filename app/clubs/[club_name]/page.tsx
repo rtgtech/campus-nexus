@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AuthSessionControl } from "@/components/auth-session-control";
+import { ClubFollowButton } from "@/components/club-follow-button";
 import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
@@ -43,6 +44,8 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
   }
 
   const { club, members, posts } = detail;
+  const followers = detail.followers ?? club.followers ?? 0;
+  const postsCount = detail.postsCount ?? club.postsCount ?? posts.length;
 
   return (
     <>
@@ -93,6 +96,18 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
 
           <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
             <aside className="space-y-6">
+              <ClubFollowButton clubSlug={club.slug} clubTitle={club.title} initialFollowers={followers} />
+
+              <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Club Posts</p>
+                    <h2 className="mt-2 font-headline-md text-2xl text-on-background">{postsCount}</h2>
+                  </div>
+                  <span className="material-symbols-outlined rounded-full bg-primary-fixed p-3 text-primary">article</span>
+                </div>
+              </section>
+
               <ClubMemberAdminPanel clubSlug={club.slug} existingUserIds={members.map((member) => member.user_id)} />
 
               <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
@@ -133,7 +148,10 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Club Posts</p>
-                  <h2 className="mt-2 font-headline-md text-2xl text-on-background">Latest updates</h2>
+                  <h2 className="mt-2 font-headline-md text-2xl text-on-background">
+                    Latest updates
+                    <span className="ml-3 align-middle text-base font-semibold text-on-surface-variant">({postsCount})</span>
+                  </h2>
                 </div>
               </div>
 

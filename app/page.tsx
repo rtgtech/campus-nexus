@@ -5,6 +5,7 @@ import { FeedPostCard } from "@/components/feed-post-card";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackFeed, getInitials, type FeedData } from "@/lib/app-data";
 import Link from "next/link";
+import { cookies } from "next/headers";
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -21,7 +22,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const view = getSearchValue(resolvedSearchParams.view);
   const showCreatePost =
     unnamedQuery === "createpost" || mode === "createpost" || view === "createpost";
-  const feedData = await getCampusData<FeedData>("/api/feed", fallbackFeed);
+  const token = (await cookies()).get("campusNexusToken")?.value;
+  const feedData = await getCampusData<FeedData>(
+    "/api/feed",
+    fallbackFeed,
+    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+  );
 
   return (
     <CampusShell active="feed">

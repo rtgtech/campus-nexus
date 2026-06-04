@@ -28,6 +28,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 from sqlalchemy.pool import StaticPool
 from werkzeug.security import check_password_hash, generate_password_hash
 
+try:
+    from .feed_ranker import rank_feed_posts
+except ImportError:
+    from feed_ranker import rank_feed_posts
+
 BACKEND_DIR = Path(__file__).resolve().parent
 
 try:
@@ -175,6 +180,27 @@ class ClubMember(Base):
     user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ClubFollower(Base):
+    __tablename__ = "club_followers"
+    __table_args__ = (UniqueConstraint("club_id", "user_id", name="uq_club_followers_club_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    club_id: Mapped[int] = mapped_column(Integer, ForeignKey("club_cards.id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "club_id": self.club_id,
+            "clubId": self.club_id,
+            "user_id": self.user_id,
+            "userId": self.user_id,
+            "created_at": self.created_at.isoformat(),
+            "createdAt": self.created_at.isoformat(),
+        }
 
 
 class SpotlightClub(OrderedResourceMixin, Base):
@@ -431,6 +457,27 @@ class UserXp(Base):
         )
 
 
+class UserFriendship(Base):
+    __tablename__ = "user_friendships"
+    __table_args__ = (UniqueConstraint("follower_id", "following_id", name="uq_user_friendships_follower_following"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    follower_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), index=True, nullable=False)
+    following_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "follower_id": self.follower_id,
+            "followerId": self.follower_id,
+            "following_id": self.following_id,
+            "followingId": self.following_id,
+            "created_at": self.created_at.isoformat(),
+            "createdAt": self.created_at.isoformat(),
+        }
+
+
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
 
@@ -620,6 +667,13 @@ def normalize_login(value: Any) -> str:
 
 def valid_email(value: str) -> bool:
     return "@" in value and "." in value.rsplit("@", 1)[-1]
+
+
+def edu_email(value: str) -> bool:
+    if not valid_email(value):
+        return False
+    domain = value.rsplit("@", 1)[-1].lower()
+    return domain == "edu" or domain.endswith(".edu")
 
 
 def read_year_of_study(value: Any) -> Optional[int]:
@@ -1318,6 +1372,37 @@ def club_posts_for_club(club: ClubCard) -> list[Post]:
     ).all()
 
 
+def club_posts_count(club: ClubCard) -> int:
+    count = db().scalar(
+        select(func.count()).select_from(Post).where((Post.club_id == club.id) & (Post.post_type == 1))
+    )
+    return int(count or 0)
+
+
+def club_followers_count(club: ClubCard) -> int:
+    count = db().scalar(select(func.count()).select_from(ClubFollower).where(ClubFollower.club_id == club.id))
+    return int(count or 0)
+
+
+def club_follow_for_user(club: ClubCard, user_id: str) -> Optional[ClubFollower]:
+    return db().scalar(select(ClubFollower).where((ClubFollower.club_id == club.id) & (ClubFollower.user_id == user_id)))
+
+
+def club_follow_payload(club: ClubCard, user: User) -> dict[str, Any]:
+    follower = club_follow_for_user(club, user.user_id)
+    return {
+        "club_id": club.id,
+        "clubId": club.id,
+        "clubSlug": club.slug,
+        "user_id": user.user_id,
+        "userId": user.user_id,
+        "isFollowing": follower is not None,
+        "followers": club_followers_count(club),
+        "postsCount": club_posts_count(club),
+        "follow": follower.to_dict() if follower is not None else None,
+    }
+
+
 def serialize_club_member(member: ClubMember) -> dict[str, Any]:
     user = db().get(User, member.user_id)
     created_at = member.created_at.isoformat()
@@ -1339,11 +1424,138 @@ def serialize_club_member(member: ClubMember) -> dict[str, Any]:
 
 
 def serialize_club_detail(club: ClubCard) -> dict[str, Any]:
+    posts = club_posts_for_club(club)
+    followers = club_followers_count(club)
+    posts_count = len(posts)
     return {
-        "club": club.to_dict(),
+        "club": {
+            **club.to_dict(),
+            "followers": followers,
+            "postsCount": posts_count,
+        },
         "members": [serialize_club_member(member) for member in club_members_for_club(club)],
-        "posts": [serialize_post(post) for post in club_posts_for_club(club)],
+        "posts": [serialize_post(post) for post in posts],
+        "followers": followers,
+        "postsCount": posts_count,
     }
+
+
+def search_user_payload(user: User) -> dict[str, Any]:
+    initials = initials_for_name(user.name)
+    return {
+        "type": "user",
+        "id": user.user_id,
+        "title": user.name,
+        "subtitle": f"@{user.username}",
+        "href": f"/{user.username}",
+        "icon": "person",
+        "initials": initials,
+        "user_id": user.user_id,
+        "userId": user.user_id,
+        "username": user.username,
+    }
+
+
+def search_club_payload(club: ClubCard) -> dict[str, Any]:
+    return {
+        "type": "club",
+        "id": club.id,
+        "title": club.title,
+        "subtitle": club.status or "Club",
+        "href": f"/clubs/{club.slug}",
+        "icon": club.icon or "groups",
+        "slug": club.slug,
+    }
+
+
+def search_post_payload(post: Post) -> dict[str, Any]:
+    author = db().get(User, post.author_id)
+    title = text_value(post.caption)[:72] or "Untitled post"
+    return {
+        "type": "post",
+        "id": post.post_id,
+        "title": title,
+        "subtitle": author.name if author is not None else "Post",
+        "href": f"/#{post.post_id}",
+        "icon": "article",
+        "post_id": post.post_id,
+        "postId": post.post_id,
+    }
+
+
+def search_results(query: str, limit: int) -> dict[str, Any]:
+    normalized_query = query.lower()
+    users = db().scalars(
+        select(User)
+        .where((func.lower(User.username).contains(normalized_query)) | (func.lower(User.name).contains(normalized_query)))
+        .order_by(User.username.asc())
+        .limit(limit)
+    ).all()
+    clubs = db().scalars(
+        select(ClubCard)
+        .where(
+            (func.lower(ClubCard.title).contains(normalized_query))
+            | (func.lower(ClubCard.slug).contains(normalized_query))
+            | (func.lower(ClubCard.description).contains(normalized_query))
+        )
+        .order_by(ClubCard.title.asc())
+        .limit(limit)
+    ).all()
+    posts = db().scalars(
+        select(Post)
+        .where(func.lower(Post.caption).contains(normalized_query))
+        .order_by(Post.created_at.desc(), Post.post_id.asc())
+        .limit(limit)
+    ).all()
+
+    return {
+        "query": query,
+        "users": [search_user_payload(user) for user in users],
+        "clubs": [search_club_payload(club) for club in clubs],
+        "posts": [search_post_payload(post) for post in posts],
+    }
+
+
+def feed_viewer_user_id() -> Optional[str]:
+    current_user = current_auth_user()
+    if current_user is not None:
+        return None if is_admin_user(current_user) else current_user.user_id
+
+    requested_user_id = text_value(request.args.get("user_id") or request.args.get("userId"))
+    if not requested_user_id:
+        return None
+
+    requested_user = db().get(User, requested_user_id)
+    if requested_user is None or is_admin_user(requested_user):
+        return None
+    return requested_user.user_id
+
+
+def feed_limit() -> Optional[int]:
+    requested_limit = optional_int(request.args.get("limit"))
+    if requested_limit is None:
+        return None
+    return max(1, min(requested_limit, 100))
+
+
+def ranked_feed_cards(viewer_user_id: Optional[str], limit: Optional[int]) -> list[dict[str, Any]]:
+    users = db().scalars(select(User).order_by(User.user_id.asc())).all()
+    clubs = db().scalars(select(ClubCard).order_by(ClubCard.id.asc())).all()
+    memberships = db().scalars(select(ClubMember).order_by(ClubMember.id.asc())).all()
+    friendships = db().scalars(select(UserFriendship).order_by(UserFriendship.id.asc())).all()
+    posts = db().scalars(ordered_statement(Post)).all()
+    admin_user_ids = {user.user_id for user in users if is_admin_user(user)}
+
+    return rank_feed_posts(
+        users=[{"user_id": user.user_id} for user in users],
+        clubs=[{"id": club.id} for club in clubs],
+        club_memberships=[(member.club_id, member.user_id) for member in memberships],
+        friendships=[(friendship.follower_id, friendship.following_id) for friendship in friendships],
+        posts=[serialize_post(post) for post in posts],
+        viewer_user_id=viewer_user_id,
+        admin_user_ids=admin_user_ids,
+        limit=limit,
+    )
 
 
 def leaderboard_entries() -> list[dict[str, Any]]:
@@ -1373,6 +1585,106 @@ def award_user_xp(user: User, xp: int) -> UserXp:
     db().commit()
     db().refresh(row)
     return row
+
+
+def friendship_between(follower_id: str, following_id: str) -> Optional[UserFriendship]:
+    return db().scalar(
+        select(UserFriendship).where(
+            (UserFriendship.follower_id == follower_id) & (UserFriendship.following_id == following_id)
+        )
+    )
+
+
+def friendship_counts(user_id: str) -> dict[str, int]:
+    followers = db().scalar(
+        select(func.count()).select_from(UserFriendship).where(UserFriendship.following_id == user_id)
+    )
+    following = db().scalar(
+        select(func.count()).select_from(UserFriendship).where(UserFriendship.follower_id == user_id)
+    )
+    return {"followers": int(followers or 0), "following": int(following or 0)}
+
+
+def friendship_user_payload(user: User, friendship: UserFriendship) -> dict[str, Any]:
+    acronym = initials_for_name(user.name)
+    return {
+        "user_id": user.user_id,
+        "userId": user.user_id,
+        "id": user.user_id,
+        "name": user.name,
+        "username": user.username,
+        "acronym": acronym,
+        "initials": acronym,
+        "friendship_id": friendship.id,
+        "friendshipId": friendship.id,
+        "created_at": friendship.created_at.isoformat(),
+        "createdAt": friendship.created_at.isoformat(),
+    }
+
+
+def friendship_list_rows(
+    user_id: str, list_name: str, limit: Optional[int] = None, offset: int = 0
+) -> tuple[list[tuple[User, UserFriendship]], int]:
+    if list_name == "followers":
+        total = db().scalar(
+            select(func.count()).select_from(UserFriendship).where(UserFriendship.following_id == user_id)
+        )
+        statement = (
+            select(User, UserFriendship)
+            .join(UserFriendship, UserFriendship.follower_id == User.user_id)
+            .where(UserFriendship.following_id == user_id)
+        )
+    else:
+        total = db().scalar(
+            select(func.count()).select_from(UserFriendship).where(UserFriendship.follower_id == user_id)
+        )
+        statement = (
+            select(User, UserFriendship)
+            .join(UserFriendship, UserFriendship.following_id == User.user_id)
+            .where(UserFriendship.follower_id == user_id)
+        )
+
+    statement = statement.order_by(UserFriendship.created_at.desc(), User.username.asc()).offset(max(offset, 0))
+    if limit is not None:
+        statement = statement.limit(limit)
+
+    return db().execute(statement).all(), int(total or 0)
+
+
+def friendship_list_payload(user_id: str, list_name: str, limit: int = 50, offset: int = 0) -> dict[str, Any]:
+    rows, total = friendship_list_rows(user_id, list_name, limit, offset)
+    return {
+        "items": [friendship_user_payload(user, friendship) for user, friendship in rows],
+        "total": total,
+        "limit": limit,
+        "offset": max(offset, 0),
+    }
+
+
+def friendship_lists(user_id: str) -> dict[str, list[dict[str, Any]]]:
+    followers, _ = friendship_list_rows(user_id, "followers")
+    following, _ = friendship_list_rows(user_id, "following")
+    return {
+        "followersList": [friendship_user_payload(user, friendship) for user, friendship in followers],
+        "followingList": [friendship_user_payload(user, friendship) for user, friendship in following],
+    }
+
+
+def friendship_status_payload(current_user: User, target_user: User, include_lists: bool = False) -> dict[str, Any]:
+    friendship = friendship_between(current_user.user_id, target_user.user_id)
+    payload = {
+        "isFollowing": friendship is not None,
+        "isSelf": current_user.user_id == target_user.user_id,
+        "follower_id": current_user.user_id,
+        "followerId": current_user.user_id,
+        "following_id": target_user.user_id,
+        "followingId": target_user.user_id,
+        **friendship_counts(target_user.user_id),
+        "friendship": friendship.to_dict() if friendship is not None else None,
+    }
+    if include_lists:
+        payload.update(friendship_lists(target_user.user_id))
+    return payload
 
 
 def resolve_member_user(data: dict[str, Any]) -> Optional[User]:
@@ -1430,6 +1742,8 @@ def validate_user_values(values: dict[str, Any]) -> Optional[str]:
         return "username is required"
     if not values["mail"] or not valid_email(values["mail"]):
         return "valid mail is required"
+    if not edu_email(values["mail"]):
+        return "mail must use a .edu domain"
     if not values["dob"]:
         return "DOB is required"
     if values["year"] is None:
@@ -1628,6 +1942,15 @@ def update_post_from_payload(post: Post, data: dict[str, Any]):
     return jsonify(serialize_post(post))
 
 
+def require_post_owner_or_admin(post: Post):
+    user = current_auth_user()
+    if user is None:
+        return jsonify({"error": "unauthorized"}), 401
+    if post.author_id != user.user_id and not is_admin_user(user):
+        return jsonify({"error": "only the post author can delete this post"}), 403
+    return None
+
+
 def marketplace_post_payload(data: dict[str, Any]) -> dict[str, Any]:
     return {
         **data,
@@ -1715,11 +2038,23 @@ def health():
 def feed():
     return jsonify(
         {
-            "feedCards": serialize_all(Post, serialize_post),
+            "feedCards": ranked_feed_cards(feed_viewer_user_id(), feed_limit()),
             "trending": serialize_all(TrendingTopic),
             "suggestedPeople": serialize_all(SuggestedPerson),
         }
     )
+
+
+@app.route("/api/search")
+def global_search():
+    query = text_value(request.args.get("q") or request.args.get("query"))[:80]
+    limit = optional_int(request.args.get("limit")) or 5
+    limit = max(1, min(limit, 10))
+
+    if len(query) < 2:
+        return jsonify({"query": query, "users": [], "clubs": [], "posts": []})
+
+    return jsonify(search_results(query, limit))
 
 
 @app.route("/api/users", methods=["GET", "POST"])
@@ -1761,6 +2096,14 @@ def users_item(user_id: str):
             db().delete(session)
         for post in db().scalars(select(Post).where(Post.author_id == user.user_id)).all():
             db().delete(post)
+        for friendship in db().scalars(
+            select(UserFriendship).where(
+                (UserFriendship.follower_id == user.user_id) | (UserFriendship.following_id == user.user_id)
+            )
+        ).all():
+            db().delete(friendship)
+        for club_follow in db().scalars(select(ClubFollower).where(ClubFollower.user_id == user.user_id)).all():
+            db().delete(club_follow)
         db().delete(user)
         db().commit()
         return ("", 204)
@@ -1772,6 +2115,61 @@ def users_item(user_id: str):
     db().commit()
     db().refresh(user)
     return jsonify(user.to_dict())
+
+
+@app.route("/api/users/<user_id>/friends", methods=["GET", "POST", "DELETE"])
+def user_friendship_collection(user_id: str):
+    target_user = db().get(User, user_id)
+    if target_user is None:
+        return jsonify({"error": "not found"}), 404
+
+    current_user = current_auth_user()
+    if current_user is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    if request.method == "GET":
+        include_lists = read_bool(request.args.get("includeLists") or request.args.get("include_lists"))
+        return jsonify(friendship_status_payload(current_user, target_user, include_lists))
+
+    if current_user.user_id == target_user.user_id:
+        return jsonify({"error": "users cannot follow themselves"}), 400
+
+    existing = friendship_between(current_user.user_id, target_user.user_id)
+
+    if request.method == "DELETE":
+        if existing is not None:
+            db().delete(existing)
+            db().commit()
+        return jsonify(friendship_status_payload(current_user, target_user))
+
+    if existing is None:
+        existing = UserFriendship(follower_id=current_user.user_id, following_id=target_user.user_id)
+        db().add(existing)
+        db().commit()
+        db().refresh(existing)
+        return jsonify(friendship_status_payload(current_user, target_user)), 201
+
+    return jsonify(friendship_status_payload(current_user, target_user))
+
+
+@app.route("/api/users/<user_id>/friends/<list_name>", methods=["GET"])
+def user_friendship_list(user_id: str, list_name: str):
+    target_user = db().get(User, user_id)
+    if target_user is None:
+        return jsonify({"error": "not found"}), 404
+
+    current_user = current_auth_user()
+    if current_user is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    if list_name not in {"followers", "following"}:
+        return jsonify({"error": "not found"}), 404
+
+    limit = optional_int(request.args.get("limit")) or 50
+    offset = optional_int(request.args.get("offset")) or 0
+    limit = max(1, min(limit, 100))
+    offset = max(offset, 0)
+    return jsonify(friendship_list_payload(target_user.user_id, list_name, limit, offset))
 
 
 @app.route("/api/posts", methods=["GET", "POST"])
@@ -1790,6 +2188,9 @@ def posts_item(post_id: str):
     if request.method == "GET":
         return jsonify(serialize_post(post))
     if request.method == "DELETE":
+        owner_error = require_post_owner_or_admin(post)
+        if owner_error is not None:
+            return owner_error
         db().delete(post)
         db().commit()
         return ("", 204)
@@ -1865,6 +2266,37 @@ def club_detail(slug: str):
     if club is None:
         return jsonify({"error": "not found"}), 404
     return jsonify(serialize_club_detail(club))
+
+
+@app.route("/api/clubs/<slug>/follow", methods=["GET", "POST", "DELETE"])
+def club_follow(slug: str):
+    club = club_by_slug(slug)
+    if club is None:
+        return jsonify({"error": "not found"}), 404
+
+    user = current_auth_user()
+    if user is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    existing = club_follow_for_user(club, user.user_id)
+
+    if request.method == "GET":
+        return jsonify(club_follow_payload(club, user))
+
+    if request.method == "DELETE":
+        if existing is not None:
+            db().delete(existing)
+            db().commit()
+        return jsonify(club_follow_payload(club, user))
+
+    if existing is None:
+        existing = ClubFollower(club_id=club.id, user_id=user.user_id)
+        db().add(existing)
+        db().commit()
+        db().refresh(existing)
+        return jsonify(club_follow_payload(club, user)), 201
+
+    return jsonify(club_follow_payload(club, user))
 
 
 @app.route("/api/clubs/<slug>/members", methods=["GET", "POST"])
@@ -2060,6 +2492,9 @@ def marketplace_item(post_id: str):
     if request.method == "GET":
         return jsonify(serialize_marketplace_post(post))
     if request.method == "DELETE":
+        owner_error = require_post_owner_or_admin(post)
+        if owner_error is not None:
+            return owner_error
         db().delete(post)
         db().commit()
         return ("", 204)

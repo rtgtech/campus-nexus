@@ -82,6 +82,8 @@ export type ClubCard = {
   extraMembersClass: string;
   avatars: string[];
   statusClass: string;
+  followers?: number;
+  postsCount?: number;
 };
 
 export type ClubMember = {
@@ -116,6 +118,8 @@ export type ClubDetailData = {
   club: ClubCard;
   members: ClubMember[];
   posts: FeedCard[];
+  followers?: number;
+  postsCount?: number;
 };
 
 export type GameCard = {
@@ -258,6 +262,8 @@ export const fallbackClubDetail: ClubDetailData = {
   },
   members: [],
   posts: [],
+  followers: 0,
+  postsCount: 0,
 };
 
 export const fallbackGames: GamesData = {

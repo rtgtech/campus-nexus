@@ -1,6 +1,7 @@
 import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { EmptyState } from "@/components/empty-state";
+import { HeaderSearch } from "@/components/header-search";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackMarketplace, type MarketplaceData } from "@/lib/app-data";
 import Link from "next/link";
@@ -140,13 +141,7 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
             <Link href="/" className="font-headline-lg text-2xl font-black tracking-tighter text-primary">
               Campus Nexus
             </Link>
-            <div className="hidden items-center rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 md:flex">
-              <span className="material-symbols-outlined text-xl text-outline">search</span>
-              <input
-                className="w-72 border-none bg-transparent text-sm font-label-md focus:ring-0"
-                type="text"
-              />
-            </div>
+            <HeaderSearch className="hidden w-80 md:block" placeholder="Search campus..." />
             <div className="flex items-center gap-3">
               <button className="material-symbols-outlined rounded-full p-2 text-primary transition hover:bg-surface-container">
                 notifications

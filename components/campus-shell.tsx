@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
+import { HeaderSearch } from "@/components/header-search";
+import { ProfileNavLink } from "@/components/profile-nav-link";
 
 type NavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
 type NavItemKey = NavKey | "create-post";
@@ -8,7 +10,6 @@ type NavItemKey = NavKey | "create-post";
 type CampusShellProps = {
   active: NavKey;
   children: ReactNode;
-  userHref?: string;
 };
 
 const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
@@ -18,12 +19,8 @@ const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: stri
   { key: "marketplace", label: "Marketplace", href: "/marketplace", icon: "storefront" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/chat", icon: "forum" },
-  { key: "profile", label: "Profile", href: "/aarav", icon: "person" },
+  { key: "profile", label: "Profile", href: "/auth", icon: "person" },
 ];
-
-function navHref(itemHref: string, userHref: string) {
-  return itemHref === "/aarav" ? userHref : itemHref;
-}
 
 export function SectionTitle({
   eyebrow,
@@ -56,7 +53,7 @@ export function SectionTitle({
   );
 }
 
-export function CampusShell({ active, children, userHref = "/aarav" }: CampusShellProps) {
+export function CampusShell({ active, children }: CampusShellProps) {
   return (
     <div className="min-h-screen bg-background text-on-background">
       <header className="sticky top-0 z-50 border-b border-outline-variant/70 bg-white/80 backdrop-blur-xl">
@@ -70,14 +67,7 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
             </Link>
           </div>
           <div className="hidden justify-center md:flex">
-            <div className="w-full max-w-sm rounded-full border border-outline-variant bg-surface-container-low px-4 py-2 md:flex md:items-center md:gap-3">
-              <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
-              <input
-                className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant"
-                placeholder="Search campus spaces..."
-                type="text"
-              />
-            </div>
+            <HeaderSearch className="w-full max-w-sm" />
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
@@ -98,18 +88,24 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
             {navItems.map((item) => {
               const selected = item.key === active;
               const isCreatePost = item.key === "create-post";
+              const className = [
+                "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                isCreatePost
+                  ? "bg-secondary text-white shadow-[0_18px_40px_rgba(236,32,36,0.22)] hover:scale-[1.01]"
+                  : selected
+                    ? "bg-primary text-on-primary shadow-[0_18px_40px_rgba(34,29,92,0.22)]"
+                    : "text-on-surface-variant hover:bg-surface-container hover:text-primary",
+              ].join(" ");
+
+              if (item.key === "profile") {
+                return <ProfileNavLink key={item.key} className={className} icon={item.icon} label={item.label} />;
+              }
+
               return (
                 <Link
                   key={item.key}
-                  href={navHref(item.href, userHref)}
-                  className={[
-                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                    isCreatePost
-                      ? "bg-secondary text-white shadow-[0_18px_40px_rgba(236,32,36,0.22)] hover:scale-[1.01]"
-                      : selected
-                      ? "bg-primary text-on-primary shadow-[0_18px_40px_rgba(34,29,92,0.22)]"
-                      : "text-on-surface-variant hover:bg-surface-container hover:text-primary",
-                  ].join(" ")}
+                  href={item.href}
+                  className={className}
                 >
                   <span className="material-symbols-outlined">{item.icon}</span>
                   <span>{item.label}</span>
@@ -127,23 +123,38 @@ export function CampusShell({ active, children, userHref = "/aarav" }: CampusShe
           {navItems.map((item) => {
             const selected = item.key === active;
             const isCreatePost = item.key === "create-post";
+            const className = [
+              "flex min-w-16 flex-col items-center rounded-2xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition",
+              isCreatePost
+                ? "bg-secondary px-4 text-white"
+                : selected
+                  ? "bg-primary-fixed text-primary"
+                  : "text-on-surface-variant",
+            ].join(" ");
+            const label = isCreatePost ? "Create" : item.label;
+
+            if (item.key === "profile") {
+              return (
+                <ProfileNavLink
+                  key={item.key}
+                  className={className}
+                  icon={item.icon}
+                  iconClassName="mb-1"
+                  label={label}
+                />
+              );
+            }
+
             return (
-              <Link
-                key={item.key}
-                href={navHref(item.href, userHref)}
-                className={[
-                  "flex min-w-16 flex-col items-center rounded-2xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition",
-                  isCreatePost
-                    ? "bg-secondary px-4 text-white"
-                    : selected
-                    ? "bg-primary-fixed text-primary"
-                    : "text-on-surface-variant",
-                ].join(" ")}
-              >
-                <span className="material-symbols-outlined mb-1">{item.icon}</span>
-                <span>{isCreatePost ? "Create" : item.label}</span>
-              </Link>
-            );
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  className={className}
+                >
+                  <span className="material-symbols-outlined mb-1">{item.icon}</span>
+                  <span>{label}</span>
+                </Link>
+              );
           })}
         </div>
       </nav>

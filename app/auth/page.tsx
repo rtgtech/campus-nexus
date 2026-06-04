@@ -19,6 +19,11 @@ function readForm(form: HTMLFormElement, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function usesEduEmail(value: string) {
+  const domain = value.toLowerCase().split("@").at(-1) ?? "";
+  return domain === "edu" || domain.endsWith(".edu");
+}
+
 export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
@@ -69,12 +74,17 @@ export default function AuthPage() {
 
     try {
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      const signupMail = readForm(form, "mail");
+      if (mode === "signup" && !usesEduEmail(signupMail)) {
+        throw new Error("Mail must use a .edu domain.");
+      }
+
       const payload =
         mode === "signup"
           ? {
               name: readForm(form, "name"),
               username: readForm(form, "username"),
-              mail: readForm(form, "mail"),
+              mail: signupMail,
               DOB: readForm(form, "dateOfBirth"),
               department: readForm(form, "department"),
               year: Number(readForm(form, "yearOfStudy")),
@@ -222,6 +232,7 @@ export default function AuthPage() {
                   name={mode === "login" ? "login" : "mail"}
                   type={mode === "login" ? "text" : "email"}
                 />
+                {mode === "signup" ? <span className="text-xs text-on-surface-variant">Use your institutional .edu email.</span> : null}
               </label>
 
               {mode === "signup" ? (
