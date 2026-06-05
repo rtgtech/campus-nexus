@@ -115,6 +115,27 @@ class Post(Base):
         }
 
 
+class PostLike(Base):
+    __tablename__ = "post_likes"
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_post_likes_post_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[str] = mapped_column(String(32), ForeignKey("posts.post_id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.user_id"), index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "post_id": self.post_id,
+            "postId": self.post_id,
+            "user_id": self.user_id,
+            "userId": self.user_id,
+            "created_at": self.created_at.isoformat(),
+            "createdAt": self.created_at.isoformat(),
+        }
+
+
 
 class TrendingTopic(OrderedResourceMixin, Base):
     __tablename__ = "trending_topics"
@@ -819,10 +840,20 @@ def require_admin_user():
     return None
 
 
-def serialize_post(post: Post) -> dict[str, Any]:
+def post_like_for_user(post_id: str, user_id: str) -> Optional[PostLike]:
+    return db().scalar(select(PostLike).where((PostLike.post_id == post_id) & (PostLike.user_id == user_id)))
+
+
+def serialize_post(post: Post, viewer_user_id: Optional[str] = None) -> dict[str, Any]:
     author = db().get(User, post.author_id)
     club = db().get(ClubCard, post.club_id) if post.club_id is not None else None
-    return post.to_dict(author.name if author is not None else None, club.slug if club is not None else None)
+    liked_by_current_user = viewer_user_id is not None and post_like_for_user(post.post_id, viewer_user_id) is not None
+    return {
+        **post.to_dict(author.name if author is not None else None, club.slug if club is not None else None),
+        "likedByCurrentUser": liked_by_current_user,
+        "liked_by_current_user": liked_by_current_user,
+        "viewerHasLiked": liked_by_current_user,
+    }
 
 
 def post_caption_from_data(data: dict[str, Any]) -> str:
@@ -1427,6 +1458,8 @@ def serialize_club_detail(club: ClubCard) -> dict[str, Any]:
     posts = club_posts_for_club(club)
     followers = club_followers_count(club)
     posts_count = len(posts)
+    viewer = current_auth_user()
+    viewer_user_id = viewer.user_id if viewer is not None else None
     return {
         "club": {
             **club.to_dict(),
@@ -1434,7 +1467,7 @@ def serialize_club_detail(club: ClubCard) -> dict[str, Any]:
             "postsCount": posts_count,
         },
         "members": [serialize_club_member(member) for member in club_members_for_club(club)],
-        "posts": [serialize_post(post) for post in posts],
+        "posts": [serialize_post(post, viewer_user_id) for post in posts],
         "followers": followers,
         "postsCount": posts_count,
     }
@@ -1551,7 +1584,7 @@ def ranked_feed_cards(viewer_user_id: Optional[str], limit: Optional[int]) -> li
         clubs=[{"id": club.id} for club in clubs],
         club_memberships=[(member.club_id, member.user_id) for member in memberships],
         friendships=[(friendship.follower_id, friendship.following_id) for friendship in friendships],
-        posts=[serialize_post(post) for post in posts],
+        posts=[serialize_post(post, viewer_user_id) for post in posts],
         viewer_user_id=viewer_user_id,
         admin_user_ids=admin_user_ids,
         limit=limit,
@@ -1949,6 +1982,22 @@ def require_post_owner_or_admin(post: Post):
     if post.author_id != user.user_id and not is_admin_user(user):
         return jsonify({"error": "only the post author can delete this post"}), 403
     return None
+
+
+def delete_post_likes(post_id: str) -> None:
+    for like in db().scalars(select(PostLike).where(PostLike.post_id == post_id)).all():
+        db().delete(like)
+
+
+def post_like_payload(post: Post, user: User) -> dict[str, Any]:
+    return {
+        "post": serialize_post(post, user.user_id),
+        "post_id": post.post_id,
+        "postId": post.post_id,
+        "likes": post.likes,
+        "liked": post_like_for_user(post.post_id, user.user_id) is not None,
+        "likedByCurrentUser": post_like_for_user(post.post_id, user.user_id) is not None,
+    }
 
 
 def marketplace_post_payload(data: dict[str, Any]) -> dict[str, Any]:
