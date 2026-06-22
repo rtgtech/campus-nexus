@@ -135,13 +135,13 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
         </div>
       ) : null}
 
-      <div className="min-h-screen bg-background pb-32 font-body-md text-on-background">
+      <div className="min-h-screen bg-background pb-24 font-body-md text-on-background">
         <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
             <Link href="/" className="font-headline-lg text-2xl font-black tracking-tighter text-primary">
               Campus Nexus
             </Link>
-            <HeaderSearch className="hidden w-80 md:block" placeholder="Search campus..." />
+            <HeaderSearch className="hidden w-80 md:block" placeholder="Search marketplace products..." types={["product"]} />
             <div className="flex items-center gap-3">
               <button className="material-symbols-outlined rounded-full p-2 text-primary transition hover:bg-surface-container">
                 notifications
@@ -186,7 +186,11 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
           ) : (
             <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
               {marketplaceData.items.map((item) => (
-              <article key={item.title} className="overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition hover:shadow-xl">
+              <article
+                key={item.post_id ?? item.id ?? item.title}
+                id={item.post_id ?? item.id}
+                className="overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition hover:shadow-xl"
+              >
                 <div className="relative h-44 overflow-hidden bg-primary-fixed">
                   {item.image ? <img alt={item.title} className="h-full w-full object-cover transition duration-500 hover:scale-105" src={item.image} /> : null}
                   <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary backdrop-blur">

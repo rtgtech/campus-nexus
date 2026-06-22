@@ -1516,36 +1516,84 @@ def search_post_payload(post: Post) -> dict[str, Any]:
     }
 
 
-def search_results(query: str, limit: int) -> dict[str, Any]:
+def search_marketplace_payload(post: Post) -> dict[str, Any]:
+    item = serialize_marketplace_post(post)
+    return {
+        "type": "product",
+        "id": item["id"],
+        "title": item["title"],
+        "subtitle": item["price"] or item["owner"],
+        "href": f"/marketplace#{item['post_id']}",
+        "icon": "storefront",
+        "post_id": item["post_id"],
+        "postId": item["post_id"],
+    }
+
+
+def search_results(query: str, limit: int, types: Optional[set[str]] = None) -> dict[str, Any]:
     normalized_query = query.lower()
-    users = db().scalars(
-        select(User)
-        .where((func.lower(User.username).contains(normalized_query)) | (func.lower(User.name).contains(normalized_query)))
-        .order_by(User.username.asc())
-        .limit(limit)
-    ).all()
-    clubs = db().scalars(
-        select(ClubCard)
-        .where(
-            (func.lower(ClubCard.title).contains(normalized_query))
-            | (func.lower(ClubCard.slug).contains(normalized_query))
-            | (func.lower(ClubCard.description).contains(normalized_query))
+    requested_types = {value for value in (types or {"user", "club", "post"}) if value}
+    users = (
+        db().scalars(
+            select(User)
+            .where((func.lower(User.username).contains(normalized_query)) | (func.lower(User.name).contains(normalized_query)))
+            .order_by(User.username.asc())
+            .limit(limit)
         )
-        .order_by(ClubCard.title.asc())
-        .limit(limit)
-    ).all()
-    posts = db().scalars(
-        select(Post)
-        .where(func.lower(Post.caption).contains(normalized_query))
-        .order_by(Post.created_at.desc(), Post.post_id.asc())
-        .limit(limit)
-    ).all()
+        .all()
+        if "user" in requested_types
+        else []
+    )
+    clubs = (
+        db().scalars(
+            select(ClubCard)
+            .where(
+                (func.lower(ClubCard.title).contains(normalized_query))
+                | (func.lower(ClubCard.slug).contains(normalized_query))
+                | (func.lower(ClubCard.description).contains(normalized_query))
+            )
+            .order_by(ClubCard.title.asc())
+            .limit(limit)
+        )
+        .all()
+        if "club" in requested_types
+        else []
+    )
+    posts = (
+        db().scalars(
+            select(Post)
+            .where(func.lower(Post.caption).contains(normalized_query))
+            .order_by(Post.created_at.desc(), Post.post_id.asc())
+            .limit(limit)
+        )
+        .all()
+        if "post" in requested_types
+        else []
+    )
+    products = (
+        db().scalars(
+            select(Post)
+            .where(
+                (Post.post_type == 2)
+                & (
+                    func.lower(func.coalesce(Post.caption, "")).contains(normalized_query)
+                    | func.lower(func.coalesce(Post.description, "")).contains(normalized_query)
+                )
+            )
+            .order_by(Post.created_at.desc(), Post.post_id.asc())
+            .limit(limit)
+        )
+        .all()
+        if "product" in requested_types
+        else []
+    )
 
     return {
         "query": query,
         "users": [search_user_payload(user) for user in users],
         "clubs": [search_club_payload(club) for club in clubs],
         "posts": [search_post_payload(post) for post in posts],
+        "products": [search_marketplace_payload(post) for post in products],
     }
 
 
@@ -2099,11 +2147,16 @@ def global_search():
     query = text_value(request.args.get("q") or request.args.get("query"))[:80]
     limit = optional_int(request.args.get("limit")) or 5
     limit = max(1, min(limit, 10))
+    requested_types = {
+        value.strip().lower()
+        for value in text_value(request.args.get("types")).split(",")
+        if value.strip()
+    }
 
     if len(query) < 2:
-        return jsonify({"query": query, "users": [], "clubs": [], "posts": []})
+        return jsonify({"query": query, "users": [], "clubs": [], "posts": [], "products": []})
 
-    return jsonify(search_results(query, limit))
+    return jsonify(search_results(query, limit, requested_types or None))
 
 
 @app.route("/api/users", methods=["GET", "POST"])
@@ -2245,6 +2298,40 @@ def posts_item(post_id: str):
         return ("", 204)
 
     return update_post_from_payload(post, read_json())
+
+
+@app.route("/api/posts/<post_id>/like", methods=["GET", "POST", "DELETE"])
+def posts_like_item(post_id: str):
+    post = db().get(Post, post_id)
+    if post is None:
+        return jsonify({"error": "not found"}), 404
+
+    user = current_auth_user()
+    if user is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    existing = post_like_for_user(post_id, user.user_id)
+
+    if request.method == "GET":
+        return jsonify(post_like_payload(post, user))
+
+    if request.method == "DELETE":
+        if existing is not None:
+            db().delete(existing)
+            post.likes = max(0, post.likes - 1)
+            db().commit()
+            db().refresh(post)
+        return jsonify(post_like_payload(post, user))
+
+    if existing is None:
+        existing = PostLike(post_id=post_id, user_id=user.user_id)
+        db().add(existing)
+        post.likes += 1
+        db().commit()
+        db().refresh(post)
+        return jsonify(post_like_payload(post, user)), 201
+
+    return jsonify(post_like_payload(post, user))
 
 
 @app.route("/api/feed/trending", methods=["GET", "POST"])

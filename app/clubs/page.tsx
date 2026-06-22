@@ -26,7 +26,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
     <>
       {showCreateClub ? <CreateClubOverlay /> : null}
 
-      <div className="min-h-screen bg-background pb-32 font-body-md text-on-background">
+      <div className="min-h-screen bg-background pb-24 font-body-md text-on-background">
         <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
             <div className="flex items-center gap-3">
@@ -35,7 +35,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
               </span>
             </div>
             <div className="flex items-center gap-4">
-              <HeaderSearch className="hidden w-72 md:block" placeholder="Search campus clubs..." />
+              <HeaderSearch className="hidden w-72 md:block" placeholder="Search campus clubs..." types={["club"]} />
               <button className="material-symbols-outlined rounded-full p-2 text-primary transition-all duration-200 ease-out hover:bg-surface-container active:scale-95">
                 notifications
               </button>

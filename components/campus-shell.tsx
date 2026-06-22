@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
-import { HeaderSearch } from "@/components/header-search";
+import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
+import { HeaderSearch, type HeaderSearchProps } from "@/components/header-search";
 import { ProfileNavLink } from "@/components/profile-nav-link";
 
 type NavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
@@ -10,6 +11,7 @@ type NavItemKey = NavKey | "create-post";
 type CampusShellProps = {
   active: NavKey;
   children: ReactNode;
+  headerSearchProps?: Pick<HeaderSearchProps, "placeholder" | "types">;
 };
 
 const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
@@ -53,21 +55,21 @@ export function SectionTitle({
   );
 }
 
-export function CampusShell({ active, children }: CampusShellProps) {
+export function CampusShell({ active, children, headerSearchProps }: CampusShellProps) {
   return (
     <div className="min-h-screen bg-background text-on-background">
       <header className="sticky top-0 z-50 border-b border-outline-variant/70 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-4 md:px-6">
+        <div className="mx-auto grid h-14 w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-4 md:px-6">
           <div className="flex items-center">
             <Link
               href="/"
-              className="font-['Space_Grotesk'] text-2xl font-black tracking-[-0.06em] text-primary"
+              className="font-['Space_Grotesk'] text-[1.65rem] font-black tracking-[-0.06em] text-primary"
             >
               Campus Nexus
             </Link>
           </div>
           <div className="hidden justify-center md:flex">
-            <HeaderSearch className="w-full max-w-sm" />
+            <HeaderSearch className="w-full max-w-sm" {...headerSearchProps} />
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
@@ -82,49 +84,19 @@ export function CampusShell({ active, children }: CampusShellProps) {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-6 px-4 pb-28 pt-6 md:grid-cols-12 md:px-6 md:pb-10">
-        <aside className="hidden md:col-span-3 md:block">
-          <nav className="sticky top-24 space-y-2">
-            {navItems.map((item) => {
-              const selected = item.key === active;
-              const isCreatePost = item.key === "create-post";
-              const className = [
-                "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                isCreatePost
-                  ? "bg-secondary text-white shadow-[0_18px_40px_rgba(236,32,36,0.22)] hover:scale-[1.01]"
-                  : selected
-                    ? "bg-primary text-on-primary shadow-[0_18px_40px_rgba(34,29,92,0.22)]"
-                    : "text-on-surface-variant hover:bg-surface-container hover:text-primary",
-              ].join(" ");
+      <CollapsibleSidebar active={active} />
 
-              if (item.key === "profile") {
-                return <ProfileNavLink key={item.key} className={className} icon={item.icon} label={item.label} />;
-              }
-
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className={className}
-                >
-                  <span className="material-symbols-outlined">{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <main className="md:col-span-9">{children}</main>
+      <div className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 md:px-6 md:pb-10">
+        <main>{children}</main>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/60 bg-white/90 px-2 pb-5 pt-3 backdrop-blur-xl md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/60 bg-white/90 px-2 pb-3 pt-2 backdrop-blur-xl md:hidden">
         <div className="mx-auto flex max-w-lg items-center justify-around">
           {navItems.map((item) => {
             const selected = item.key === active;
             const isCreatePost = item.key === "create-post";
             const className = [
-              "flex min-w-16 flex-col items-center rounded-2xl px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] transition",
+              "flex min-w-14 flex-col items-center rounded-2xl px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] transition",
               isCreatePost
                 ? "bg-secondary px-4 text-white"
                 : selected
@@ -139,7 +111,7 @@ export function CampusShell({ active, children }: CampusShellProps) {
                   key={item.key}
                   className={className}
                   icon={item.icon}
-                  iconClassName="mb-1"
+                  iconClassName="mb-0.5"
                   label={label}
                 />
               );
@@ -151,7 +123,7 @@ export function CampusShell({ active, children }: CampusShellProps) {
                   href={item.href}
                   className={className}
                 >
-                  <span className="material-symbols-outlined mb-1">{item.icon}</span>
+                  <span className="material-symbols-outlined mb-0.5">{item.icon}</span>
                   <span>{label}</span>
                 </Link>
               );

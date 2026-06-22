@@ -30,35 +30,43 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   );
 
   return (
-    <CampusShell active="feed">
+    <CampusShell
+      active="feed"
+      headerSearchProps={{
+        placeholder: "Search people and clubs...",
+        types: ["user", "club"],
+      }}
+    >
       <>
         {showCreatePost ? <CreatePostOverlay /> : null}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <section className="space-y-6">
-          {feedData.feedCards.length === 0 ? (
-            <EmptyState
-              title="No posts yet"
-              description="The feed is ready for real campus posts once publishing workflows are connected."
-              action={
-                <Link
-                  href="/?=createpost"
-                  className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white"
-                >
-                  <span className="material-symbols-outlined text-base">add</span>
-                  Create post
-                </Link>
-              }
-            />
-          ) : (
-            feedData.feedCards.map((card) => (
-            <FeedPostCard
-              key={card.post_id ?? card.title}
-              post={card}
-            />
-            ))
-          )}
-        </section>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <section>
+            {feedData.feedCards.length === 0 ? (
+              <EmptyState
+                title="No posts yet"
+                description="The feed is ready for real campus posts once publishing workflows are connected."
+                action={
+                  <Link
+                    href="/?=createpost"
+                    className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white"
+                  >
+                    <span className="material-symbols-outlined text-base">add</span>
+                    Create post
+                  </Link>
+                }
+              />
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-2">
+                {feedData.feedCards.map((card) => (
+                  <FeedPostCard
+                    key={card.post_id ?? card.title}
+                    post={card}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
         <aside className="space-y-6">
           <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-6 shadow-[0_12px_30px_rgba(27,27,35,0.06)]">

@@ -22,6 +22,9 @@ export type FeedCard = {
   price?: string | null;
   description?: string | null;
   createdAt?: string;
+  likedByCurrentUser?: boolean;
+  liked_by_current_user?: boolean;
+  viewerHasLiked?: boolean;
 };
 
 export type TrendingItem = {
@@ -191,6 +194,8 @@ export type MessagesData = {
 };
 
 export type MarketplaceItem = {
+  id?: string;
+  post_id?: string;
   title: string;
   owner: string;
   mode: string;

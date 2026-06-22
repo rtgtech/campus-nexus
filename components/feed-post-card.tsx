@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { API_BASE_URL, readAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 
 type FeedPostCardProps = {
@@ -13,7 +14,11 @@ function isMp4(url: string) {
   return normalizedUrl.endsWith(".mp4") || normalizedUrl.startsWith("data:video/mp4");
 }
 
-function readLikeCount(value: string | number) {
+function readMetricCount(value: string | number | undefined) {
+  if (value === undefined) {
+    return 0;
+  }
+
   if (typeof value === "number") {
     return value;
   }
@@ -22,9 +27,16 @@ function readLikeCount(value: string | number) {
   return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
-function formatLikeLabel(value: number) {
-  const formattedValue = new Intl.NumberFormat("en").format(Math.max(0, value));
-  return `${formattedValue} ${value === 1 ? "like" : "likes"}`;
+function formatMetricCount(value: number) {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`.replace(".0M", "M");
+  }
+
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`.replace(".0K", "K");
+  }
+
+  return new Intl.NumberFormat("en").format(Math.max(0, value));
 }
 
 function pluralize(value: number, unit: string) {
@@ -76,26 +88,68 @@ function profileHref(post: FeedCard) {
 }
 
 export function FeedPostCard({ post }: FeedPostCardProps) {
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(readLikeCount(post.likes));
+  const initialLiked =
+    post.likedByCurrentUser ?? post.liked_by_current_user ?? post.viewerHasLiked ?? false;
+  const [liked, setLiked] = useState(initialLiked);
+  const [likeCount, setLikeCount] = useState(readMetricCount(post.likes));
+  const [isLikePending, setIsLikePending] = useState(false);
   const mediaUrl = post.mediaUrl || post.image;
   const title = post.title || post.caption || "Untitled post";
-  const body = post.body || post.caption || "";
-  const tag = post.hashtags?.[0] || post.tag;
+  const captionText = post.caption || title;
+  const detailText = post.body && post.body !== captionText ? post.body : "";
+  const primaryTag = post.hashtags?.[0] || post.tag;
   const hasMedia = Boolean(mediaUrl);
   const authorHref = profileHref(post);
   const postedAt = formatPostTime(post.createdAt || post.meta);
+  const commentsCount = readMetricCount(post.comments);
+  const sharesCount = readMetricCount(post.shares);
+  const isMarketplacePost = post.type === 2;
+  const clubHref = post.clubSlug ? `/clubs/${encodeURIComponent(post.clubSlug)}` : null;
 
-  function handleLike() {
-    setLiked((current) => {
-      setLikeCount((count) => count + (current ? -1 : 1));
-      return !current;
-    });
+  async function handleLike() {
+    if (!post.post_id || isLikePending) {
+      return;
+    }
+
+    const session = readAuthSession();
+    if (!session?.token) {
+      return;
+    }
+
+    const nextLiked = !liked;
+    const previousLiked = liked;
+    const previousLikeCount = likeCount;
+
+    setIsLikePending(true);
+    setLiked(nextLiked);
+    setLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(post.post_id)}/like`, {
+        method: nextLiked ? "POST" : "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error("Like request failed");
+      }
+
+      setLiked(Boolean(data?.liked ?? data?.likedByCurrentUser ?? nextLiked));
+      setLikeCount(readMetricCount(data?.likes));
+    } catch {
+      setLiked(previousLiked);
+      setLikeCount(previousLikeCount);
+    } finally {
+      setIsLikePending(false);
+    }
   }
 
   async function handleShare() {
     const shareUrl = `${window.location.origin}${window.location.pathname}${post.post_id ? `#${post.post_id}` : ""}`;
-    const shareData = { title, text: body || title, url: shareUrl };
+    const shareData = { title, text: detailText || captionText || title, url: shareUrl };
 
     if (navigator.share) {
       await navigator.share(shareData).catch(() => undefined);
@@ -108,77 +162,139 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   return (
     <article
       id={post.post_id}
-      className="scroll-mt-24 overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white/85 shadow-[0_12px_30px_rgba(27,27,35,0.06)] backdrop-blur-xl"
+      className="scroll-mt-24 overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white shadow-[0_16px_40px_rgba(27,27,35,0.08)]"
     >
       <div className="flex items-center justify-between px-5 py-4 md:px-6">
-        <Link
-          href={authorHref}
-          className="flex min-w-0 items-center gap-3 rounded-2xl outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40"
-          aria-label={`View ${post.author}'s profile`}
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link
+            href={authorHref}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary outline-none transition hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary/40"
+            aria-label={`View ${post.author}'s profile`}
+          >
             {getInitials(post.author)}
-          </span>
+          </Link>
           <div className="min-w-0">
-            <h3 className="truncate font-semibold text-on-surface">{post.author}</h3>
-            {postedAt ? <p className="truncate text-xs font-semibold text-on-surface-variant">{postedAt}</p> : null}
+            <Link
+              href={authorHref}
+              className="truncate font-semibold text-on-surface outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              {post.author}
+            </Link>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-on-surface-variant">
+              {clubHref ? (
+                <Link href={clubHref} className="truncate text-secondary transition hover:text-primary">
+                  @{post.clubSlug}
+                </Link>
+              ) : null}
+              {postedAt ? <span>{postedAt}</span> : null}
+            </div>
           </div>
-        </Link>
+        </div>
         <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container" type="button">
           <span className="material-symbols-outlined">more_horiz</span>
         </button>
       </div>
 
       {hasMedia ? (
-        <div className="relative aspect-[4/3] overflow-hidden bg-primary md:aspect-[16/10]">
+        <div className="relative overflow-hidden bg-surface-container-low">
           {isMp4(mediaUrl) ? (
-            <video className="h-full w-full object-cover" controls src={mediaUrl} />
+            <video className="aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]" controls src={mediaUrl} />
           ) : (
-            <img alt={title} className="h-full w-full object-cover" src={mediaUrl} />
+            <img alt={title} className="aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]" src={mediaUrl} />
           )}
-          <div className="absolute inset-x-0 bottom-0 bg-[rgba(34,29,92,0.72)] px-6 pb-6 pt-20 text-white">
-            <div className="flex items-end justify-between gap-4">
-              <div className="min-w-0">
-                <h4 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight">{title}</h4>
-                {body ? <p className="mt-2 max-w-xl text-sm text-white/82">{body}</p> : null}
-              </div>
-              {tag ? (
-                <span className="shrink-0 rounded-full bg-white/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur">
-                  {tag}
+          {isMarketplacePost || primaryTag ? (
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
+              {isMarketplacePost ? (
+                <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur">
+                  Marketplace
+                </span>
+              ) : <span />}
+              {isMarketplacePost && post.price ? (
+                <span className="rounded-full bg-white/92 px-3 py-1 text-xs font-bold text-primary shadow-sm">
+                  {post.price}
+                </span>
+              ) : primaryTag ? (
+                <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur">
+                  {primaryTag}
                 </span>
               ) : null}
             </div>
-          </div>
+          ) : null}
         </div>
       ) : (
         <div className="px-5 pb-2 pt-1 md:px-6">
           <div className="rounded-[24px] bg-surface-container-low px-5 py-6">
-            <h4 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-primary">{title}</h4>
-            {body ? <p className="mt-3 text-sm leading-6 text-on-surface-variant">{body}</p> : null}
-            {tag ? (
+            <p className="text-lg font-semibold leading-8 text-on-surface">{captionText}</p>
+            {detailText ? <p className="mt-3 text-sm leading-6 text-on-surface-variant">{detailText}</p> : null}
+            {primaryTag ? (
               <span className="mt-5 inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                {tag}
+                {primaryTag}
               </span>
             ) : null}
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between px-5 py-4 md:px-6">
-        <div className="flex gap-5 text-sm font-semibold text-on-surface-variant">
+      <div className="px-5 pb-5 pt-4 md:px-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 text-on-surface">
+            <button
+              aria-pressed={liked}
+              className="rounded-full p-2 transition hover:bg-surface-container disabled:opacity-60"
+              disabled={isLikePending}
+              type="button"
+              onClick={handleLike}
+            >
+              <span className={liked ? "material-symbols-outlined text-secondary" : "material-symbols-outlined"}>
+                {liked ? "favorite" : "favorite_border"}
+              </span>
+            </button>
+            <button className="rounded-full p-2 transition hover:bg-surface-container" type="button">
+              <span className="material-symbols-outlined">chat_bubble_outline</span>
+            </button>
+            <button className="rounded-full p-2 transition hover:bg-surface-container" type="button" onClick={handleShare}>
+              <span className="material-symbols-outlined">repeat</span>
+            </button>
+            <button className="rounded-full p-2 transition hover:bg-surface-container" type="button" onClick={handleShare}>
+              <span className="material-symbols-outlined">send</span>
+            </button>
+          </div>
+          <button className="rounded-full p-2 text-on-surface transition hover:bg-surface-container" type="button">
+            <span className="material-symbols-outlined">bookmark_add</span>
+          </button>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-on-surface">
+          <span>{formatMetricCount(likeCount)} likes</span>
+          <span className="text-on-surface-variant">{formatMetricCount(commentsCount)} comments</span>
+          <span className="text-on-surface-variant">{formatMetricCount(sharesCount)} shares</span>
+        </div>
+
+        <div className="mt-3 space-y-2 text-sm leading-6 text-on-surface">
+          <p>
+            <Link href={authorHref} className="mr-2 font-semibold transition hover:text-primary">
+              {post.author}
+            </Link>
+            <span className="text-on-surface">{captionText}</span>
+          </p>
+          {detailText ? <p className="text-on-surface-variant">{detailText}</p> : null}
+          {post.hashtags && post.hashtags.length > 0 ? (
+            <p className="flex flex-wrap gap-x-2 gap-y-1 text-secondary">
+              {post.hashtags.map((tag) => (
+                <span key={tag}>{tag}</span>
+              ))}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between border-t border-outline-variant/50 pt-3 text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
           <button
-            aria-pressed={liked}
-            className={liked ? "flex items-center gap-2 text-secondary" : "flex items-center gap-2 hover:text-primary"}
+            className="transition hover:text-primary"
             type="button"
-            onClick={handleLike}
           >
-            <span className="material-symbols-outlined text-secondary">{liked ? "favorite" : "favorite_border"}</span>
-            {formatLikeLabel(likeCount)}
+            View discussion
           </button>
-          <button className="flex items-center gap-2 hover:text-primary" type="button" onClick={handleShare}>
-            <span className="material-symbols-outlined">share</span>
-            Share
-          </button>
+          {postedAt ? <span>{postedAt}</span> : <span>Campus Nexus</span>}
         </div>
       </div>
     </article>

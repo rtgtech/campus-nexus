@@ -256,7 +256,7 @@ export default function MindSnapPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-white pb-28 font-body-md text-on-surface">
+      <div className="min-h-screen bg-white pb-24 font-body-md text-on-surface">
         <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/80 shadow-sm shadow-primary/5 backdrop-blur-xl">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
             <Link href="/games" className="font-['Space_Grotesk'] text-xl font-black tracking-normal text-primary">

@@ -20,8 +20,8 @@ const items: Array<{ key: BottomNavKey; label: string; href: string; icon: strin
 export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
   const shellClass =
     variant === "games"
-      ? "fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pt-3 pb-6 bg-white/95 dark:bg-primary/95 backdrop-blur-2xl border-t border-surface-container-highest shadow-2xl z-50"
-      : "fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pt-3 pb-6 bg-white/95 backdrop-blur-2xl border-t border-surface-container-highest shadow-xl z-50";
+      ? "fixed bottom-0 left-0 w-full flex justify-around items-center px-3 pt-2 pb-3 bg-white/95 dark:bg-primary/95 backdrop-blur-2xl border-t border-surface-container-highest shadow-2xl z-50"
+      : "fixed bottom-0 left-0 w-full flex justify-around items-center px-3 pt-2 pb-3 bg-white/95 backdrop-blur-2xl border-t border-surface-container-highest shadow-xl z-50";
 
   return (
     <nav className={shellClass}>
@@ -29,7 +29,7 @@ export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
         const isActive = item.key === active;
 
         let className =
-          "flex flex-col items-center justify-center px-3 py-1.5 transition-all duration-300";
+          "flex flex-col items-center justify-center px-2.5 py-1 transition-all duration-300";
 
         if (isActive && variant === "club") {
           className += " text-primary bg-primary/5 rounded-2xl px-4";
@@ -50,7 +50,7 @@ export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
               className={className}
               icon={item.icon}
               label={item.label}
-              labelClassName="mt-1 text-[10px] font-bold uppercase tracking-widest"
+              labelClassName="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em]"
             />
           );
         }
@@ -67,7 +67,7 @@ export function SourceBottomNav({ active, variant }: SourceBottomNavProps) {
             >
               {item.icon}
             </span>
-            <span className="mt-1 text-[10px] font-bold uppercase tracking-widest">
+            <span className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em]">
               {item.label}
             </span>
           </Link>

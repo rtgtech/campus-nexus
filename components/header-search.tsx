@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "@/lib/auth-client";
 
+export type SearchKind = "user" | "club" | "post" | "product";
+
 type SearchItem = {
   id: string | number;
-  type: "user" | "club" | "post";
+  type: SearchKind;
   title: string;
   subtitle: string;
   href: string;
@@ -19,24 +21,43 @@ type SearchResponse = {
   users: SearchItem[];
   clubs: SearchItem[];
   posts: SearchItem[];
+  products: SearchItem[];
 };
 
-type HeaderSearchProps = {
+export type HeaderSearchProps = {
   className?: string;
   placeholder?: string;
+  types?: SearchKind[];
 };
 
 const emptyResults: SearchResponse = {
   users: [],
   clubs: [],
   posts: [],
+  products: [],
 };
 
-function resultGroups(results: SearchResponse) {
+const defaultTypes: SearchKind[] = ["user", "club", "post"];
+
+const searchGroupConfig: Array<{ key: keyof SearchResponse; label: string; type: SearchKind }> = [
+  { key: "users", label: "People", type: "user" },
+  { key: "clubs", label: "Clubs", type: "club" },
+  { key: "products", label: "Products", type: "product" },
+  { key: "posts", label: "Posts", type: "post" },
+];
+
+const typeMeta: Record<SearchKind, { badge: string; label: string }> = {
+  user: { badge: "person", label: "Profile" },
+  club: { badge: "groups", label: "Club" },
+  product: { badge: "storefront", label: "Product" },
+  post: { badge: "article", label: "Post" },
+};
+
+function resultGroups(results: SearchResponse, enabledTypes: SearchKind[]) {
   return [
-    { label: "People", items: results.users },
-    { label: "Clubs", items: results.clubs },
-    { label: "Posts", items: results.posts },
+    ...searchGroupConfig
+      .filter((group) => enabledTypes.includes(group.type))
+      .map((group) => ({ label: group.label, items: results[group.key] })),
   ].filter((group) => group.items.length > 0);
 }
 
@@ -48,19 +69,24 @@ function resultIcon(item: SearchItem) {
   return <span className="material-symbols-outlined text-lg">{item.icon}</span>;
 }
 
-export function HeaderSearch({ className = "", placeholder = "Search campus spaces..." }: HeaderSearchProps) {
+export function HeaderSearch({
+  className = "",
+  placeholder = "Search campus spaces...",
+  types = defaultTypes,
+}: HeaderSearchProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResponse>(emptyResults);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [open, setOpen] = useState(false);
 
-  const groups = useMemo(() => resultGroups(results), [results]);
+  const enabledTypes = useMemo(() => Array.from(new Set(types)), [types]);
+  const groups = useMemo(() => resultGroups(results, enabledTypes), [enabledTypes, results]);
   const firstResult = groups[0]?.items[0];
   const trimmedQuery = query.trim();
 
   useEffect(() => {
-    if (trimmedQuery.length < 2) {
+    if (trimmedQuery.length < 2 || enabledTypes.length === 0) {
       setResults(emptyResults);
       setStatus("idle");
       return;
@@ -71,7 +97,11 @@ export function HeaderSearch({ className = "", placeholder = "Search campus spac
       setStatus("loading");
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(trimmedQuery)}`, {
+        const params = new URLSearchParams({
+          q: trimmedQuery,
+          types: enabledTypes.join(","),
+        });
+        const response = await fetch(`${API_BASE_URL}/api/search?${params.toString()}`, {
           signal: controller.signal,
         });
         const data = await response.json().catch(() => emptyResults);
@@ -84,6 +114,7 @@ export function HeaderSearch({ className = "", placeholder = "Search campus spac
           users: Array.isArray(data.users) ? data.users : [],
           clubs: Array.isArray(data.clubs) ? data.clubs : [],
           posts: Array.isArray(data.posts) ? data.posts : [],
+          products: Array.isArray(data.products) ? data.products : [],
         });
         setStatus("idle");
       } catch {
@@ -98,7 +129,7 @@ export function HeaderSearch({ className = "", placeholder = "Search campus spac
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [trimmedQuery]);
+  }, [enabledTypes, trimmedQuery]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,12 +148,12 @@ export function HeaderSearch({ className = "", placeholder = "Search campus spac
       onFocus={() => setOpen(true)}
       onSubmit={handleSubmit}
     >
-      <div className="flex w-full items-center gap-3 rounded-full border border-outline-variant bg-surface-container-low px-4 py-2">
+      <div className="flex w-full items-center gap-3 rounded-full border border-outline-variant bg-surface-container-low px-4 py-1.5">
         <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
         <input
-          className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant"
+          className="w-full appearance-none border-none bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:outline-none focus:ring-0"
           placeholder={placeholder}
-          type="search"
+          type="text"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -151,12 +182,24 @@ export function HeaderSearch({ className = "", placeholder = "Search campus spac
                       className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-surface-container-low"
                       onClick={() => setOpen(false)}
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
+                      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
                         {resultIcon(item)}
+                        <span
+                          className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white text-primary shadow-sm"
+                          aria-label={typeMeta[item.type].label}
+                          title={typeMeta[item.type].label}
+                        >
+                          <span className="material-symbols-outlined text-[11px] leading-none">
+                            {typeMeta[item.type].badge}
+                          </span>
+                        </span>
                       </span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-on-surface">{item.title}</span>
                         <span className="block truncate text-xs text-on-surface-variant">{item.subtitle}</span>
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-secondary">
+                        {typeMeta[item.type].label}
                       </span>
                     </Link>
                   ))}

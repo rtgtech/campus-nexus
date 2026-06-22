@@ -5,6 +5,7 @@ import { ClubFollowButton } from "@/components/club-follow-button";
 import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
+import { HeaderSearch } from "@/components/header-search";
 import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { API_BASE_URL } from "@/lib/campus-api";
 import { fallbackClubDetail, getInitials, type ClubDetailData } from "@/lib/app-data";
@@ -49,13 +50,14 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
 
   return (
     <>
-      <div className="min-h-screen bg-background pb-32 font-body-md text-on-background">
+      <div className="min-h-screen bg-background pb-24 font-body-md text-on-background">
         <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
             <Link href="/clubs" className="font-headline-lg text-2xl font-black tracking-tighter text-primary">
               Campus Nexus
             </Link>
             <div className="flex items-center gap-3">
+              <HeaderSearch className="hidden w-72 md:block" placeholder="Search campus clubs..." types={["club"]} />
               <Link
                 href="/clubs"
                 className="hidden rounded-full border border-outline-variant/70 bg-white px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary sm:inline-flex"

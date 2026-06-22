@@ -9,7 +9,7 @@ export default async function GamesPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-background pb-32 font-body-md text-on-surface">
+      <div className="min-h-screen bg-background pb-24 font-body-md text-on-surface">
         <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/80 shadow-sm shadow-primary/5 backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
             <div className="font-['Space_Grotesk'] text-2xl font-black tracking-tighter text-primary">

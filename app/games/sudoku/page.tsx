@@ -273,7 +273,7 @@ export default function SudokuPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-white pb-28 font-body-md text-on-surface">
+      <div className="min-h-screen bg-white pb-24 font-body-md text-on-surface">
         <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/85 shadow-sm shadow-primary/5 backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
             <Link href="/games" className="font-['Space_Grotesk'] text-xl font-black tracking-normal text-primary">
