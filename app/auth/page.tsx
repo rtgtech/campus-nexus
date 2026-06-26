@@ -125,34 +125,28 @@ export default function AuthPage() {
           <Link href="/" className="font-['Space_Grotesk'] text-2xl font-black tracking-[-0.06em] text-primary">
             Campus Nexus
           </Link>
-          <Link
-            href="/"
-            className="rounded-full border border-outline-variant/70 bg-white px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary"
-          >
-            Back to feed
-          </Link>
         </header>
 
         <section className="grid flex-1 items-center gap-6 py-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.72fr)]">
-          <div className="relative hidden min-h-[640px] overflow-hidden rounded-[28px] bg-primary text-white shadow-[0_24px_80px_rgba(34,29,92,0.22)] lg:block">
-            <div className="relative flex h-full flex-col justify-between p-8">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white/12 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white backdrop-blur">
-                <span className="material-symbols-outlined text-base">verified_user</span>
-                Student Access
-              </div>
+          <div className="relative py-10 rounded-[28px] bg-primary text-white shadow-[0_24px_80px_rgba(34,29,92,0.22)] lg:block">
+            <div className="relative flex p-8 flex-col justify-between">
+              
 
               <div className="max-w-xl">
                 <h1 className="font-['Space_Grotesk'] text-5xl font-bold leading-tight tracking-tight">
                   Your campus circle starts here.
                 </h1>
                 <p className="mt-4 max-w-lg text-base leading-7 text-white/82">
-                  Sign in to post, discover clubs, follow marketplace listings, and keep your student profile ready.
+                  Sign in to post, discover clubs, follow events and activities, and keep your student profile ready.
+                </p>
+                <p>
+                  Never miss an activity ever again
                 </p>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  ["clubs", "Live clubs"],
+                  ["groups", "Live clubs"],
                   ["forum", "Campus chats"],
                   ["storefront", "Marketplace"],
                 ].map(([icon, label]) => (
@@ -307,7 +301,7 @@ export default function AuthPage() {
                   aria-live="polite"
                   className={status === "error" ? "text-sm font-semibold text-secondary" : "text-sm text-on-surface-variant"}
                 >
-                  {status === "saving" ? "Contacting the backend..." : message || "Authentication is saved to the Flask backend."}
+                  {status === "saving" ? "Signing you in..." : message}
                 </p>
                 <button
                   disabled={status === "saving"}

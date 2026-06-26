@@ -32,7 +32,7 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
 
     return [
       "flex h-14 items-center  rounded-2xl px-3 text-sm font-semibold transition-colors duration-200",
-      isHovered ? "w-full justify-start" : "w-14 justify-center",
+      isHovered ? "w-full justify-start gap-3" : "w-14 justify-center",
       isCreatePost
         ? "bg-secondary text-white shadow-[0_18px_40px_rgba(236,32,36,0.18)] hover:bg-secondary-container"
         : selected
@@ -59,7 +59,7 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
         aria-label="Primary"
         className="h-full overflow-hidden border-r border-outline-variant/60 bg-white/92 p-2 shadow-[12px_0_34px_rgba(27,27,35,0.08)] backdrop-blur-xl"
       >
-        <button
+        {/* <button
           aria-expanded={isHovered}
           aria-label={isPinnedOpen ? "Collapse sidebar" : "Expand sidebar"}
           className={[
@@ -73,8 +73,8 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
             {"menu"}
           </span>
           <span className={labelClassName}></span>
-        </button>
-
+        </button> */}
+        <div className="h-12" />
         <div className="space-y-2">
           {navItems.map((item) => {
             const icon = <span className="material-symbols-outlined shrink-0 text-[22px]">{item.icon}</span>;

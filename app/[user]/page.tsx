@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { FollowButton } from "@/components/follow-button";
@@ -86,6 +87,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                 <button className="rounded-full border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface">
                   Share
                 </button>
+                <Link
+                  href="/my_activity"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary transition hover:bg-primary/90"
+                >
+                  <span className="material-symbols-outlined text-base">history</span>
+                  My Activity
+                </Link>
               </div>
             </div>
           </div>

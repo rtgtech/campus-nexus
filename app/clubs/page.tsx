@@ -1,6 +1,6 @@
-import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { AdminCreateClubAction } from "@/components/admin-create-club-action";
+import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { CreateClubOverlay } from "@/components/create-club-overlay";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderSearch } from "@/components/header-search";
@@ -26,9 +26,9 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
     <>
       {showCreateClub ? <CreateClubOverlay /> : null}
 
-      <div className="min-h-screen bg-background pb-24 font-body-md text-on-background">
+      <div className="min-h-screen bg-background pb-10 font-body-md text-on-background">
         <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
-          <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
+          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
             <div className="flex items-center gap-3">
               <span className="font-headline-lg text-2xl font-black tracking-tighter text-primary">
                 Campus Nexus
@@ -46,6 +46,8 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
             </div>
           </div>
         </header>
+
+        <CollapsibleSidebar active="club" />
 
         <main className="mx-auto max-w-7xl space-y-16 px-5 pt-24">
           <section className="space-y-6">
@@ -171,8 +173,6 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
 
         <AdminCreateClubAction variant="floating" />
       </div>
-
-      <SourceBottomNav active="club" variant="club" />
 
       <style
         dangerouslySetInnerHTML={{

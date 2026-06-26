@@ -148,7 +148,7 @@ export function HeaderSearch({
       onFocus={() => setOpen(true)}
       onSubmit={handleSubmit}
     >
-      <div className="flex w-full items-center gap-3 rounded-full border border-outline-variant bg-surface-container-low px-4 py-1.5">
+      <div className="flex w-full items-center gap-3 rounded-full border border-outline-variant bg-[#F5F5F5] px-4 h-10">
         <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
         <input
           className="w-full appearance-none border-none bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:outline-none focus:ring-0"

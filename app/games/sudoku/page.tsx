@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
-import { SourceBottomNav } from "@/components/source-bottom-nav";
+import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { API_BASE_URL, isAdminUser, readAuthSession } from "@/lib/auth-client";
 
 type Cell = {
@@ -273,9 +273,9 @@ export default function SudokuPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-white pb-24 font-body-md text-on-surface">
+      <div className="min-h-screen bg-white pb-10 font-body-md text-on-surface">
         <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/85 shadow-sm shadow-primary/5 backdrop-blur-xl">
-          <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
+          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
             <Link href="/games" className="font-['Space_Grotesk'] text-xl font-black tracking-normal text-primary">
               Sudoku
             </Link>
@@ -291,24 +291,21 @@ export default function SudokuPage() {
           </div>
         </header>
 
+        <CollapsibleSidebar active="games" />
+
         <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 pt-6 md:grid-cols-[minmax(0,1fr)_320px] md:px-8">
           <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm md:p-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">6 x 6 Sudoku</p>
-                <h1 className="mt-2 font-headline-lg text-4xl text-primary">Campus Sudoku</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
-                  Fill every row, column, and 2 x 3 box with numbers 1 to 6.
-                </p>
+                <h1 className="mt-1 font-headline-lg text-4xl text-primary">Campus Sudoku</h1>
               </div>
-              <div className="rounded-2xl bg-primary-fixed px-4 py-3 text-right text-primary">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em]">Reward</p>
+              <div className="rounded-2xl bg-primary-fixed px-2 py-1 text-right text-primary">
                 <p className="font-headline-md text-2xl">100 XP</p>
               </div>
             </div>
 
             <div className="mt-6 flex justify-center">
-              <div className="grid w-full max-w-[520px] grid-cols-6 rounded-[24px] border-2 border-primary bg-primary p-1 shadow-[0_18px_44px_rgba(34,29,92,0.12)]">
+              <div className="grid  w-[400px] grid-cols-6 border-2 border-primary bg-primary p-1 shadow-[0_18px_44px_rgba(34,29,92,0.12)]">
                 {grid.map((rowValues, row) =>
                   rowValues.map((value, col) => {
                     const fixed = isFixedCell(puzzle, row, col);
@@ -321,7 +318,7 @@ export default function SudokuPage() {
                       <button
                         key={cellKey(row, col)}
                         className={[
-                          "aspect-square min-h-12 border border-outline-variant bg-white text-center font-headline-md text-2xl transition hover:bg-primary-fixed/60 focus:outline-none",
+                          "aspect-square min-h-10 border border-outline-variant bg-white text-center font-headline-md text-2xl transition hover:bg-primary-fixed/60 focus:outline-none",
                           fixed ? "font-bold text-primary" : "text-on-surface",
                           selected ? "z-10 bg-primary-fixed ring-2 ring-primary" : "",
                           duplicate ? "bg-secondary/12 text-secondary ring-2 ring-secondary" : "",
@@ -444,8 +441,6 @@ export default function SudokuPage() {
           </aside>
         </main>
       </div>
-
-      <SourceBottomNav active="games" variant="games" />
     </>
   );
 }

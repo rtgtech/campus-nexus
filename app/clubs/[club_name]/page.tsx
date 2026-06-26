@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AuthSessionControl } from "@/components/auth-session-control";
+import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { ClubFollowButton } from "@/components/club-follow-button";
 import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { HeaderSearch } from "@/components/header-search";
-import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { API_BASE_URL } from "@/lib/campus-api";
 import { fallbackClubDetail, getInitials, type ClubDetailData } from "@/lib/app-data";
 
@@ -50,9 +50,9 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
 
   return (
     <>
-      <div className="min-h-screen bg-background pb-24 font-body-md text-on-background">
+      <div className="min-h-screen bg-background pb-10 font-body-md text-on-background">
         <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
-          <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
+          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
             <Link href="/clubs" className="font-headline-lg text-2xl font-black tracking-tighter text-primary">
               Campus Nexus
             </Link>
@@ -68,6 +68,8 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
             </div>
           </div>
         </header>
+
+        <CollapsibleSidebar active="club" />
 
         <main className="mx-auto max-w-7xl space-y-8 px-5 pt-24">
           <section className="overflow-hidden rounded-[32px] border border-surface-container-highest bg-white shadow-sm">
@@ -170,8 +172,6 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           </div>
         </main>
       </div>
-
-      <SourceBottomNav active="club" variant="club" />
     </>
   );
 }

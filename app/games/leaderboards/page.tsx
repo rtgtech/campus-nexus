@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AuthSessionControl } from "@/components/auth-session-control";
+import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { EmptyState } from "@/components/empty-state";
-import { SourceBottomNav } from "@/components/source-bottom-nav";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackLeaderboard, type LeaderboardEntry, type LeaderboardData } from "@/lib/app-data";
 
@@ -95,9 +95,9 @@ export default async function GameLeaderboardsPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-background pb-24 font-body-md text-on-surface">
+      <div className="min-h-screen bg-background pb-10 font-body-md text-on-surface">
         <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/80 shadow-sm shadow-primary/5 backdrop-blur-xl">
-          <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
+          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
             <Link href="/games" className="font-['Space_Grotesk'] text-2xl font-black tracking-normal text-primary">
               Campus Nexus
             </Link>
@@ -109,6 +109,8 @@ export default async function GameLeaderboardsPage() {
             </div>
           </div>
         </header>
+
+        <CollapsibleSidebar active="games" />
 
         <main className="mx-auto max-w-5xl space-y-8 px-4 pt-8 md:px-10">
           <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm md:p-8">
@@ -142,8 +144,6 @@ export default async function GameLeaderboardsPage() {
           )}
         </main>
       </div>
-
-      <SourceBottomNav active="games" variant="games" />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AuthSessionControl } from "@/components/auth-session-control";
-import { SourceBottomNav } from "@/components/source-bottom-nav";
+import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackGames, type GamesData } from "@/lib/app-data";
 
@@ -9,9 +9,9 @@ export default async function GamesPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-background pb-24 font-body-md text-on-surface">
+      <div className="min-h-screen bg-background pb-10 font-body-md text-on-surface">
         <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/80 shadow-sm shadow-primary/5 backdrop-blur-xl">
-          <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5">
+          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
             <div className="font-['Space_Grotesk'] text-2xl font-black tracking-tighter text-primary">
               Campus Nexus
             </div>
@@ -23,6 +23,8 @@ export default async function GamesPage() {
             </div>
           </div>
         </header>
+
+        <CollapsibleSidebar active="games" />
 
         <main className="mx-auto max-w-7xl space-y-10 px-4 pt-8 md:px-10">
           <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm md:p-8">
@@ -112,7 +114,7 @@ export default async function GamesPage() {
                 </div>
 
                 <div className="bg-white p-6">
-                  <div className="grid aspect-square grid-cols-6 rounded-[24px] border-2 border-primary bg-primary p-1 shadow-[0_18px_44px_rgba(34,29,92,0.12)]">
+                  <div className="grid aspect-square grid-cols-6 border-2 border-primary bg-primary p-1 shadow-[0_18px_44px_rgba(34,29,92,0.12)]">
                     {[1, 0, 3, 0, 5, 0, 0, 5, 0, 1, 0, 3, 0, 0, 4, 0, 6, 0, 5, 0, 0, 2, 0, 4, 0, 4, 0, 0, 1, 0, 0, 0, 2, 3, 0, 5].map((value, index) => (
                       <span
                         key={`${value}-${index}`}
@@ -187,8 +189,6 @@ export default async function GamesPage() {
           ) : null}
         </main>
       </div>
-
-      <SourceBottomNav active="games" variant="games" />
     </>
   );
 }

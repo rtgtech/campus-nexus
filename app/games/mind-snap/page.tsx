@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
-import { SourceBottomNav } from "@/components/source-bottom-nav";
+import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { API_BASE_URL, isAdminUser, readAuthSession } from "@/lib/auth-client";
 
 type Phase = "ready" | "flashing" | "selecting" | "feedback" | "finished";
@@ -256,7 +256,7 @@ export default function MindSnapPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-white pb-24 font-body-md text-on-surface">
+      <div className="min-h-screen bg-white pb-10 font-body-md text-on-surface">
         <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/80 shadow-sm shadow-primary/5 backdrop-blur-xl">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
             <Link href="/games" className="font-['Space_Grotesk'] text-xl font-black tracking-normal text-primary">
@@ -273,6 +273,8 @@ export default function MindSnapPage() {
             </div>
           </div>
         </header>
+
+        <CollapsibleSidebar active="games" />
 
         <main className="mx-auto grid max-w-6xl gap-4 px-4 pt-4 lg:grid-cols-[minmax(0,1fr)_280px]">
           <section className="rounded-[24px] border border-surface-container-highest bg-white p-3 shadow-sm sm:p-4">
@@ -433,8 +435,6 @@ export default function MindSnapPage() {
           </aside>
         </main>
       </div>
-
-      <SourceBottomNav active="games" variant="games" />
     </>
   );
 }
