@@ -2,21 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { readAuthSession } from "@/lib/auth-client";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:5000";
 
-function readForm(form: HTMLFormElement, name: string) {
-  const value = new FormData(form).get(name);
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readMedia(form: HTMLFormElement) {
-  const file = new FormData(form).get("media");
-
-  if (!(file instanceof File) || file.size === 0) {
+function readMedia(file: File | null) {
+  if (!file) {
     return Promise.resolve("");
   }
 
@@ -28,21 +21,75 @@ function readMedia(form: HTMLFormElement) {
   });
 }
 
+function mediaKind(file: File | null) {
+  if (!file) {
+    return null;
+  }
+  return file.type.startsWith("video/") ? "video" : "image";
+}
+
 export function CreatePostOverlay() {
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [step, setStep] = useState<"media" | "content">("media");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [content, setContent] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl("");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setPreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedFile]);
+
+  function selectFile(file: File | null) {
+    if (!file || !(file.type.startsWith("image/") || file.type.startsWith("video/"))) {
+      return;
+    }
+
+    setSelectedFile(file);
+    setStatus("idle");
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    selectFile(event.target.files?.[0] ?? null);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    selectFile(event.dataTransfer.files?.[0] ?? null);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const caption = readForm(form, "caption");
-    const hashtags = readForm(form, "hashtags");
-    const taggedPeople = readForm(form, "taggedPeople");
+    if (!selectedFile || !content.trim()) {
+      return;
+    }
+
     setStatus("saving");
 
     try {
       const session = readAuthSession();
-      const mediaUrl = await readMedia(form);
+      const mediaUrl = await readMedia(selectedFile);
       const response = await fetch(`${API_BASE_URL}/api/posts`, {
         method: "POST",
         headers: {
@@ -50,11 +97,9 @@ export function CreatePostOverlay() {
           ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
         },
         body: JSON.stringify({
-          type: Number(readForm(form, "type")),
-          caption,
+          type: 0,
+          caption: content.trim(),
           mediaUrl,
-          hashtags,
-          mentions: taggedPeople,
         }),
       });
 
@@ -77,7 +122,7 @@ export function CreatePostOverlay() {
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Create Post</p>
             <h2 className="mt-2 font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-on-background">
-              Share a campus moment.
+              {step === "media" ? "Choose your media." : "Write your post."}
             </h2>
           </div>
           <Link
@@ -89,56 +134,81 @@ export function CreatePostOverlay() {
         </div>
 
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-on-surface">Media</span>
-            <input
-              name="media"
-              accept="image/*,video/mp4"
-              className="w-full rounded-2xl border border-dashed border-outline-variant/80 bg-surface-container-low px-4 py-5 text-sm text-on-surface outline-none file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-on-primary"
-              type="file"
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-on-surface">Post type</span>
-            <select
-              name="type"
-              className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-              defaultValue="0"
+          {step === "media" ? (
+            <div
+              className={[
+                "flex h-[420px] max-h-[calc(100dvh-14rem)] flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed p-4 text-center transition md:h-[500px]",
+                isDragging
+                  ? "border-secondary bg-secondary/5"
+                  : "border-outline-variant/80 bg-surface-container-low",
+              ].join(" ")}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
             >
-              <option value="0">Normal post</option>
-              <option value="3">Admin post</option>
-            </select>
-          </label>
+              <input
+                ref={inputRef}
+                accept="image/*,video/*"
+                className="sr-only"
+                type="file"
+                onChange={handleFileChange}
+              />
 
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-on-surface">Caption</span>
-            <textarea
-              name="caption"
-              className="min-h-36 w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-              placeholder="Write a caption..."
-            />
-          </label>
+              {previewUrl ? (
+                <div className="flex min-h-0 w-full max-w-md flex-1 flex-col justify-center">
+                  <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[22px] bg-black">
+                    {mediaKind(selectedFile) === "video" ? (
+                      <video className="max-h-full max-w-full object-contain" controls src={previewUrl} />
+                    ) : (
+                      <img alt="" className="max-h-full max-w-full object-contain" src={previewUrl} />
+                    )}
+                  </div>
+                  <p className="mt-3 truncate text-sm font-semibold text-on-surface">{selectedFile?.name}</p>
+                </div>
+              ) : (
+                <div className="flex max-w-sm flex-col items-center">
+                  <span className="material-symbols-outlined rounded-full bg-primary-fixed p-5 text-4xl text-primary">
+                    add_photo_alternate
+                  </span>
+                  <p className="mt-5 text-lg font-bold text-on-background">Drag media here</p>
+                  <p className="mt-2 text-sm leading-6 text-on-surface-variant">Images and videos are supported.</p>
+                </div>
+              )}
 
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-on-surface">Hashtags</span>
-            <input
-              name="hashtags"
-              className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-              placeholder="#tag"
-              type="text"
-            />
-          </label>
+              <button
+                className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary px-5 py-3 text-sm font-semibold text-primary transition hover:border-secondary hover:text-secondary"
+                type="button"
+                onClick={() => inputRef.current?.click()}
+              >
+                <span className="material-symbols-outlined text-base">add</span>
+                Add media
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-[180px_minmax(0,1fr)]">
+              <div className="flex h-48 items-center justify-center overflow-hidden rounded-[22px] bg-black md:h-60">
+                {mediaKind(selectedFile) === "video" ? (
+                  <video className="max-h-full max-w-full object-contain" controls src={previewUrl} />
+                ) : (
+                  <img alt="" className="max-h-full max-w-full object-contain" src={previewUrl} />
+                )}
+              </div>
 
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-on-surface">Tag people</span>
-            <input
-              name="taggedPeople"
-              className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-              placeholder="@user"
-              type="text"
-            />
-          </label>
+              <label className="block space-y-2">
+                <span className="text-sm font-semibold text-on-surface">Post body</span>
+                <textarea
+                  className="min-h-[300px] w-full resize-none rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm leading-6 text-on-surface outline-none transition focus:border-primary md:min-h-[420px]"
+                  maxLength={2000}
+                  placeholder="Write something..."
+                  value={content}
+                  onChange={(event) => {
+                    setContent(event.target.value);
+                    setStatus("idle");
+                  }}
+                />
+              </label>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/60 pt-5">
             <p className={status === "error" ? "text-sm font-semibold text-secondary" : "text-sm text-on-surface-variant"}>
@@ -148,15 +218,43 @@ export function CreatePostOverlay() {
                 ? "Post created."
                 : status === "error"
                 ? "Backend is not reachable. Start the API and try again."
-                : "Posts are saved to the backend."}
+                : step === "media"
+                ? selectedFile
+                  ? "Media selected."
+                  : "Select media to continue."
+                : `${content.trim().length}/2000`}
             </p>
-            <button
-              disabled={status === "saving"}
-              className="rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.02] disabled:opacity-60"
-              type="submit"
-            >
-              Publish Post
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {step === "content" ? (
+                <button
+                  className="rounded-full border border-outline-variant/70 px-5 py-3 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary"
+                  disabled={status === "saving"}
+                  type="button"
+                  onClick={() => setStep("media")}
+                >
+                  Back
+                </button>
+              ) : null}
+
+              {step === "media" ? (
+                <button
+                  disabled={!selectedFile}
+                  className="rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.02] disabled:opacity-50"
+                  type="button"
+                  onClick={() => setStep("content")}
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  disabled={status === "saving" || !content.trim()}
+                  className="rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.02] disabled:opacity-50"
+                  type="submit"
+                >
+                  Post
+                </button>
+              )}
+            </div>
           </div>
         </form>
       </div>

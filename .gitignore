@@ -43,3 +43,4 @@ Thumbs.db
 stitch_campus_student_social_hub/
 backend/__pycache__
 backend/venv
+cn_data/

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { HeaderSearch, type HeaderSearchProps } from "@/components/header-search";
+import { NotificationsButton } from "@/components/notifications-button";
 import { ProfileNavLink } from "@/components/profile-nav-link";
 
 type NavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
@@ -63,7 +64,7 @@ export function CampusShell({ active, children, headerSearchProps }: CampusShell
           <div className="flex items-center">
             <Link
               href="/"
-              className="font-['Space_Grotesk'] text-[1.65rem] font-black tracking-[-0.06em] text-primary"
+              className=" text-[1.25rem] font-black tracking-[-0.06em] text-primary"
             >
               Campus Nexus
             </Link>
@@ -75,10 +76,7 @@ export function CampusShell({ active, children, headerSearchProps }: CampusShell
             <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
               <span className="material-symbols-outlined">bolt</span>
             </button>
-            <button className="relative rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-secondary" />
-            </button>
+            <NotificationsButton />
             <AuthSessionControl compact />
           </div>
         </div>

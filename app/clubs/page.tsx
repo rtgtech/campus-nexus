@@ -34,8 +34,8 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                 Campus Nexus
               </span>
             </div>
+            <HeaderSearch className="hidden w-88 md:block" placeholder="Search campus clubs..." types={["club"]} />
             <div className="flex items-center gap-4">
-              <HeaderSearch className="hidden w-72 md:block" placeholder="Search campus clubs..." types={["club"]} />
               <button className="material-symbols-outlined rounded-full p-2 text-primary transition-all duration-200 ease-out hover:bg-surface-container active:scale-95">
                 notifications
               </button>
@@ -53,10 +53,11 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
           <section className="space-y-6">
             <div className="flex items-end justify-between">
               <div>
-                <h2 className="font-headline-lg text-headline-lg text-on-background">Spotlight Clubs</h2>
+                <h2 className="font-headline-lg text-headline-lg text-on-background">Featured Clubs</h2>
                 <p className="font-body-md text-on-surface-variant">Rising student communities across campus</p>
               </div>
-              <div className="flex gap-2">
+              { clubsData.spotlightClubs.length > 4 && (
+                <div className="flex gap-2">
                 <button className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface transition-colors hover:bg-surface-container-highest">
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
@@ -64,6 +65,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                   <span className="material-symbols-outlined">chevron_right</span>
                 </button>
               </div>
+              )}
             </div>
             {clubsData.spotlightClubs.length === 0 ? (
               <EmptyState title="No spotlight clubs yet" description="Featured clubs will appear here when real clubs are added." />

@@ -70,25 +70,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
         <aside className="space-y-6">
           <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-6 shadow-[0_12px_30px_rgba(27,27,35,0.06)]">
-            <SectionTitle title="Trending" description="Topics will appear as real activity grows." />
-            {feedData.trending.length === 0 ? (
-              <p className="mt-5 rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
-                No trending topics yet.
-              </p>
-            ) : (
-              <div className="mt-5 space-y-4">
-                {feedData.trending.map((item) => (
-                <div key={item.tag} className="rounded-2xl bg-surface-container-low p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">{item.label}</p>
-                  <p className="mt-2 font-['Space_Grotesk'] text-lg font-bold text-primary">{item.tag}</p>
-                  <p className="mt-1 text-sm text-on-surface-variant">{item.posts}</p>
-                </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-[28px] border border-outline-variant/60 bg-white/85 p-6 shadow-[0_12px_30px_rgba(27,27,35,0.06)]">
             <SectionTitle title="Suggested People" description="Recommendations will appear after real profiles exist." />
             {feedData.suggestedPeople.length === 0 ? (
               <p className="mt-5 rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">

@@ -32,43 +32,45 @@ class FeedRankingTest(unittest.TestCase):
 
         backend_app._database_initialized = True
         self.client = backend_app.app.test_client()
+        self.user_ids: dict[str, int] = {}
+        self.post_ids: dict[str, str] = {}
+
+    def user_id(self, label: str) -> int:
+        return self.user_ids[label]
+
+    def post_id(self, label: str) -> str:
+        return self.post_ids[label]
 
     def add_user(self, session, user_id: str, username: str, name: str) -> backend_app.User:
         user = backend_app.User(
-            user_id=user_id,
-            name=name,
+            full_name=name,
             username=username,
-            mail=f"{username}@example.edu",
-            dob="2000-01-01",
-            year=2,
+            email=f"{username}@example.edu",
+            date_of_birth=datetime(2000, 1, 1).date(),
+            semester=2,
             department="CS",
             password_hash="test",
         )
         session.add(user)
+        session.flush()
+        self.user_ids[user_id] = user.user_id
         return user
 
     def add_club(self, session, club_id: int, slug: str, title: str) -> backend_app.ClubCard:
         club = backend_app.ClubCard(
-            id=club_id,
-            title=title,
+            club_id=club_id,
+            name=title,
             slug=slug,
             description=f"{title} club",
             status="Open",
-            icon="groups",
-            icon_bg="bg-primary",
-            banner_bg="bg-primary-fixed/20",
-            banner_image="",
-            extra_members="0",
-            extra_members_class="bg-primary-container text-white",
-            avatars=[],
-            status_class="text-secondary",
-            sort_order=club_id,
+            logo_url="",
+            created_by_service="admin",
         )
         session.add(club)
         return club
 
     def add_member(self, session, club_id: int, user_id: str) -> None:
-        session.add(backend_app.ClubMember(club_id=club_id, user_id=user_id, title="Member"))
+        session.add(backend_app.ClubMember(club_id=club_id, user_id=self.user_id(user_id), role="member"))
 
     def add_post(
         self,
@@ -82,25 +84,23 @@ class FeedRankingTest(unittest.TestCase):
         likes: int = 0,
         shares: int = 0,
     ) -> None:
-        session.add(
-            backend_app.Post(
-                post_id=post_id,
-                author_id=author_id,
-                club_id=club_id,
-                post_type=post_type,
-                media_url="",
-                caption=caption,
-                likes=likes,
-                shares=shares,
-                hashtags=[],
-                mentions=[],
-                created_at=datetime(2026, 6, 3, 12, 0, 0),
-                sort_order=0,
-            )
+        post = backend_app.Post(
+            author_id=self.user_id(author_id),
+            club_id=club_id,
+            post_type="club_post" if post_type == 1 else "normal",
+            media_url="",
+            content=caption,
+            like_count=likes,
+            share_count=shares,
+            engagement_score=likes + shares * 2,
+            created_at=datetime(2026, 6, 3, 12, 0, 0),
         )
+        session.add(post)
+        session.flush()
+        self.post_ids[post_id] = str(post.post_id)
 
     def add_token(self, session, token: str, user_id: str) -> None:
-        session.add(backend_app.AuthSession(token=token, user_id=user_id))
+        session.add(backend_app.AuthSession(token=token, user_id=self.user_id(user_id)))
 
     def test_feed_contains_ranked_user_and_club_posts(self) -> None:
         with backend_app.SessionLocal() as session:
@@ -119,7 +119,7 @@ class FeedRankingTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         feed_cards = response.get_json()["feedCards"]
-        self.assertEqual({post["post_id"] for post in feed_cards}, {"post_user", "post_club"})
+        self.assertEqual({post["post_id"] for post in feed_cards}, {self.post_id("post_user"), self.post_id("post_club")})
         self.assertGreaterEqual(feed_cards[0]["feedScore"], feed_cards[1]["feedScore"])
         self.assertEqual(set(feed_cards[0]["rankingSignals"]), {"pagerank", "engagement", "recency", "social"})
 
@@ -142,7 +142,7 @@ class FeedRankingTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         feed_cards = response.get_json()["feedCards"]
-        self.assertEqual(feed_cards[0]["post_id"], "post_robotics")
+        self.assertEqual(feed_cards[0]["post_id"], self.post_id("post_robotics"))
 
     def test_new_users_and_new_clubs_get_default_club_relationships(self) -> None:
         with backend_app.SessionLocal() as session:
@@ -151,7 +151,10 @@ class FeedRankingTest(unittest.TestCase):
             self.add_post(session, "post_robotics", "user_author", "Robotics update", club_id=1, post_type=1)
             session.commit()
 
-        self.assertEqual(self.client.get("/api/feed?user_id=user_new").get_json()["feedCards"][0]["post_id"], "post_robotics")
+        self.assertEqual(
+            self.client.get("/api/feed?user_id=user_new").get_json()["feedCards"][0]["post_id"],
+            self.post_id("post_robotics"),
+        )
 
         with backend_app.SessionLocal() as session:
             self.add_user(session, "user_new", "new_user", "New User")
@@ -159,11 +162,11 @@ class FeedRankingTest(unittest.TestCase):
             self.add_post(session, "post_new_club", "user_author", "New club update", club_id=2, post_type=1)
             session.commit()
 
-        response = self.client.get("/api/feed?user_id=user_new")
+        response = self.client.get(f"/api/feed?user_id={self.user_id('user_new')}")
 
         self.assertEqual(response.status_code, 200)
         post_ids = {post["post_id"] for post in response.get_json()["feedCards"]}
-        self.assertEqual(post_ids, {"post_robotics", "post_new_club"})
+        self.assertEqual(post_ids, {self.post_id("post_robotics"), self.post_id("post_new_club")})
 
     def test_empty_posts_return_empty_feed(self) -> None:
         response = self.client.get("/api/feed")
@@ -190,7 +193,13 @@ class FeedRankingTest(unittest.TestCase):
             self.add_user(session, "user_followed", "followed", "Followed User")
             self.add_user(session, "user_unrelated", "unrelated", "Unrelated User")
             self.add_token(session, "viewer-token", "user_viewer")
-            session.add(backend_app.UserFriendship(follower_id="user_viewer", following_id="user_followed"))
+            session.add(
+                backend_app.UserFriendship(
+                    requester_id=self.user_id("user_viewer"),
+                    receiver_id=self.user_id("user_followed"),
+                    status="accepted",
+                )
+            )
             self.add_post(session, "post_followed", "user_followed", "Followed post")
             self.add_post(session, "post_unrelated", "user_unrelated", "Unrelated post")
             session.commit()
@@ -200,7 +209,10 @@ class FeedRankingTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         feed_cards = response.get_json()["feedCards"]
         by_id = {post["post_id"]: post for post in feed_cards}
-        self.assertGreater(by_id["post_followed"]["rankingSignals"]["social"], by_id["post_unrelated"]["rankingSignals"]["social"])
+        self.assertGreater(
+            by_id[self.post_id("post_followed")]["rankingSignals"]["social"],
+            by_id[self.post_id("post_unrelated")]["rankingSignals"]["social"],
+        )
 
 
 if __name__ == "__main__":

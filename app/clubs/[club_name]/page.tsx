@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { ClubFollowButton } from "@/components/club-follow-button";
-import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
+import { ClubMemberAdminPanel, ClubMembersButton } from "@/components/club-member-admin-panel";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { HeaderSearch } from "@/components/header-search";
 import { API_BASE_URL } from "@/lib/campus-api";
-import { fallbackClubDetail, getInitials, type ClubDetailData } from "@/lib/app-data";
+import { fallbackClubDetail, type ClubDetailData } from "@/lib/app-data";
 
 type ClubDetailPageProps = {
   params: Promise<{
@@ -78,6 +78,9 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
                 <img alt={club.title} className="absolute inset-0 h-full w-full object-cover" src={club.bannerImage} />
               ) : null}
               <div className="absolute inset-0 bg-primary/70" />
+              <div className="absolute right-5 top-5 z-10">
+                <ClubMembersButton clubSlug={club.slug} members={members} />
+              </div>
               <div className="relative flex min-h-72 flex-col justify-end p-6 text-white md:p-8">
                 <div className="flex flex-wrap items-end justify-between gap-5">
                   <div className="max-w-3xl">
@@ -98,7 +101,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
             </div>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
             <aside className="space-y-6">
               <ClubFollowButton clubSlug={club.slug} clubTitle={club.title} initialFollowers={followers} />
 
@@ -110,41 +113,6 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
                   </div>
                   <span className="material-symbols-outlined rounded-full bg-primary-fixed p-3 text-primary">article</span>
                 </div>
-              </section>
-
-              <ClubMemberAdminPanel clubSlug={club.slug} existingUserIds={members.map((member) => member.user_id)} />
-
-              <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Members</p>
-                    <h2 className="mt-2 font-headline-md text-2xl text-on-background">{members.length}</h2>
-                  </div>
-                  <span className="material-symbols-outlined rounded-full bg-primary-fixed p-3 text-primary">groups</span>
-                </div>
-
-                {members.length === 0 ? (
-                  <div className="mt-5">
-                    <EmptyState title="No members yet" description="Members will appear after the admin adds users to this club." />
-                  </div>
-                ) : (
-                  <div className="mt-5 space-y-3">
-                    {members.map((member) => (
-                      <div key={member.id} className="flex items-center gap-3 rounded-2xl bg-surface-container-low p-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-xs font-bold text-primary">
-                          {member.initials || getInitials(member.name)}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-on-surface">{member.name}</p>
-                          <p className="truncate text-xs text-on-surface-variant">
-                            {member.title}
-                            {member.username ? ` - @${member.username}` : ""}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </section>
             </aside>
 
@@ -171,6 +139,13 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
             </section>
           </div>
         </main>
+
+        <ClubMemberAdminPanel
+          clubSlug={club.slug}
+          existingUserIds={members.map((member) => member.user_id)}
+          existingTitles={members.map((member) => member.title || "Member")}
+          members={members}
+        />
       </div>
     </>
   );
