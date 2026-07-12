@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import os
 import re
-import secrets
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any, Optional, Sequence
 
 from flask import Flask, g, jsonify, request
+import jwt
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -70,7 +70,15 @@ MENTION_RE = re.compile(r"(?<![\w])@([A-Za-z0-9_.-]+)")
 app = Flask(__name__)
 _database_initialized = False
 _database_lock = Lock()
-_admin_tokens: set[str] = set()
+
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+JWT_ALGORITHM = "HS256"
+JWT_ISSUER = "campus-nexus"
+JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "24"))
+if len(JWT_SECRET) < 32:
+    raise RuntimeError("JWT_SECRET must be set to at least 32 characters")
+if JWT_EXPIRES_HOURS <= 0:
+    raise RuntimeError("JWT_EXPIRES_HOURS must be positive")
 
 
 class Base(DeclarativeBase):
@@ -124,14 +132,6 @@ class User(Base):
             "acronym": initials_for_name(name),
             "initials": initials_for_name(name),
         }
-
-
-class AuthSession(Base):
-    __tablename__ = "auth_sessions"
-
-    token: Mapped[str] = mapped_column(Text, primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
 class Friendship(Base):
@@ -843,12 +843,22 @@ def current_auth_user() -> Optional[AuthUser]:
     token = bearer_token()
     if token is None:
         return None
-    if token in _admin_tokens:
-        return AdminIdentity()
-    session = db().get(AuthSession, token)
-    if session is None:
+    try:
+        claims = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            issuer=JWT_ISSUER,
+            options={"require": ["exp", "iat", "iss", "role", "sub"]},
+        )
+    except jwt.InvalidTokenError:
         return None
-    return db().get(User, session.user_id)
+    if claims["role"] == "admin" and claims["sub"] == AdminIdentity.user_id:
+        return AdminIdentity()
+    if claims["role"] != "student":
+        return None
+    user = get_user(claims["sub"])
+    return user if user is not None and user.is_active else None
 
 
 def bearer_token() -> Optional[str]:
@@ -872,16 +882,20 @@ def require_admin_user():
     return None
 
 
-def create_auth_session(user: User) -> str:
-    token = secrets.token_urlsafe(32)
-    db().add(AuthSession(token=token, user_id=user.user_id))
-    return token
-
-
-def create_admin_session() -> str:
-    token = secrets.token_urlsafe(32)
-    _admin_tokens.add(token)
-    return token
+def create_auth_token(user: AuthUser) -> str:
+    now = datetime.now(timezone.utc)
+    role = "admin" if is_admin_user(user) else "student"
+    return jwt.encode(
+        {
+            "sub": str(user.user_id),
+            "role": role,
+            "iss": JWT_ISSUER,
+            "iat": now,
+            "exp": now + timedelta(hours=JWT_EXPIRES_HOURS),
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
 
 
 def auth_payload(user: AuthUser, token: str) -> dict[str, Any]:
@@ -1545,7 +1559,7 @@ def create_user_from_payload(data: dict[str, Any], require_password: bool = Fals
         date_of_birth=values["dob"],
         semester=values["year"],
         department=values["department"],
-        password_hash=generate_password_hash(password or secrets.token_urlsafe(32)),
+        password_hash=generate_password_hash(password or os.urandom(32).hex()),
     )
     return user, None, None
 
@@ -2530,7 +2544,7 @@ def auth_signup():
         return error_response, status
     db().add(user)
     db().flush()
-    token = create_auth_session(user)
+    token = create_auth_token(user)
     db().commit()
     db().refresh(user)
     return jsonify(auth_payload(user, token)), 201
@@ -2545,13 +2559,11 @@ def auth_login():
         return jsonify({"error": "login and password are required"}), 400
     if admin_login_matches(login, password):
         admin = AdminIdentity()
-        return jsonify(auth_payload(admin, create_admin_session()))
+        return jsonify(auth_payload(admin, create_auth_token(admin)))
     user = find_auth_user_by_login(login)
     if user is None or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "invalid login or password"}), 401
-    token = create_auth_session(user)
-    db().commit()
-    return jsonify(auth_payload(user, token))
+    return jsonify(auth_payload(user, create_auth_token(user)))
 
 
 @app.route("/api/auth/me")
@@ -2564,13 +2576,6 @@ def auth_me():
 
 @app.route("/api/auth/logout", methods=["POST"])
 def auth_logout():
-    token = bearer_token()
-    if token is not None:
-        _admin_tokens.discard(token)
-        session = db().get(AuthSession, token)
-        if session is not None:
-            db().delete(session)
-            db().commit()
     return ("", 204)
 
 

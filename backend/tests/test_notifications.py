@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-32-characters"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
@@ -27,6 +28,7 @@ class NotificationsTest(unittest.TestCase):
         backend_app._database_initialized = True
         self.client = backend_app.app.test_client()
         self.user_ids: dict[str, int] = {}
+        self.tokens: dict[str, str] = {}
 
     def add_user(self, session, label: str, username: str, name: str) -> backend_app.User:
         user = backend_app.User(
@@ -44,10 +46,10 @@ class NotificationsTest(unittest.TestCase):
         return user
 
     def add_token(self, session, token: str, label: str) -> None:
-        session.add(backend_app.AuthSession(token=token, user_id=self.user_ids[label]))
+        self.tokens[token] = backend_app.create_auth_token(session.get(backend_app.User, self.user_ids[label]))
 
     def auth(self, token: str) -> dict[str, str]:
-        return {"Authorization": f"Bearer {token}"}
+        return {"Authorization": f"Bearer {self.tokens.get(token, token)}"}
 
     def notifications(self, token: str) -> dict:
         response = self.client.get("/api/notifications", headers=self.auth(token))

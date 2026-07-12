@@ -39,6 +39,8 @@ npm run dev:backend
 | `PORT` | `5000` | Flask port. |
 | `FLASK_DEBUG` | unset | Set to `1` to enable Flask debug mode. |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin. |
+| `JWT_SECRET` | required | Secret used to sign JWTs; use at least 32 random characters. |
+| `JWT_EXPIRES_HOURS` | `24` | JWT lifetime in hours. |
 
 ## Aggregate Endpoints
 
@@ -55,10 +57,10 @@ npm run dev:backend
 | `POST` | `/api/auth/signup` | Create a student account with mail, username, name, date of birth, department, year, and password. |
 | `POST` | `/api/auth/login` | Login with email or username and password. |
 | `GET` | `/api/auth/me` | Return the authenticated user for a bearer token. |
-| `POST` | `/api/auth/logout` | Delete the authenticated session token. |
+| `POST` | `/api/auth/logout` | Acknowledge client-side logout. JWTs expire automatically. |
 | `GET` | `/api/profile/<user>` | Stored profile when present, otherwise an empty default profile. |
 
-The Next.js frontend stores the returned token in a `campusNexusToken` cookie for route middleware and in `localStorage` as `campusNexusAuth` for client-side header state.
+The backend returns an HS256 JWT containing the user subject, role, issuer, issued-at time, and expiry. The Next.js frontend stores it in a `campusNexusToken` cookie for route middleware and in `localStorage` as `campusNexusAuth` for client-side header state.
 
 Startup also seeds an admin service account when missing:
 

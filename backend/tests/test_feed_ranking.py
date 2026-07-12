@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-32-characters"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
@@ -34,6 +35,7 @@ class FeedRankingTest(unittest.TestCase):
         self.client = backend_app.app.test_client()
         self.user_ids: dict[str, int] = {}
         self.post_ids: dict[str, str] = {}
+        self.tokens: dict[str, str] = {}
 
     def user_id(self, label: str) -> int:
         return self.user_ids[label]
@@ -100,7 +102,7 @@ class FeedRankingTest(unittest.TestCase):
         self.post_ids[post_id] = str(post.post_id)
 
     def add_token(self, session, token: str, user_id: str) -> None:
-        session.add(backend_app.AuthSession(token=token, user_id=self.user_id(user_id)))
+        self.tokens[token] = backend_app.create_auth_token(session.get(backend_app.User, self.user_id(user_id)))
 
     def test_feed_contains_ranked_user_and_club_posts(self) -> None:
         with backend_app.SessionLocal() as session:
@@ -115,7 +117,7 @@ class FeedRankingTest(unittest.TestCase):
             self.add_post(session, "post_club", "user_member", "Club post", club_id=1, post_type=1, likes=2)
             session.commit()
 
-        response = self.client.get("/api/feed", headers={"Authorization": "Bearer viewer-token"})
+        response = self.client.get("/api/feed", headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"})
 
         self.assertEqual(response.status_code, 200)
         feed_cards = response.get_json()["feedCards"]
@@ -138,7 +140,7 @@ class FeedRankingTest(unittest.TestCase):
             self.add_post(session, "post_arts", "user_arts", "Arts update", club_id=2, post_type=1)
             session.commit()
 
-        response = self.client.get("/api/feed", headers={"Authorization": "Bearer viewer-token"})
+        response = self.client.get("/api/feed", headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"})
 
         self.assertEqual(response.status_code, 200)
         feed_cards = response.get_json()["feedCards"]
@@ -204,7 +206,7 @@ class FeedRankingTest(unittest.TestCase):
             self.add_post(session, "post_unrelated", "user_unrelated", "Unrelated post")
             session.commit()
 
-        response = self.client.get("/api/feed", headers={"Authorization": "Bearer viewer-token"})
+        response = self.client.get("/api/feed", headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"})
 
         self.assertEqual(response.status_code, 200)
         feed_cards = response.get_json()["feedCards"]
