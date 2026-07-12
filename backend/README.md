@@ -100,4 +100,5 @@ Compatibility aliases are preserved:
 
 `POST`, `PATCH`, `PUT`, and `DELETE` requests for `/api/clubs`, `/api/clubs/items`, `/api/clubs/spotlight`, and `/api/clubs/stats` require admin access.
 Club member create, update, and delete requests under `/api/clubs/<slug>/members` also require admin access.
-Club posts use normal `/api/posts` requests with `type: 1` plus `clubSlug` or `club_id`; the author must already be a member of that club.
+Club posts and announcements use `/api/posts` with `type: 1` or `type: 3` plus `clubSlug` or `club_id`; the authenticated author must be that club's president, chairman, or secretary.
+Regular posts accept mixed image/MP4 arrays in `mediaUrls`; announcements require exactly one image in `mediaUrls` as their poster.

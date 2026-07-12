@@ -123,7 +123,7 @@ class NotificationsTest(unittest.TestCase):
             session.flush()
             session.add_all(
                 [
-                    backend_app.ClubMember(club_id=club.club_id, user_id=self.user_ids["author"], status="active"),
+                    backend_app.ClubMember(club_id=club.club_id, user_id=self.user_ids["author"], role="president", status="active"),
                     backend_app.ClubMember(club_id=club.club_id, user_id=self.user_ids["member"], status="active"),
                     backend_app.ClubFollower(club_id=club.club_id, user_id=self.user_ids["member"]),
                     backend_app.ClubFollower(club_id=club.club_id, user_id=self.user_ids["follower"]),
@@ -137,6 +137,52 @@ class NotificationsTest(unittest.TestCase):
         self.assertEqual([item["type"] for item in self.notifications("member-token")["items"]], ["club_post"])
         self.assertEqual([item["type"] for item in self.notifications("follower-token")["items"]], ["club_post"])
         self.assertEqual(self.notifications("author-token")["total"], 0)
+
+    def test_only_club_leaders_can_publish_posts_and_announcements(self) -> None:
+        with backend_app.SessionLocal() as session:
+            for role in ("president", "chairman", "secretary", "member"):
+                self.add_user(session, role, role, role.title())
+                self.add_token(session, f"{role}-token", role)
+            club = backend_app.Club(name="Robotics", slug="robotics", description="", status="Open")
+            session.add(club)
+            session.flush()
+            for role in ("president", "chairman", "secretary", "member"):
+                session.add(backend_app.ClubMember(club_id=club.club_id, user_id=self.user_ids[role], role=role, status="active"))
+            session.commit()
+
+        created_posts = []
+        for role, post_type, media_urls in (
+            ("president", 1, ["data:image/png;base64,cGhvdG8=", "data:video/mp4;base64,dmlkZW8="]),
+            ("chairman", 3, ["data:image/png;base64,cG9zdGVy"]),
+            ("secretary", 1, []),
+        ):
+            response = self.client.post(
+                "/api/posts",
+                json={"type": post_type, "clubSlug": "robotics", "caption": f"{role} update", "mediaUrls": media_urls},
+                headers=self.auth(f"{role}-token"),
+            )
+            self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
+            created_posts.append(response.get_json())
+
+        self.assertEqual(created_posts[0]["mediaUrls"], ["data:image/png;base64,cGhvdG8=", "data:video/mp4;base64,dmlkZW8="])
+
+        invalid_announcement = self.client.post(
+            "/api/posts",
+            json={"type": 3, "clubSlug": "robotics", "caption": "Too many posters", "mediaUrls": ["one.jpg", "two.jpg"]},
+            headers=self.auth("president-token"),
+        )
+        self.assertEqual(invalid_announcement.status_code, 400)
+
+        denied = self.client.post(
+            "/api/posts",
+            json={"type": 1, "clubSlug": "robotics", "caption": "member update"},
+            headers=self.auth("member-token"),
+        )
+        self.assertEqual(denied.status_code, 403)
+
+        posts = self.client.get("/api/clubs/robotics").get_json()["posts"]
+        self.assertEqual({post["type"] for post in posts}, {1, 3})
+        self.assertEqual(len(posts), 3)
 
     def test_like_creates_one_notification_excluding_self_likes(self) -> None:
         with backend_app.SessionLocal() as session:

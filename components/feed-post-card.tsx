@@ -94,16 +94,18 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   const [likeCount, setLikeCount] = useState(readMetricCount(post.likes));
   const [isLikePending, setIsLikePending] = useState(false);
   const mediaUrl = post.mediaUrl || post.image;
+  const mediaUrls = post.mediaUrls?.length ? post.mediaUrls : mediaUrl ? [mediaUrl] : [];
   const title = post.title || post.caption || "Untitled post";
   const captionText = post.caption || title;
   const detailText = post.body && post.body !== captionText ? post.body : "";
   const primaryTag = post.hashtags?.[0] || post.tag;
-  const hasMedia = Boolean(mediaUrl);
+  const hasMedia = mediaUrls.length > 0;
   const authorHref = profileHref(post);
   const postedAt = formatPostTime(post.createdAt || post.meta);
   const commentsCount = readMetricCount(post.comments);
   const sharesCount = readMetricCount(post.shares);
   const isMarketplacePost = post.type === 2;
+  const isAnnouncement = post.type === 3;
   const clubHref = post.clubSlug ? `/clubs/${encodeURIComponent(post.clubSlug)}` : null;
 
   async function handleLike() {
@@ -186,6 +188,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
                   @{post.clubSlug}
                 </Link>
               ) : null}
+              {isAnnouncement ? <span className="rounded bg-secondary/10 px-1.5 py-0.5 text-secondary">Announcement</span> : null}
               {postedAt ? <span>{postedAt}</span> : null}
             </div>
           </div>
@@ -196,11 +199,13 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
       </div>
 
       {hasMedia ? (
-        <div className="relative overflow-hidden bg-surface-container-low">
-          {isMp4(mediaUrl) ? (
-            <video className="aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]" controls src={mediaUrl} />
-          ) : (
-            <img alt={title} className="aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]" src={mediaUrl} />
+        <div className={`relative grid overflow-hidden bg-surface-container-low ${mediaUrls.length > 1 ? "grid-cols-2 gap-0.5" : ""}`}>
+          {mediaUrls.map((url, index) =>
+            isMp4(url) ? (
+              <video key={`${url}-${index}`} className={mediaUrls.length > 1 ? "aspect-square h-full w-full object-cover" : "aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]"} controls src={url} />
+            ) : (
+              <img key={`${url}-${index}`} alt={`${title} ${index + 1}`} className={mediaUrls.length > 1 ? "aspect-square h-full w-full object-cover" : "aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]"} src={url} />
+            )
           )}
           {isMarketplacePost || primaryTag ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">

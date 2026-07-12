@@ -14,7 +14,7 @@ type ClubMemberAdminPanelProps = {
 
 type Status = "idle" | "searching" | "saving" | "success" | "error";
 
-const DESIGNATIONS = ["President", "Vice President", "Chairman", "Vice Chairman", "Treasurer", "Member"];
+const DESIGNATIONS = ["President", "Vice President", "Chairman", "Vice Chairman", "Secretary", "Treasurer", "Member"];
 const SINGLE_DESIGNATIONS = new Set(DESIGNATIONS.filter((designation) => designation !== "Member"));
 
 export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles }: ClubMemberAdminPanelProps) {

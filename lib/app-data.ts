@@ -14,6 +14,7 @@ export type FeedCard = {
   caption?: string;
   type?: 0 | 1 | 2 | 3;
   mediaUrl?: string;
+  mediaUrls?: string[];
   likes: string | number;
   shares?: number;
   comments: string | number;

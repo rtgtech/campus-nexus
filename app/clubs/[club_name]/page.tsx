@@ -4,6 +4,7 @@ import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { ClubFollowButton } from "@/components/club-follow-button";
 import { ClubMembersButton } from "@/components/club-members-button";
+import { ClubPostComposer } from "@/components/club-post-composer";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { HeaderSearch } from "@/components/header-search";
@@ -125,6 +126,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
                     <span className="ml-3 align-middle text-base font-semibold text-on-surface-variant">({postsCount})</span>
                   </h2>
                 </div>
+                <ClubPostComposer clubSlug={club.slug} members={members} />
               </div>
 
               {posts.length === 0 ? (

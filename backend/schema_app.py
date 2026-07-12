@@ -58,8 +58,10 @@ DEFAULT_ADMIN_USER = {
 
 POST_TYPE_TO_CODE = {"normal": 0, "club_post": 1, "announcement": 3, "event": 3, "repost": 0}
 CODE_TO_POST_TYPE = {0: "normal", 1: "club_post", 2: "normal", 3: "announcement"}
-CLUB_MEMBER_ROLES = {"president", "vice_president", "chairman", "vice_chairman", "treasurer", "member"}
+CLUB_MEMBER_ROLES = {"president", "vice_president", "chairman", "vice_chairman", "secretary", "treasurer", "member"}
 SINGLE_CLUB_MEMBER_ROLES = CLUB_MEMBER_ROLES - {"member"}
+CLUB_PUBLISHER_ROLES = {"president", "chairman", "secretary"}
+CLUB_POST_TYPES = {"club_post", "announcement"}
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")
 VIDEO_EXTENSIONS = (".mp4",)
 HASHTAG_RE = re.compile(r"(?<![\w])#([A-Za-z0-9_]+)")
@@ -329,11 +331,18 @@ class Post(Base):
     def shares(self, value: int) -> None:
         self.share_count = max(int(value), 0)
 
-    def to_dict(self, author_name: Optional[str] = None, club_slug: Optional[str] = None) -> dict[str, Any]:
+    def to_dict(
+        self,
+        author_name: Optional[str] = None,
+        club_slug: Optional[str] = None,
+        media_urls: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         created_at = self.created_at.isoformat()
         caption = self.caption
         hashtags = extract_hashtags(caption)
         title = caption[:72] or "Untitled post"
+        media_urls = media_urls if media_urls is not None else ([self.media_url] if self.media_url else [])
+        primary_media = media_urls[0] if media_urls else ""
         return {
             "post_id": str(self.post_id),
             "postId": str(self.post_id),
@@ -346,8 +355,10 @@ class Post(Base):
             "clubSlug": club_slug,
             "type": self.type_code,
             "postType": self.post_type,
-            "media_url": self.media_url or "",
-            "mediaUrl": self.media_url or "",
+            "media_url": primary_media,
+            "mediaUrl": primary_media,
+            "media_urls": media_urls,
+            "mediaUrls": media_urls,
             "caption": caption,
             "likes": self.like_count,
             "shares": self.share_count,
@@ -360,11 +371,21 @@ class Post(Base):
             "meta": created_at,
             "title": title,
             "body": caption,
-            "image": self.media_url or "",
+            "image": primary_media,
             "tag": hashtags[0] if hashtags else "#campusnexus",
             "comments": self.comment_count,
             "engagement_score": self.engagement_score or float(self.like_count + self.share_count * 2),
         }
+
+
+class PostMedia(Base):
+    __tablename__ = "post_media"
+
+    media_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(Integer, ForeignKey("posts.post_id", ondelete="CASCADE"), index=True, nullable=False)
+    media_url: Mapped[str] = mapped_column(Text, nullable=False)
+    media_type: Mapped[str] = mapped_column(Text, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class PostLike(Base):
@@ -753,6 +774,30 @@ def media_error(media_url: str, post_type_code: int) -> Optional[str]:
     return None
 
 
+def read_media_urls(data: dict[str, Any]) -> list[str]:
+    if "mediaUrls" in data or "media_urls" in data:
+        return read_string_list(get_first(data, "mediaUrls", "media_urls"))
+    media_url = text_value(get_first(data, "media_url", "mediaUrl", "image"))
+    return [media_url] if media_url else []
+
+
+def post_media_urls(post: Post) -> list[str]:
+    # ponytail: per-post lookup is sufficient at current feed size; eager-load if feed volume grows.
+    rows = db().scalars(
+        select(PostMedia).where(PostMedia.post_id == post.post_id).order_by(PostMedia.sort_order.asc(), PostMedia.media_id.asc())
+    ).all()
+    return [row.media_url for row in rows] or ([post.media_url] if post.media_url else [])
+
+
+def replace_post_media(post: Post, media_urls: list[str]) -> None:
+    for row in db().scalars(select(PostMedia).where(PostMedia.post_id == post.post_id)).all():
+        db().delete(row)
+    for index, media_url in enumerate(media_urls):
+        db().add(PostMedia(post_id=post.post_id, media_url=media_url, media_type=media_kind(media_url) or "", sort_order=index))
+    post.media_url = media_urls[0] if media_urls else None
+    post.media_type = media_kind(post.media_url or "")
+
+
 def post_type_code(value: Any, default: int = 0) -> Optional[int]:
     if value is None or value == "":
         return default
@@ -861,7 +906,11 @@ def serialize_post(post: Post, viewer_user_id: Optional[str] = None) -> dict[str
     if viewer_pk is not None:
         liked_by_current_user = post_like_for_user(post.post_id, viewer_pk) is not None
     return {
-        **post.to_dict(author.full_name if author is not None else None, club.slug if club is not None else None),
+        **post.to_dict(
+            author.full_name if author is not None else None,
+            club.slug if club is not None else None,
+            post_media_urls(post),
+        ),
         "likedByCurrentUser": liked_by_current_user,
         "liked_by_current_user": liked_by_current_user,
         "viewerHasLiked": liked_by_current_user,
@@ -913,7 +962,8 @@ def make_post(data: dict[str, Any]) -> Post:
     tags = unique_preserving_order([*explicit_hashtags, *extract_hashtags(caption)])
     mentions = unique_preserving_order([*explicit_mentions, *extract_mentions(caption)])
     decorated_caption = " ".join([caption, *tags, *mentions]).strip()
-    media_url = text_value(get_first(data, "media_url", "mediaUrl", "image"))
+    media_urls = read_media_urls(data)
+    media_url = media_urls[0] if media_urls else ""
     code = post_type_code(get_first(data, "type", "postType", "post_type"), default=0) or 0
     return Post(
         author_id=resolve_post_author_id(data) or 0,
@@ -927,19 +977,28 @@ def make_post(data: dict[str, Any]) -> Post:
     )
 
 
-def validate_post(post: Post):
+def validate_post(post: Post, media_urls: Optional[list[str]] = None):
     if db().get(User, post.author_id) is None:
         return jsonify({"error": "author_id must reference an existing user"}), 400
-    if post.post_type == "club_post":
+    if post.post_type in CLUB_POST_TYPES:
         if post.club_id is None or db().get(Club, post.club_id) is None:
-            return jsonify({"error": "club_id or clubSlug must reference an existing club for club posts"}), 400
-        if not is_club_member(post.club_id, post.author_id):
-            return jsonify({"error": "club posts require club membership"}), 403
+            return jsonify({"error": "club_id or clubSlug must reference an existing club"}), 400
+        actor = current_auth_user()
+        if not isinstance(actor, User):
+            return jsonify({"error": "unauthorized"}), 401
+        if actor.user_id != post.author_id:
+            return jsonify({"error": "club post author must match the authenticated user"}), 403
+        if not can_publish_club_content(post.club_id, post.author_id):
+            return jsonify({"error": "club posts and announcements require a president, chairman, or secretary role"}), 403
     else:
         post.club_id = None
-    error = media_error(post.media_url or "", post.type_code)
-    if error is not None:
-        return jsonify({"error": error}), 400
+    media_urls = media_urls if media_urls is not None else post_media_urls(post)
+    for media_url in media_urls:
+        error = media_error(media_url, post.type_code)
+        if error is not None:
+            return jsonify({"error": error}), 400
+    if post.post_type == "announcement" and (len(media_urls) != 1 or media_kind(media_urls[0]) != "image"):
+        return jsonify({"error": "announcements require exactly one poster image"}), 400
     return None
 
 
@@ -950,12 +1009,14 @@ def create_post_from_payload(data: dict[str, Any]):
     if code == 2:
         return create_marketplace_item_from_payload(data)
     post = make_post({**data, "type": code})
-    validation_error = validate_post(post)
+    media_urls = read_media_urls(data)
+    validation_error = validate_post(post, media_urls)
     if validation_error is not None:
         return validation_error
     post.engagement_score = float(post.like_count + post.share_count * 2)
     db().add(post)
     db().flush()
+    replace_post_media(post, media_urls)
     notify_new_post(post)
     db().commit()
     db().refresh(post)
@@ -973,8 +1034,10 @@ def update_post_from_payload(post: Post, data: dict[str, Any]):
             post.author_id = author_id
     if "club_id" in data or "clubId" in data or "clubSlug" in data or "club_slug" in data:
         post.club_id = resolve_post_club_id(data)
-    if "media_url" in data or "mediaUrl" in data or "image" in data:
-        post.media_url = text_value(get_first(data, "media_url", "mediaUrl", "image"))
+    media_changed = any(key in data for key in ("media_url", "mediaUrl", "media_urls", "mediaUrls", "image"))
+    media_urls = read_media_urls(data) if media_changed else post_media_urls(post)
+    if media_changed:
+        post.media_url = media_urls[0] if media_urls else None
         post.media_type = media_kind(post.media_url or "")
     if any(key in data for key in ("caption", "body", "title", "hashtags", "tag", "mentions", "taggedPeople", "tagged_people")):
         post.content = make_post({**post.to_dict(), **data, "author_id": post.author_id}).content
@@ -983,9 +1046,11 @@ def update_post_from_payload(post: Post, data: dict[str, Any]):
     if "shares" in data:
         post.share_count = max(optional_int(data.get("shares")) or 0, 0)
     post.engagement_score = float(post.like_count + post.share_count * 2)
-    validation_error = validate_post(post)
+    validation_error = validate_post(post, media_urls)
     if validation_error is not None:
         return validation_error
+    if media_changed:
+        replace_post_media(post, media_urls)
     db().commit()
     db().refresh(post)
     return jsonify(serialize_post(post))
@@ -1068,7 +1133,7 @@ def can_remove_club_member(club: Club, user: Optional[AuthUser], member: ClubMem
 def club_posts_for_club(club: Club) -> list[Post]:
     return db().scalars(
         select(Post)
-        .where((Post.club_id == club.club_id) & (Post.post_type == "club_post") & (Post.is_deleted.is_(False)))
+        .where((Post.club_id == club.club_id) & (Post.post_type.in_(CLUB_POST_TYPES)) & (Post.is_deleted.is_(False)))
         .order_by(Post.created_at.desc(), Post.post_id.asc())
     ).all()
 
@@ -1134,6 +1199,18 @@ def is_club_member(club_id: int, user_id: Any) -> bool:
     )
 
 
+def can_publish_club_content(club_id: int, user_id: Any) -> bool:
+    pk = user_pk(user_id)
+    return pk is not None and db().scalar(
+        select(ClubMember).where(
+            (ClubMember.club_id == club_id)
+            & (ClubMember.user_id == pk)
+            & (ClubMember.status == "active")
+            & (ClubMember.role.in_(CLUB_PUBLISHER_ROLES))
+        )
+    ) is not None
+
+
 def resolve_member_user(data: dict[str, Any]) -> Optional[User]:
     user_id = optional_int(get_first(data, "user_id", "userId"))
     if user_id is not None:
@@ -1165,7 +1242,8 @@ def create_club_member_resource(club: Club, actor: Optional[AuthUser]):
         club_id=club.club_id,
         user_id=user.user_id,
         role=role,
-        can_post=True,
+        can_post=role in CLUB_PUBLISHER_ROLES,
+        can_create_announcement=role in CLUB_PUBLISHER_ROLES,
         added_by_service="admin",
     )
     db().add(member)
@@ -1636,7 +1714,7 @@ def notify_new_post(post: Post) -> None:
     author = db().get(User, post.author_id)
     if author is None:
         return
-    if post.post_type == "club_post" and post.club_id is not None:
+    if post.post_type in CLUB_POST_TYPES and post.club_id is not None:
         club = db().get(Club, post.club_id)
         club_name = club.name if club is not None else "a club"
         add_notifications_for_users(
@@ -2265,6 +2343,8 @@ def club_member_item(slug: str, member_id: int):
         if role_error is not None:
             return jsonify({"error": role_error}), 409
         member.role = role
+        member.can_post = role in CLUB_PUBLISHER_ROLES
+        member.can_create_announcement = role in CLUB_PUBLISHER_ROLES
     db().commit()
     db().refresh(member)
     return jsonify(serialize_club_member(member))
