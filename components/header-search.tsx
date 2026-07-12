@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { EntityListItem } from "@/components/entity-list-item";
 import { API_BASE_URL } from "@/lib/auth-client";
 
 export type SearchKind = "user" | "club" | "post" | "product";
@@ -59,14 +59,6 @@ function resultGroups(results: SearchResponse, enabledTypes: SearchKind[]) {
       .filter((group) => enabledTypes.includes(group.type))
       .map((group) => ({ label: group.label, items: results[group.key] })),
   ].filter((group) => group.items.length > 0);
-}
-
-function resultIcon(item: SearchItem) {
-  if (item.type === "user" && item.initials) {
-    return <span className="text-xs font-bold">{item.initials}</span>;
-  }
-
-  return <span className="material-symbols-outlined text-lg">{item.icon}</span>;
 }
 
 export function HeaderSearch({
@@ -176,32 +168,25 @@ export function HeaderSearch({
                 <div key={group.label} className="py-1">
                   <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">{group.label}</p>
                   {group.items.map((item) => (
-                    <Link
+                    <EntityListItem
                       key={`${item.type}-${item.id}`}
                       href={item.href}
-                      className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-surface-container-low"
-                      onClick={() => setOpen(false)}
-                    >
-                      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
-                        {resultIcon(item)}
-                        <span
-                          className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white text-primary shadow-sm"
-                          aria-label={typeMeta[item.type].label}
-                          title={typeMeta[item.type].label}
-                        >
-                          <span className="material-symbols-outlined text-[11px] leading-none">
-                            {typeMeta[item.type].badge}
-                          </span>
+                      title={item.title}
+                      subtitle={item.subtitle}
+                      kind={item.type}
+                      icon={item.icon}
+                      initials={item.initials}
+                      badgeIcon={typeMeta[item.type].badge}
+                      badgeLabel={typeMeta[item.type].label}
+                      className="flex min-w-0 items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-surface-container-low"
+                      avatarClassName="rounded-full bg-primary-fixed text-primary"
+                      trailing={
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-secondary">
+                          {typeMeta[item.type].label}
                         </span>
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-on-surface">{item.title}</span>
-                        <span className="block truncate text-xs text-on-surface-variant">{item.subtitle}</span>
-                      </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-secondary">
-                        {typeMeta[item.type].label}
-                      </span>
-                    </Link>
+                      }
+                      onNavigate={() => setOpen(false)}
+                    />
                   ))}
                 </div>
               ))}

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { EntityListItem, profileEntityHref } from "@/components/entity-list-item";
 import { API_BASE_URL, type CampusAuthSession, readAuthSession } from "@/lib/auth-client";
-import { getInitials } from "@/lib/app-data";
 
 type FriendshipUser = {
   user_id: string;
@@ -37,10 +37,6 @@ type Status = "idle" | "loading" | "saving" | "error";
 type ListStatus = "idle" | "loading" | "error";
 type ActiveList = "followers" | "following" | null;
 
-function profileHref(user: FriendshipUser) {
-  return `/${encodeURIComponent(user.username || user.user_id || user.userId)}`;
-}
-
 function UserRow({
   canUnfollow,
   isSaving,
@@ -52,29 +48,30 @@ function UserRow({
   onUnfollow: (userId: string) => void;
   user: FriendshipUser;
 }) {
+  const userId = user.user_id || user.userId;
+
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-surface-container-low p-3">
-      <Link
-        href={profileHref(user)}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary"
-      >
-        {user.initials || user.acronym || getInitials(user.name)}
-      </Link>
-      <Link href={profileHref(user)} className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-on-surface">{user.name}</p>
-        <p className="truncate text-xs text-on-surface-variant">@{user.username || user.user_id || user.userId}</p>
-      </Link>
-      {canUnfollow ? (
-        <button
-          className="rounded-full border border-outline-variant px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-secondary hover:text-secondary disabled:opacity-60"
-          disabled={isSaving}
-          type="button"
-          onClick={() => onUnfollow(user.user_id || user.userId)}
-        >
-          {isSaving ? "..." : "Unfollow"}
-        </button>
-      ) : null}
-    </div>
+    <EntityListItem
+      href={profileEntityHref(user)}
+      title={user.name}
+      subtitle={`@${user.username || userId}`}
+      kind="user"
+      initials={user.initials || user.acronym}
+      className="flex min-w-0 items-center gap-3 rounded-2xl bg-surface-container-low p-3"
+      avatarClassName="rounded-full bg-primary-fixed text-primary"
+      trailing={
+        canUnfollow ? (
+          <button
+            className="rounded-full border border-outline-variant px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-secondary hover:text-secondary disabled:opacity-60"
+            disabled={isSaving}
+            type="button"
+            onClick={() => onUnfollow(userId)}
+          >
+            {isSaving ? "..." : "Unfollow"}
+          </button>
+        ) : null
+      }
+    />
   );
 }
 

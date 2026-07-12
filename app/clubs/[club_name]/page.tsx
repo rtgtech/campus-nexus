@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { ClubFollowButton } from "@/components/club-follow-button";
-import { ClubMemberAdminPanel, ClubMembersButton } from "@/components/club-member-admin-panel";
+import { ClubMembersButton } from "@/components/club-members-button";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { HeaderSearch } from "@/components/header-search";
@@ -79,7 +79,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
               ) : null}
               <div className="absolute inset-0 bg-primary/70" />
               <div className="absolute right-5 top-5 z-10">
-                <ClubMembersButton clubSlug={club.slug} members={members} />
+                <ClubMembersButton members={members} />
               </div>
               <div className="relative flex min-h-72 flex-col justify-end p-6 text-white md:p-8">
                 <div className="flex flex-wrap items-end justify-between gap-5">
@@ -139,13 +139,6 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
             </section>
           </div>
         </main>
-
-        <ClubMemberAdminPanel
-          clubSlug={club.slug}
-          existingUserIds={members.map((member) => member.user_id)}
-          existingTitles={members.map((member) => member.title || "Member")}
-          members={members}
-        />
       </div>
     </>
   );

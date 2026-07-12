@@ -7,6 +7,7 @@ import {
   API_BASE_URL,
   CampusAuthSession,
   clearAuthSession,
+  isAdminUser,
   readAuthSession,
   saveAuthSession,
 } from "@/lib/auth-client";
@@ -111,7 +112,7 @@ export default function AuthPage() {
       setMessage(mode === "signup" ? "Account created." : "Signed in.");
       const nextPath = new URLSearchParams(window.location.search).get("next") || "/";
       const safeNextPath = nextPath.startsWith("/") && !nextPath.startsWith("/auth") ? nextPath : "/";
-      window.setTimeout(() => window.location.assign(safeNextPath), 150);
+      window.setTimeout(() => window.location.assign(isAdminUser((data as CampusAuthSession).user) ? "/admin" : safeNextPath), 150);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Authentication failed");

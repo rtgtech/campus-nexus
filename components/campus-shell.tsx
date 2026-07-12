@@ -74,7 +74,9 @@ export function CampusShell({ active, children, headerSearchProps }: CampusShell
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
-              <span className="material-symbols-outlined">bolt</span>
+              <Link href="/games">
+                <span className="material-symbols-outlined shrink-0 text-[22px]">{"sports_esports"}</span>
+              </Link>
             </button>
             <NotificationsButton />
             <AuthSessionControl compact />

@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
-import { API_BASE_URL, isAdminUser, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, readAuthSession } from "@/lib/auth-client";
 
 type Phase = "ready" | "flashing" | "selecting" | "feedback" | "finished";
-type XpSaveStatus = "idle" | "saving" | "saved" | "skipped" | "error";
+type XpSaveStatus = "idle" | "saving" | "saved" | "error";
 
 type RoundResult = {
   correct: number;
@@ -153,12 +153,6 @@ export default function MindSnapPage() {
     if (!session) {
       setXpSaveStatus("error");
       setXpSaveMessage("Sign in to save XP.");
-      return;
-    }
-
-    if (isAdminUser(session.user)) {
-      setXpSaveStatus("skipped");
-      setXpSaveMessage("Admin XP is not ranked.");
       return;
     }
 

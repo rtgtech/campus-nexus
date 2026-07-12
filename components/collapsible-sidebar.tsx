@@ -16,7 +16,6 @@ const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: stri
   { key: "create-post", label: "Create post", href: "/?=createpost", icon: "add" },
   { key: "club", label: "Clubs", href: "/clubs", icon: "groups" },
   { key: "marketplace", label: "Marketplace", href: "/marketplace", icon: "storefront" },
-  { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/chat", icon: "forum" },
   { key: "profile", label: "Profile", href: "/auth", icon: "person" },
 ];
@@ -29,8 +28,10 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
   function navClassName(item: (typeof navItems)[number]) {
     const selected = item.key === active;
     const isCreatePost = item.key === "create-post";
+    const isCreatePostandFeed = item.key === "create-post" && active === "feed";
 
     return [
+      isCreatePostandFeed ? "display:none" : "",
       "flex h-14 items-center  rounded-2xl px-3 text-sm font-semibold transition-colors duration-200",
       isHovered ? "w-full justify-start gap-3" : "w-14 justify-center",
       isCreatePost
@@ -91,6 +92,10 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
                   labelClassName={labelClassName}
                 />
               );
+            }
+
+            if (item.key === "create-post" && active !== "feed") {
+              return null
             }
 
             return (

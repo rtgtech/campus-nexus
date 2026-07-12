@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
-import { API_BASE_URL, isAdminUser, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, readAuthSession } from "@/lib/auth-client";
 
 type Cell = {
   row: number;
@@ -17,7 +17,7 @@ type Puzzle = {
   solution: number[][];
 };
 
-type XpSaveStatus = "idle" | "saving" | "saved" | "skipped" | "error";
+type XpSaveStatus = "idle" | "saving" | "saved" | "error";
 
 const SIZE = 6;
 const BOX_ROWS = 2;
@@ -206,12 +206,6 @@ export default function SudokuPage() {
     if (!session) {
       setXpSaveStatus("error");
       setXpSaveMessage("Puzzle solved. Sign in to save 100 XP.");
-      return;
-    }
-
-    if (isAdminUser(session.user)) {
-      setXpSaveStatus("skipped");
-      setXpSaveMessage("Puzzle solved. Admin XP is not ranked.");
       return;
     }
 

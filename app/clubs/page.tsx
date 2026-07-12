@@ -1,31 +1,16 @@
 import { AuthSessionControl } from "@/components/auth-session-control";
-import { AdminCreateClubAction } from "@/components/admin-create-club-action";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
-import { CreateClubOverlay } from "@/components/create-club-overlay";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderSearch } from "@/components/header-search";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackClubs, type ClubsData } from "@/lib/app-data";
 import Link from "next/link";
 
-type ClubsPageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-};
-
-function getSearchValue(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-export default async function ClubsPage({ searchParams }: ClubsPageProps) {
-  const resolvedSearchParams = (await searchParams) ?? {};
-  const mode = getSearchValue(resolvedSearchParams.mode);
-  const showCreateClub = mode === "createclub";
+export default async function ClubsPage() {
   const clubsData = await getCampusData<ClubsData>("/api/clubs", fallbackClubs);
 
   return (
     <>
-      {showCreateClub ? <CreateClubOverlay /> : null}
-
       <div className="min-h-screen bg-background pb-10 font-body-md text-on-background">
         <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
           <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
@@ -105,7 +90,6 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
               <EmptyState
                 title="No clubs yet"
                 description="Club discovery is ready for real club records."
-                action={<AdminCreateClubAction />}
               />
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -172,8 +156,6 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
             </section>
           ) : null}
         </main>
-
-        <AdminCreateClubAction variant="floating" />
       </div>
 
       <style

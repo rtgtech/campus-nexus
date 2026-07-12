@@ -10,15 +10,28 @@ function authRedirect(request: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-async function tokenIsValid(token: string) {
+type AuthUser = {
+  mail?: string;
+  username?: string | null;
+};
+
+function isAdminUser(user: AuthUser | null | undefined) {
+  return user?.username === "admin" && user.mail === "admin@cn.nhce";
+}
+
+async function authenticatedUser(token: string) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
-    return response.ok;
+    if (!response.ok) {
+      return null;
+    }
+    const data = (await response.json()) as { user?: AuthUser };
+    return data.user ?? null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -30,15 +43,15 @@ export async function middleware(request: NextRequest) {
     return isAuthRoute ? NextResponse.next() : authRedirect(request);
   }
 
-  const isValid = await tokenIsValid(token);
-  if (!isValid) {
+  const user = await authenticatedUser(token);
+  if (!user) {
     const response = isAuthRoute ? NextResponse.next() : authRedirect(request);
     response.cookies.delete(AUTH_COOKIE_NAME);
     return response;
   }
 
   if (isAuthRoute) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL(isAdminUser(user) ? "/admin" : "/", request.url));
   }
 
   return NextResponse.next();

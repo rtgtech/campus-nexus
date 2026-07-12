@@ -23,7 +23,7 @@ function fileToDataUrl(file: File | null) {
   });
 }
 
-export function CreateClubOverlay() {
+export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: string }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [step, setStep] = useState<"details" | "banner">("details");
@@ -133,7 +133,7 @@ export function CreateClubOverlay() {
       }
 
       setStatus("success");
-      router.push("/clubs");
+      router.push(returnHref);
       router.refresh();
     } catch (error) {
       setStatus("error");
@@ -166,7 +166,7 @@ export function CreateClubOverlay() {
                 Sign in with the admin service account to create or manage clubs.
               </p>
             </div>
-            <Link href="/clubs" className="rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary">
+            <Link href={returnHref} className="rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary">
               Close
             </Link>
           </div>
@@ -185,7 +185,7 @@ export function CreateClubOverlay() {
               {step === "details" ? "Add club details." : "Select a banner image."}
             </h1>
           </div>
-          <Link href="/clubs" className="rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary">
+          <Link href={returnHref} className="rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary">
             Close
           </Link>
         </div>
