@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { readAuthSession } from "@/lib/auth-client";
+import { authFetch } from "@/lib/auth-client";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:5000";
+  process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://localhost:5000";
 
 function readMedia(file: File | null) {
   if (!file) {
@@ -28,7 +27,7 @@ function mediaKind(file: File | null) {
   return file.type.startsWith("video/") ? "video" : "image";
 }
 
-export function CreatePostOverlay() {
+export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [step, setStep] = useState<"media" | "content">("media");
@@ -88,13 +87,11 @@ export function CreatePostOverlay() {
     setStatus("saving");
 
     try {
-      const session = readAuthSession();
       const mediaUrl = await readMedia(selectedFile);
-      const response = await fetch(`${API_BASE_URL}/api/posts`, {
+      const response = await authFetch(`${API_BASE_URL}/api/posts`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
         },
         body: JSON.stringify({
           type: 0,
@@ -108,7 +105,7 @@ export function CreatePostOverlay() {
       }
 
       setStatus("success");
-      router.push("/");
+      router.push(returnHref);
       router.refresh();
     } catch {
       setStatus("error");
@@ -125,12 +122,13 @@ export function CreatePostOverlay() {
               {step === "media" ? "Choose your media." : "Write your post."}
             </h2>
           </div>
-          <Link
-            href="/"
+          <button
+            type="button"
             className="rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary"
+            onClick={() => router.replace(returnHref)}
           >
             Close
-          </Link>
+          </button>
         </div>
 
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>

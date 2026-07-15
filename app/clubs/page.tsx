@@ -32,7 +32,7 @@ export default async function ClubsPage() {
           </div>
         </header>
 
-        <CollapsibleSidebar active="club" />
+        <CollapsibleSidebar active="clubs" />
 
         <main className="mx-auto max-w-7xl space-y-16 px-5 pt-24">
           <section className="space-y-6">

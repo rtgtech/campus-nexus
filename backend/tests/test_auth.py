@@ -37,10 +37,15 @@ class AuthTest(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 201)
-        token = response.get_json()["token"]
-        headers = {"Authorization": f"Bearer {token}"}
-        self.assertEqual(self.client.get("/api/auth/me", headers=headers).status_code, 200)
-        self.assertEqual(self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}x"}).status_code, 401)
+        self.assertNotIn("token", response.get_json())
+        self.assertIn("HttpOnly", response.headers["Set-Cookie"])
+        self.assertIn("SameSite=Lax", response.headers["Set-Cookie"])
+        self.assertEqual(self.client.get("/api/auth/me").status_code, 200)
+
+        token = self.client.get_cookie(backend_app.JWT_COOKIE_NAME).value
+        bad_client = backend_app.app.test_client()
+        bad_client.set_cookie(backend_app.JWT_COOKIE_NAME, f"{token}x")
+        self.assertEqual(bad_client.get("/api/auth/me").status_code, 401)
 
     def test_rejects_expired_tokens_and_accepts_admin_tokens(self) -> None:
         now = datetime.now(timezone.utc)
@@ -55,13 +60,19 @@ class AuthTest(unittest.TestCase):
             backend_app.JWT_SECRET,
             algorithm=backend_app.JWT_ALGORITHM,
         )
-        self.assertEqual(self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {expired}"}).status_code, 401)
+        expired_client = backend_app.app.test_client()
+        expired_client.set_cookie(backend_app.JWT_COOKIE_NAME, expired)
+        self.assertEqual(expired_client.get("/api/auth/me").status_code, 401)
 
         response = self.client.post("/api/auth/login", json={"login": "admin", "password": "12345678"})
         self.assertEqual(response.status_code, 200)
-        token = response.get_json()["token"]
-        me = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        me = self.client.get("/api/auth/me")
         self.assertEqual(me.get_json()["user"]["user_id"], "admin")
+
+        self.assertEqual(self.client.post("/api/auth/logout").status_code, 403)
+        logout = self.client.post("/api/auth/logout", headers={"Origin": backend_app.CORS_ORIGIN})
+        self.assertEqual(logout.status_code, 204)
+        self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
 
 
 if __name__ == "__main__":

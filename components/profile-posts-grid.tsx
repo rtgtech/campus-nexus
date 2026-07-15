@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FeedPostCard } from "@/components/feed-post-card";
-import { API_BASE_URL, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 
 type ProfilePostsGridProps = {
@@ -94,9 +94,8 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
     setDeleteMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(activePostId)}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(activePostId)}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.token}` },
       });
 
       if (!response.ok) {

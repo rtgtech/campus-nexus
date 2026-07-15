@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
-import { FollowButton } from "@/components/follow-button";
+import { FriendButton } from "@/components/follow-button";
 import { ProfilePostsGrid } from "@/components/profile-posts-grid";
 import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
 import { fallbackFeed, fallbackProfile, getInitials, type CampusUser, type FeedData, type ProfileData } from "@/lib/app-data";
@@ -78,7 +78,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">{profile.bio}</p>
               <div className="mt-6 flex flex-wrap gap-3">
                 {profileUser ? (
-                  <FollowButton targetUserId={profileUser.user_id} targetName={displayName} />
+                  <FriendButton targetUserId={profileUser.user_id} targetName={displayName} />
                 ) : (
                   <button className="rounded-full bg-surface-container px-6 py-3 text-sm font-semibold text-on-surface-variant" disabled>
                     Profile unavailable

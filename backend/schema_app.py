@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pickle
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -12,6 +13,7 @@ from flask import Flask, g, jsonify, request
 import jwt
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -30,9 +32,23 @@ from sqlalchemy.pool import StaticPool
 from werkzeug.security import check_password_hash, generate_password_hash
 
 try:
-    from .feed_ranker import rank_feed_posts
+    from .feed_ranker import (
+        build_feed_graph,
+        load_feed_graph,
+        persist_feed_graph,
+        publish_staged_feed_graph,
+        rank_feed_posts,
+        stage_feed_graph,
+    )
 except ImportError:
-    from feed_ranker import rank_feed_posts
+    from feed_ranker import (
+        build_feed_graph,
+        load_feed_graph,
+        persist_feed_graph,
+        publish_staged_feed_graph,
+        rank_feed_posts,
+        stage_feed_graph,
+    )
 
 BACKEND_DIR = Path(__file__).resolve().parent
 
@@ -75,6 +91,9 @@ JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "campus-nexus"
 JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "24"))
+JWT_COOKIE_NAME = "campusNexusToken"
+JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "0") == "1"
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:3000")
 if len(JWT_SECRET) < 32:
     raise RuntimeError("JWT_SECRET must be set to at least 32 characters")
 if JWT_EXPIRES_HOURS <= 0:
@@ -136,7 +155,10 @@ class User(Base):
 
 class Friendship(Base):
     __tablename__ = "friendships"
-    __table_args__ = (UniqueConstraint("requester_id", "receiver_id", name="uq_friendships_requester_receiver"),)
+    __table_args__ = (
+        CheckConstraint("requester_id < receiver_id", name="ck_friendships_canonical_pair"),
+        UniqueConstraint("requester_id", "receiver_id", name="uq_friendships_requester_receiver"),
+    )
 
     friendship_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     requester_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
@@ -149,21 +171,13 @@ class Friendship(Base):
     def id(self) -> int:
         return self.friendship_id
 
-    @property
-    def follower_id(self) -> str:
-        return str(self.requester_id)
-
-    @property
-    def following_id(self) -> str:
-        return str(self.receiver_id)
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.friendship_id,
-            "follower_id": str(self.requester_id),
-            "followerId": str(self.requester_id),
-            "following_id": str(self.receiver_id),
-            "followingId": str(self.receiver_id),
+            "user_a_id": str(self.requester_id),
+            "userAId": str(self.requester_id),
+            "user_b_id": str(self.receiver_id),
+            "userBId": str(self.receiver_id),
             "created_at": self.created_at.isoformat(),
             "createdAt": self.created_at.isoformat(),
         }
@@ -840,7 +854,7 @@ def unique_club_slug(value: Any, current_club_id: Optional[int] = None) -> str:
 
 
 def current_auth_user() -> Optional[AuthUser]:
-    token = bearer_token()
+    token = bearer_token() or request.cookies.get(JWT_COOKIE_NAME)
     if token is None:
         return None
     try:
@@ -898,8 +912,19 @@ def create_auth_token(user: AuthUser) -> str:
     )
 
 
-def auth_payload(user: AuthUser, token: str) -> dict[str, Any]:
-    return {"token": token, "user": user.to_dict()}
+def auth_response(user: AuthUser, status: int = 200):
+    response = jsonify({"user": user.to_dict()})
+    response.status_code = status
+    response.set_cookie(
+        JWT_COOKIE_NAME,
+        create_auth_token(user),
+        max_age=JWT_EXPIRES_HOURS * 3600,
+        httponly=True,
+        secure=JWT_COOKIE_SECURE,
+        samesite="Lax",
+        path="/",
+    )
+    return response
 
 
 def find_auth_user_by_login(login: str) -> Optional[User]:
@@ -1071,7 +1096,7 @@ def update_post_from_payload(post: Post, data: dict[str, Any]):
 
 
 def club_by_slug(slug: str) -> Optional[Club]:
-    return db().scalar(select(Club).where(Club.slug == slugify(slug)))
+    return db().scalar(select(Club).where((Club.slug == slugify(slug)) & (Club.is_active.is_(True))))
 
 
 def make_club_card(data: dict[str, Any]) -> Club:
@@ -1261,7 +1286,7 @@ def create_club_member_resource(club: Club, actor: Optional[AuthUser]):
         added_by_service="admin",
     )
     db().add(member)
-    db().commit()
+    commit_with_feed_graph()
     db().refresh(member)
     return jsonify(serialize_club_member(member)), 201
 
@@ -1394,49 +1419,97 @@ def feed_limit() -> Optional[int]:
     return max(1, min(limit, 100)) if limit is not None else None
 
 
+def build_database_feed_graph(session: Session):
+    users = session.scalars(select(User).where(User.is_active.is_(True)).order_by(User.user_id.asc())).all()
+    clubs = session.scalars(select(Club).where(Club.is_active.is_(True)).order_by(Club.club_id.asc())).all()
+    memberships = session.scalars(select(ClubMember).where(ClubMember.status == "active").order_by(ClubMember.club_member_id.asc())).all()
+    followers = session.scalars(select(ClubFollower).order_by(ClubFollower.club_id.asc(), ClubFollower.user_id.asc())).all()
+    friendships = session.scalars(select(Friendship).where(Friendship.status == "accepted").order_by(Friendship.friendship_id.asc())).all()
+    return build_feed_graph(
+        users=[{"user_id": str(user.user_id)} for user in users],
+        clubs=[{"id": club.club_id} for club in clubs],
+        club_memberships=[(member.club_id, str(member.user_id)) for member in memberships],
+        club_followers=[(follower.club_id, str(follower.user_id)) for follower in followers],
+        friendships=[(str(friendship.requester_id), str(friendship.receiver_id)) for friendship in friendships],
+    )
+
+
+def rebuild_persisted_feed_graph(session: Session):
+    graph = build_database_feed_graph(session)
+    persist_feed_graph(graph)
+    return graph
+
+
+def commit_with_feed_graph() -> None:
+    session = db()
+    session.flush()
+    # ponytail: full rebuilds keep writes simple; update individual edges if measured write latency becomes a problem.
+    graph = build_database_feed_graph(session)
+    staged_path, destination = stage_feed_graph(graph)
+    try:
+        session.commit()
+    except Exception:
+        staged_path.unlink(missing_ok=True)
+        raise
+    try:
+        publish_staged_feed_graph(graph, staged_path, destination)
+    finally:
+        staged_path.unlink(missing_ok=True)
+
+
+def current_feed_graph():
+    try:
+        return load_feed_graph()
+    except (FileNotFoundError, EOFError, OSError, ValueError, pickle.UnpicklingError):
+        return rebuild_persisted_feed_graph(db())
+
+
 def ranked_feed_cards(viewer_user_id: Optional[str], limit: Optional[int]) -> list[dict[str, Any]]:
-    users = db().scalars(select(User).where(User.is_active.is_(True)).order_by(User.user_id.asc())).all()
-    clubs = db().scalars(select(Club).where(Club.is_active.is_(True)).order_by(Club.club_id.asc())).all()
-    memberships = db().scalars(select(ClubMember).where(ClubMember.status == "active").order_by(ClubMember.club_member_id.asc())).all()
-    friendships = db().scalars(select(Friendship).where(Friendship.status == "accepted").order_by(Friendship.friendship_id.asc())).all()
     posts = db().scalars(
         select(Post)
         .where(Post.is_deleted.is_(False))
         .order_by(Post.created_at.desc(), Post.post_id.asc())
     ).all()
     return rank_feed_posts(
-        users=[{"user_id": str(user.user_id)} for user in users],
-        clubs=[{"id": club.club_id} for club in clubs],
-        club_memberships=[(member.club_id, str(member.user_id)) for member in memberships],
-        friendships=[(str(friendship.requester_id), str(friendship.receiver_id)) for friendship in friendships],
+        graph=current_feed_graph(),
         posts=[serialize_post(post, viewer_user_id) for post in posts],
         viewer_user_id=viewer_user_id,
-        admin_user_ids=set(),
         limit=limit,
     )
 
 
-def friendship_between(follower_id: Any, following_id: Any) -> Optional[Friendship]:
-    follower = user_pk(follower_id)
-    following = user_pk(following_id)
-    if follower is None or following is None:
+def friendship_between(user_a_id: Any, user_b_id: Any) -> Optional[Friendship]:
+    user_a = user_pk(user_a_id)
+    user_b = user_pk(user_b_id)
+    if user_a is None or user_b is None:
         return None
     return db().scalar(
         select(Friendship).where(
-            (Friendship.requester_id == follower)
-            & (Friendship.receiver_id == following)
+            (
+                ((Friendship.requester_id == user_a) & (Friendship.receiver_id == user_b))
+                | ((Friendship.requester_id == user_b) & (Friendship.receiver_id == user_a))
+            )
             & (Friendship.status == "accepted")
         )
     )
 
 
-def friendship_counts(user_id: Any) -> dict[str, int]:
+def friendship_rows(user_id: Any) -> list[tuple[User, Friendship]]:
     pk = user_pk(user_id)
     if pk is None:
-        return {"followers": 0, "following": 0}
-    followers = db().scalar(select(func.count()).select_from(Friendship).where((Friendship.receiver_id == pk) & (Friendship.status == "accepted")))
-    following = db().scalar(select(func.count()).select_from(Friendship).where((Friendship.requester_id == pk) & (Friendship.status == "accepted")))
-    return {"followers": int(followers or 0), "following": int(following or 0)}
+        return []
+    outgoing = db().execute(
+        select(User, Friendship)
+        .join(Friendship, Friendship.receiver_id == User.user_id)
+        .where((Friendship.requester_id == pk) & (Friendship.status == "accepted"))
+    ).all()
+    incoming = db().execute(
+        select(User, Friendship)
+        .join(Friendship, Friendship.requester_id == User.user_id)
+        .where((Friendship.receiver_id == pk) & (Friendship.status == "accepted"))
+    ).all()
+    rows = sorted([*outgoing, *incoming], key=lambda row: row[1].created_at, reverse=True)
+    return list({user.user_id: (user, friendship) for user, friendship in rows}.values())
 
 
 def friendship_user_payload(user: User, friendship: Friendship) -> dict[str, Any]:
@@ -1455,50 +1528,27 @@ def friendship_user_payload(user: User, friendship: Friendship) -> dict[str, Any
     }
 
 
-def friendship_list_rows(user_id: Any, list_name: str, limit: Optional[int] = None, offset: int = 0):
-    pk = user_pk(user_id)
-    if pk is None:
-        return [], 0
-    if list_name == "followers":
-        total = db().scalar(select(func.count()).select_from(Friendship).where((Friendship.receiver_id == pk) & (Friendship.status == "accepted")))
-        statement = select(User, Friendship).join(Friendship, Friendship.requester_id == User.user_id).where((Friendship.receiver_id == pk) & (Friendship.status == "accepted"))
-    else:
-        total = db().scalar(select(func.count()).select_from(Friendship).where((Friendship.requester_id == pk) & (Friendship.status == "accepted")))
-        statement = select(User, Friendship).join(Friendship, Friendship.receiver_id == User.user_id).where((Friendship.requester_id == pk) & (Friendship.status == "accepted"))
-    statement = statement.order_by(Friendship.created_at.desc(), User.username.asc()).offset(max(offset, 0))
-    if limit is not None:
-        statement = statement.limit(limit)
-    return db().execute(statement).all(), int(total or 0)
-
-
-def friendship_list_payload(user_id: Any, list_name: str, limit: int = 50, offset: int = 0) -> dict[str, Any]:
-    rows, total = friendship_list_rows(user_id, list_name, limit, offset)
-    return {"items": [friendship_user_payload(user, friendship) for user, friendship in rows], "total": total, "limit": limit, "offset": max(offset, 0)}
-
-
-def friendship_lists(user_id: Any) -> dict[str, list[dict[str, Any]]]:
-    followers, _ = friendship_list_rows(user_id, "followers")
-    following, _ = friendship_list_rows(user_id, "following")
+def friendship_lists(user_id: Any, current_user_id: Any) -> dict[str, list[dict[str, Any]]]:
+    # ponytail: load the full profile list; add pagination when friend counts become large enough to affect the UI.
+    friends = friendship_rows(user_id)
+    current_friend_ids = set() if user_pk(user_id) == user_pk(current_user_id) else {user.user_id for user, _ in friendship_rows(current_user_id)}
+    mutuals = [(user, friendship) for user, friendship in friends if user.user_id in current_friend_ids]
     return {
-        "followersList": [friendship_user_payload(user, friendship) for user, friendship in followers],
-        "followingList": [friendship_user_payload(user, friendship) for user, friendship in following],
+        "friendsList": [friendship_user_payload(user, friendship) for user, friendship in friends],
+        "mutualsList": [friendship_user_payload(user, friendship) for user, friendship in mutuals],
     }
 
 
 def friendship_status_payload(current_user: User, target_user: User, include_lists: bool = False) -> dict[str, Any]:
     friendship = friendship_between(current_user.user_id, target_user.user_id)
     payload = {
-        "isFollowing": friendship is not None,
+        "isFriend": friendship is not None,
         "isSelf": current_user.user_id == target_user.user_id,
-        "follower_id": str(current_user.user_id),
-        "followerId": str(current_user.user_id),
-        "following_id": str(target_user.user_id),
-        "followingId": str(target_user.user_id),
-        **friendship_counts(target_user.user_id),
+        "friends": len(friendship_rows(target_user.user_id)),
         "friendship": friendship.to_dict() if friendship is not None else None,
     }
     if include_lists:
-        payload.update(friendship_lists(target_user.user_id))
+        payload.update(friendship_lists(target_user.user_id, current_user.user_id))
     return payload
 
 
@@ -1706,14 +1756,8 @@ def add_notifications_for_users(
         add_notification(user_id, actor_id, notification_type, target_type, target_id, message)
 
 
-def follower_user_ids_for_author(author_id: int) -> list[int]:
-    return list(
-        db().scalars(
-            select(Friendship.requester_id).where(
-                (Friendship.receiver_id == author_id) & (Friendship.status == "accepted")
-            )
-        ).all()
-    )
+def friend_user_ids(user_id: int) -> list[int]:
+    return [user.user_id for user, _ in friendship_rows(user_id)]
 
 
 def club_audience_user_ids(club_id: int) -> list[int]:
@@ -1741,7 +1785,7 @@ def notify_new_post(post: Post) -> None:
         )
         return
     add_notifications_for_users(
-        follower_user_ids_for_author(post.author_id),
+        friend_user_ids(post.author_id),
         post.author_id,
         "friend_post",
         "post",
@@ -1751,7 +1795,7 @@ def notify_new_post(post: Post) -> None:
 
 
 def notification_href(notification: Notification, actor: Optional[User], post: Optional[Post], club: Optional[Club]) -> str:
-    if notification.type == "friend_request":
+    if notification.type in {"friend_request", "friend_accept"}:
         return f"/{actor.username}" if actor is not None else "/"
     if notification.type == "club_post" and club is not None:
         return f"/clubs/{club.slug}#{notification.target_id}"
@@ -1760,8 +1804,8 @@ def notification_href(notification: Notification, actor: Optional[User], post: O
 
 def notification_title(notification: Notification, actor: Optional[User], post: Optional[Post], club: Optional[Club]) -> str:
     actor_name = actor.full_name if actor is not None else "Someone"
-    if notification.type == "friend_request":
-        return f"{actor_name} followed you"
+    if notification.type in {"friend_request", "friend_accept"}:
+        return f"{actor_name} is now your friend"
     if notification.type == "friend_post":
         return f"{actor_name} shared a post"
     if notification.type == "club_post":
@@ -1796,7 +1840,7 @@ def serialize_notification(notification: Notification) -> dict[str, Any]:
         "time": relative_time(notification.created_at),
         "createdAt": notification.created_at.isoformat(),
         "href": notification_href(notification, actor, post, club),
-        "actionLabel": "View profile" if notification.type == "friend_request" else "View post",
+        "actionLabel": "View profile" if notification.type in {"friend_request", "friend_accept"} else "View post",
         "iconText": initials_for_name(actor_name),
         "iconName": "groups" if source == "club" else {"post_like": "favorite", "post_comment": "chat_bubble", "friend_post": "post_add"}.get(notification.type, "person"),
         "isRead": notification.is_read,
@@ -1945,6 +1989,17 @@ def handle_options():
 
 
 @app.before_request
+def protect_cookie_mutations():
+    if (
+        request.method in {"POST", "PUT", "PATCH", "DELETE"}
+        and request.cookies.get(JWT_COOKIE_NAME)
+        and request.headers.get("Origin") != CORS_ORIGIN
+    ):
+        return jsonify({"error": "invalid request origin"}), 403
+    return None
+
+
+@app.before_request
 def prepare_database_session():
     if request.path == "/health":
         return None
@@ -1973,9 +2028,11 @@ def handle_database_error(error):
 
 @app.after_request
 def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = os.getenv("CORS_ORIGIN", "*")
+    response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    response.headers.add("Vary", "Origin")
     return response
 
 
@@ -2011,7 +2068,7 @@ def users_collection():
     if error_response is not None:
         return error_response, status
     db().add(user)
-    db().commit()
+    commit_with_feed_graph()
     db().refresh(user)
     return jsonify(user.to_dict()), 201
 
@@ -2025,7 +2082,7 @@ def users_item(user_id: str):
         return jsonify(user.to_dict())
     if request.method == "DELETE":
         db().delete(user)
-        db().commit()
+        commit_with_feed_graph()
         return ("", 204)
     update_error = update_user_from_payload(user, read_json())
     if update_error is not None:
@@ -2047,38 +2104,37 @@ def user_friendship_collection(user_id: str):
         include_lists = read_bool(request.args.get("includeLists") or request.args.get("include_lists"))
         return jsonify(friendship_status_payload(current_user, target_user, include_lists))
     if current_user.user_id == target_user.user_id:
-        return jsonify({"error": "users cannot follow themselves"}), 400
+        return jsonify({"error": "users cannot befriend themselves"}), 400
     existing = friendship_between(current_user.user_id, target_user.user_id)
     if request.method == "DELETE":
-        if existing is not None:
-            db().delete(existing)
-            db().commit()
+        friendships = db().scalars(
+            select(Friendship).where(
+                (
+                    ((Friendship.requester_id == current_user.user_id) & (Friendship.receiver_id == target_user.user_id))
+                    | ((Friendship.requester_id == target_user.user_id) & (Friendship.receiver_id == current_user.user_id))
+                )
+                & (Friendship.status == "accepted")
+            )
+        ).all()
+        if friendships:
+            for friendship in friendships:
+                db().delete(friendship)
+            commit_with_feed_graph()
         return jsonify(friendship_status_payload(current_user, target_user))
     if existing is None:
-        db().add(Friendship(requester_id=current_user.user_id, receiver_id=target_user.user_id, status="accepted"))
+        user_a_id, user_b_id = sorted((current_user.user_id, target_user.user_id))
+        db().add(Friendship(requester_id=user_a_id, receiver_id=user_b_id, status="accepted"))
         add_notification(
             target_user.user_id,
             current_user.user_id,
-            "friend_request",
+            "friend_accept",
             "user",
             current_user.user_id,
-            f"{current_user.full_name} started following you.",
+            f"{current_user.full_name} added you as a friend.",
         )
-        db().commit()
+        commit_with_feed_graph()
         return jsonify(friendship_status_payload(current_user, target_user)), 201
     return jsonify(friendship_status_payload(current_user, target_user))
-
-
-@app.route("/api/users/<user_id>/friends/<list_name>", methods=["GET"])
-def user_friendship_list(user_id: str, list_name: str):
-    target_user = get_user(user_id)
-    if target_user is None or list_name not in {"followers", "following"}:
-        return jsonify({"error": "not found"}), 404
-    if current_auth_user() is None:
-        return jsonify({"error": "unauthorized"}), 401
-    limit = max(1, min(optional_int(request.args.get("limit")) or 50, 100))
-    offset = max(optional_int(request.args.get("offset")) or 0, 0)
-    return jsonify(friendship_list_payload(target_user.user_id, list_name, limit, offset))
 
 
 @app.route("/api/posts", methods=["GET", "POST"])
@@ -2244,7 +2300,7 @@ def create_club_alias():
         return admin_error
     item = make_club_card(read_json())
     db().add(item)
-    db().commit()
+    commit_with_feed_graph()
     db().refresh(item)
     return jsonify(item.to_dict()), 201
 
@@ -2266,7 +2322,7 @@ def club_item(item_id: int):
         return admin_error
     if request.method == "DELETE":
         club.is_active = False
-        db().commit()
+        commit_with_feed_graph()
         return ("", 204)
     data = read_json()
     if "title" in data or "name" in data:
@@ -2306,11 +2362,11 @@ def club_follow(slug: str):
     if request.method == "DELETE":
         if existing is not None:
             db().delete(existing)
-            db().commit()
+            commit_with_feed_graph()
         return jsonify(club_follow_payload(club, user))
     if existing is None:
         db().add(ClubFollower(club_id=club.club_id, user_id=user.user_id))
-        db().commit()
+        commit_with_feed_graph()
         return jsonify(club_follow_payload(club, user)), 201
     return jsonify(club_follow_payload(club, user))
 
@@ -2345,7 +2401,7 @@ def club_member_item(slug: str, member_id: int):
         if not can_remove_club_member(club, user, member):
             return jsonify({"error": "admin or club president access required"}), 403
         member.status = "removed"
-        db().commit()
+        commit_with_feed_graph()
         return ("", 204)
     admin_error = require_admin_user()
     if admin_error is not None:
@@ -2544,10 +2600,9 @@ def auth_signup():
         return error_response, status
     db().add(user)
     db().flush()
-    token = create_auth_token(user)
-    db().commit()
+    commit_with_feed_graph()
     db().refresh(user)
-    return jsonify(auth_payload(user, token)), 201
+    return auth_response(user, 201)
 
 
 @app.route("/api/auth/login", methods=["POST"])
@@ -2558,12 +2613,11 @@ def auth_login():
     if not login or not password:
         return jsonify({"error": "login and password are required"}), 400
     if admin_login_matches(login, password):
-        admin = AdminIdentity()
-        return jsonify(auth_payload(admin, create_auth_token(admin)))
+        return auth_response(AdminIdentity())
     user = find_auth_user_by_login(login)
     if user is None or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "invalid login or password"}), 401
-    return jsonify(auth_payload(user, create_auth_token(user)))
+    return auth_response(user)
 
 
 @app.route("/api/auth/me")
@@ -2576,7 +2630,9 @@ def auth_me():
 
 @app.route("/api/auth/logout", methods=["POST"])
 def auth_logout():
-    return ("", 204)
+    response = app.make_response(("", 204))
+    response.delete_cookie(JWT_COOKIE_NAME, path="/", secure=JWT_COOKIE_SECURE, samesite="Lax")
+    return response
 
 
 @app.route("/api/profile/<user>")

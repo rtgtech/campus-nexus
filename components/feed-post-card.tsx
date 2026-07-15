@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { API_BASE_URL, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 
 type FeedPostCardProps = {
@@ -114,7 +114,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
     }
 
     const session = readAuthSession();
-    if (!session?.token) {
+    if (!session) {
       return;
     }
 
@@ -127,11 +127,8 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
     setLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(post.post_id)}/like`, {
+      const response = await authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(post.post_id)}/like`, {
         method: nextLiked ? "POST" : "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
       });
 
       const data = await response.json().catch(() => null);

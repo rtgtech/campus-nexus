@@ -29,18 +29,30 @@ The backend explicitly loads `backend/.env`, creates missing tables on startup, 
 npm run dev:backend
 ```
 
-`npm run dev:backend` runs `backend/run.ps1`, which creates `backend/venv` when missing, installs backend dependencies when needed, copies `.env.example` to `.env` when missing, and starts Flask. The frontend defaults to `http://127.0.0.1:5000`. Override with `CAMPUS_NEXUS_API_URL` for server-side page fetches and `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` for browser form submissions.
+`npm run dev:backend` runs `backend/run.ps1`, which creates `backend/venv` when missing, installs backend dependencies when needed, copies `.env.example` to `.env` when missing, and starts Flask. Browser requests default to `http://localhost:5000`. Override with `CAMPUS_NEXUS_API_URL` for server-side page fetches and `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` for browser form submissions.
 
 ## Environment
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | `postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus` | SQLAlchemy database URL loaded from `backend/.env`. |
+| `FEED_GRAPH_PATH` | `backend/.cache/feed_graph.gpickle` | Optional path for the persisted feed-ranking graph. |
 | `PORT` | `5000` | Flask port. |
 | `FLASK_DEBUG` | unset | Set to `1` to enable Flask debug mode. |
-| `CORS_ORIGIN` | `*` | Allowed CORS origin. |
+| `CORS_ORIGIN` | `http://localhost:3000` | Exact frontend origin allowed to send the auth cookie. |
 | `JWT_SECRET` | required | Secret used to sign JWTs; use at least 32 random characters. |
 | `JWT_EXPIRES_HOURS` | `24` | JWT lifetime in hours. |
+| `JWT_COOKIE_SECURE` | `0` | Set to `1` when serving the frontend and backend over HTTPS. |
+
+## Feed graph maintenance
+
+The API updates the persisted feed graph when users, clubs, friendships, or club memberships change. Reconcile it after direct database edits with:
+
+```powershell
+backend\venv\Scripts\python.exe backend\update_feed_graph.py
+```
+
+Keep the gpickle file application-owned; Python pickle files must never be accepted from users.
 
 ## Aggregate Endpoints
 
@@ -60,7 +72,7 @@ npm run dev:backend
 | `POST` | `/api/auth/logout` | Acknowledge client-side logout. JWTs expire automatically. |
 | `GET` | `/api/profile/<user>` | Stored profile when present, otherwise an empty default profile. |
 
-The backend returns an HS256 JWT containing the user subject, role, issuer, issued-at time, and expiry. The Next.js frontend stores it in a `campusNexusToken` cookie for route middleware and in `localStorage` as `campusNexusAuth` for client-side header state.
+The backend stores an HS256 JWT in the HttpOnly `campusNexusToken` cookie. Browser JavaScript stores only the returned user profile, never the token.
 
 Startup also seeds an admin service account when missing:
 

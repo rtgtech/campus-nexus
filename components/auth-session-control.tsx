@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { API_BASE_URL, CampusAuthSession, clearAuthSession, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, CampusAuthSession, authFetch, clearAuthSession, readAuthSession } from "@/lib/auth-client";
 import { getInitials } from "@/lib/app-data";
 
 type AuthSessionControlProps = {
@@ -20,13 +20,11 @@ export function AuthSessionControl({ compact = false }: AuthSessionControlProps)
   }, []);
 
   async function handleLogout() {
-    const token = session?.token;
     setIsLoggingOut(true);
     try {
-      if (token) {
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
+      if (session) {
+        await authFetch(`${API_BASE_URL}/api/auth/logout`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
         });
       }
     } finally {

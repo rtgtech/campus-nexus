@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
-import { API_BASE_URL, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 
 type Phase = "ready" | "flashing" | "selecting" | "feedback" | "finished";
 type XpSaveStatus = "idle" | "saving" | "saved" | "error";
@@ -160,11 +160,10 @@ export default function MindSnapPage() {
     setXpSaveMessage("Saving XP...");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/games/xp`, {
+      const response = await authFetch(`${API_BASE_URL}/api/games/xp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.token}`,
         },
         body: JSON.stringify({
           game: "mind-snap",

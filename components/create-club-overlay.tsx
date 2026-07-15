@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { CampusAuthSession, isAdminUser, readAuthSession } from "@/lib/auth-client";
+import { CampusAuthSession, authFetch, isAdminUser, readAuthSession } from "@/lib/auth-client";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:5000";
+  process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://localhost:5000";
 
 const departmentOptions = ["CS", "Mech", "ECE", "Electrical", "Civil", "Architecture", "Design", "Business"];
 
@@ -110,11 +110,10 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
         .filter(Boolean)
         .join("\n");
 
-      const response = await fetch(`${API_BASE_URL}/api/clubs`, {
+      const response = await authFetch(`${API_BASE_URL}/api/clubs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${activeSession.token}`,
         },
         body: JSON.stringify({
           title: clubName.trim(),

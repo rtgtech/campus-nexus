@@ -2,11 +2,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
+import { CreatePostLink } from "@/components/create-post-route";
 import { HeaderSearch, type HeaderSearchProps } from "@/components/header-search";
 import { NotificationsButton } from "@/components/notifications-button";
 import { ProfileNavLink } from "@/components/profile-nav-link";
 
-type NavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
+type NavKey = "feed" | "clubs" | "marketplace" | "games" | "messages" | "profile";
 type NavItemKey = NavKey | "create-post";
 
 type CampusShellProps = {
@@ -18,7 +19,7 @@ type CampusShellProps = {
 const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
   { key: "create-post", label: "Create post", href: "/?=createpost", icon: "add" },
-  { key: "club", label: "Clubs", href: "/clubs", icon: "groups" },
+  { key: "clubs", label: "Clubs", href: "/clubs", icon: "groups" },
   { key: "marketplace", label: "Marketplace", href: "/marketplace", icon: "storefront" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },
   { key: "messages", label: "Chat", href: "/chat", icon: "forum" },
@@ -114,6 +115,15 @@ export function CampusShell({ active, children, headerSearchProps }: CampusShell
                   iconClassName="mb-0.5"
                   label={label}
                 />
+              );
+            }
+
+            if (isCreatePost) {
+              return (
+                <CreatePostLink key={item.key} className={className}>
+                  <span className="material-symbols-outlined mb-0.5">{item.icon}</span>
+                  <span>{label}</span>
+                </CreatePostLink>
               );
             }
 

@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   API_BASE_URL,
   CampusAuthSession,
+  authFetch,
   clearAuthSession,
   isAdminUser,
   readAuthSession,
@@ -41,22 +42,18 @@ export default function AuthPage() {
 
     async function restoreSession() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${sessionToRestore.token}` },
-        });
+        const response = await authFetch(`${API_BASE_URL}/api/auth/me`);
         if (!response.ok) {
           throw new Error("Stored session expired");
         }
         if (!cancelled) {
-          saveAuthSession(sessionToRestore);
+          const data = (await response.json()) as CampusAuthSession;
+          saveAuthSession(data);
           router.replace("/");
         }
       } catch {
         if (!cancelled) {
-          const latestSession = readAuthSession();
-          if (latestSession?.token === sessionToRestore.token) {
-            clearAuthSession();
-          }
+          clearAuthSession();
         }
       }
     }
@@ -96,7 +93,7 @@ export default function AuthPage() {
               password: readForm(form, "password"),
             };
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await authFetch(`${API_BASE_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

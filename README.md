@@ -66,7 +66,7 @@ The app works with defaults for local development.
 | Variable | Used by | Default | Purpose |
 | --- | --- | --- | --- |
 | `CAMPUS_NEXUS_API_URL` | Next.js server components | `http://127.0.0.1:5000` | Backend base URL for server-side data fetches. |
-| `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` | Browser/client components | `http://127.0.0.1:5000` | Backend base URL for form submissions from the browser. |
+| `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` | Browser/client components | `http://localhost:5000` | Backend base URL for form submissions from the browser. |
 | `DATABASE_URL` | Flask backend, from `backend/.env` | `postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus` | SQLAlchemy database URL for persisted API data. |
 | `PORT` | Flask backend | `5000` | Backend port. |
 | `FLASK_DEBUG` | Flask backend | unset | Set to `1` to enable Flask debug mode. |
@@ -76,7 +76,7 @@ Example:
 
 ```powershell
 $env:CAMPUS_NEXUS_API_URL="http://127.0.0.1:5000"
-$env:NEXT_PUBLIC_CAMPUS_NEXUS_API_URL="http://127.0.0.1:5000"
+$env:NEXT_PUBLIC_CAMPUS_NEXUS_API_URL="http://localhost:5000"
 ```
 
 ## Project Structure

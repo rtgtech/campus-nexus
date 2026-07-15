@@ -70,7 +70,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
           </div>
         </header>
 
-        <CollapsibleSidebar active="club" />
+        <CollapsibleSidebar active="clubs" />
 
         <main className="mx-auto max-w-7xl space-y-8 px-5 pt-24">
           <section className="overflow-hidden rounded-[32px] border border-surface-container-highest bg-white shadow-sm">

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { CreatePostRoute } from "@/components/create-post-route";
 import "material-symbols/outlined.css";
 import "./globals.css";
 
@@ -29,7 +31,12 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Suspense fallback={null}>
+          <CreatePostRoute />
+        </Suspense>
+      </body>
     </html>
   );
 }

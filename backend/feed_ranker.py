@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import math
+import os
+import pickle
+import tempfile
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+from threading import Lock
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
 import networkx as nx
@@ -19,10 +24,15 @@ RECENCY_HALF_LIFE_HOURS = 24.0
 
 DEFAULT_CLUB_EDGE_WEIGHT = 0.05
 CLUB_MEMBER_EDGE_WEIGHT = 1.0
-FOLLOW_EDGE_WEIGHT = 0.65
-MUTUAL_FOLLOW_EDGE_WEIGHT = 1.0
-FOLLOWING_SOCIAL_WEIGHT = 0.75
-FOLLOWER_SOCIAL_WEIGHT = 0.35
+FRIENDSHIP_EDGE_WEIGHT = 1.0
+
+GRAPH_SCHEMA_VERSION = 1
+DEFAULT_GRAPH_PATH = Path(__file__).resolve().parent / ".cache" / "feed_graph.gpickle"
+
+_graph_cache_lock = Lock()
+_cached_graph: Optional[nx.Graph] = None
+_cached_graph_path: Optional[Path] = None
+_cached_graph_mtime_ns: Optional[int] = None
 
 
 def _user_node(user_id: Any) -> str:
@@ -130,6 +140,7 @@ def _build_graph(
     club_memberships: Iterable[tuple[Any, Any]],
     friendships: Iterable[tuple[Any, Any]],
     admin_user_ids: set[str],
+    club_followers: Iterable[tuple[Any, Any]] = (),
 ) -> nx.Graph:
     graph = nx.Graph()
 
@@ -155,44 +166,41 @@ def _build_graph(
         for club_id, user_id in club_memberships
         if str(user_id) in user_ids and str(club_id) in club_ids and str(user_id) not in admin_user_ids
     }
+    follower_pairs = {
+        (str(club_id), str(user_id))
+        for club_id, user_id in club_followers
+        if str(user_id) in user_ids and str(club_id) in club_ids and str(user_id) not in admin_user_ids
+    }
 
     for user_id in user_ids:
         for club_id in club_ids:
-            weight = CLUB_MEMBER_EDGE_WEIGHT if (club_id, user_id) in member_pairs else DEFAULT_CLUB_EDGE_WEIGHT
+            weight = (
+                CLUB_MEMBER_EDGE_WEIGHT
+                if (club_id, user_id) in member_pairs or (club_id, user_id) in follower_pairs
+                else DEFAULT_CLUB_EDGE_WEIGHT
+            )
             graph.add_edge(_user_node(user_id), _club_node(club_id), weight=weight)
 
-    friendship_directions: dict[tuple[str, str], set[tuple[str, str]]] = {}
-    for follower_id, following_id in friendships:
-        follower = str(follower_id)
-        following = str(following_id)
-        if follower == following:
+    friendship_pairs: set[tuple[str, str]] = set()
+    for user_a_id, user_b_id in friendships:
+        user_a = str(user_a_id)
+        user_b = str(user_b_id)
+        if user_a == user_b:
             continue
-        if follower not in user_ids or following not in user_ids:
+        if user_a not in user_ids or user_b not in user_ids:
             continue
-        if follower in admin_user_ids or following in admin_user_ids:
+        if user_a in admin_user_ids or user_b in admin_user_ids:
             continue
-        key = tuple(sorted((follower, following)))
-        friendship_directions.setdefault(key, set()).add((follower, following))
+        friendship_pairs.add(tuple(sorted((user_a, user_b))))
 
-    for (user_a, user_b), directions in friendship_directions.items():
-        weight = MUTUAL_FOLLOW_EDGE_WEIGHT if len(directions) > 1 else FOLLOW_EDGE_WEIGHT
-        graph.add_edge(_user_node(user_a), _user_node(user_b), weight=weight)
+    for user_a, user_b in friendship_pairs:
+        graph.add_edge(
+            _user_node(user_a),
+            _user_node(user_b),
+            weight=FRIENDSHIP_EDGE_WEIGHT,
+        )
 
     return graph
-
-
-def _friendship_lookup(
-    friendships: Iterable[tuple[Any, Any]],
-    *,
-    admin_user_ids: set[str],
-) -> set[tuple[str, str]]:
-    return {
-        (str(follower_id), str(following_id))
-        for follower_id, following_id in friendships
-        if str(follower_id) != str(following_id)
-        and str(follower_id) not in admin_user_ids
-        and str(following_id) not in admin_user_ids
-    }
 
 
 def _pagerank(graph: nx.Graph) -> dict[str, float]:
@@ -234,15 +242,105 @@ def _pagerank(graph: nx.Graph) -> dict[str, float]:
     return nx.degree_centrality(graph)
 
 
-def rank_feed_posts(
+def build_feed_graph(
     *,
     users: Iterable[Mapping[str, Any]],
     clubs: Iterable[Mapping[str, Any]],
     club_memberships: Iterable[tuple[Any, Any]],
+    club_followers: Iterable[tuple[Any, Any]],
     friendships: Iterable[tuple[Any, Any]],
+    admin_user_ids: Iterable[str] = (),
+) -> nx.Graph:
+    graph = _build_graph(
+        users=users,
+        clubs=clubs,
+        club_memberships=club_memberships,
+        club_followers=club_followers,
+        friendships=friendships,
+        admin_user_ids={str(user_id) for user_id in admin_user_ids},
+    )
+    nx.set_node_attributes(graph, _pagerank(graph), "pagerank")
+    graph.graph["schema_version"] = GRAPH_SCHEMA_VERSION
+    graph.graph["generated_at"] = datetime.now(timezone.utc).isoformat()
+    return graph
+
+
+def feed_graph_path() -> Path:
+    configured = os.getenv("FEED_GRAPH_PATH")
+    return Path(configured).expanduser().resolve() if configured else DEFAULT_GRAPH_PATH
+
+
+def stage_feed_graph(graph: nx.Graph, path: Optional[Path] = None) -> tuple[Path, Path]:
+    destination = (path or feed_graph_path()).resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            pickle.dump(graph, output, protocol=pickle.HIGHEST_PROTOCOL)
+            output.flush()
+            os.fsync(output.fileno())
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+    return temporary_path, destination
+
+
+def publish_staged_feed_graph(graph: nx.Graph, staged_path: Path, destination: Path) -> None:
+    global _cached_graph, _cached_graph_path, _cached_graph_mtime_ns
+    with _graph_cache_lock:
+        os.replace(staged_path, destination)
+        _cached_graph = graph
+        _cached_graph_path = destination
+        _cached_graph_mtime_ns = destination.stat().st_mtime_ns
+
+
+def persist_feed_graph(graph: nx.Graph, path: Optional[Path] = None) -> Path:
+    staged_path, destination = stage_feed_graph(graph, path)
+    try:
+        publish_staged_feed_graph(graph, staged_path, destination)
+    finally:
+        staged_path.unlink(missing_ok=True)
+    return destination
+
+
+def load_feed_graph(path: Optional[Path] = None) -> nx.Graph:
+    global _cached_graph, _cached_graph_path, _cached_graph_mtime_ns
+    graph_path = (path or feed_graph_path()).resolve()
+    current_mtime_ns = graph_path.stat().st_mtime_ns
+    with _graph_cache_lock:
+        if (
+            _cached_graph is not None
+            and _cached_graph_path == graph_path
+            and _cached_graph_mtime_ns == current_mtime_ns
+        ):
+            return _cached_graph
+        with graph_path.open("rb") as source:
+            graph = pickle.load(source)
+            loaded_mtime_ns = os.fstat(source.fileno()).st_mtime_ns
+        if not isinstance(graph, nx.Graph) or graph.is_directed():
+            raise ValueError("feed graph file does not contain an undirected NetworkX graph")
+        if graph.graph.get("schema_version") != GRAPH_SCHEMA_VERSION:
+            raise ValueError("feed graph schema version is not supported")
+        _cached_graph = graph
+        _cached_graph_path = graph_path
+        _cached_graph_mtime_ns = loaded_mtime_ns
+        return graph
+
+
+def reset_feed_graph_cache() -> None:
+    global _cached_graph, _cached_graph_path, _cached_graph_mtime_ns
+    with _graph_cache_lock:
+        _cached_graph = None
+        _cached_graph_path = None
+        _cached_graph_mtime_ns = None
+
+
+def rank_feed_posts(
+    *,
+    graph: nx.Graph,
     posts: Sequence[Mapping[str, Any]],
     viewer_user_id: Optional[str],
-    admin_user_ids: Iterable[str] = (),
     limit: Optional[int] = None,
     now_ts: Optional[float] = None,
 ) -> list[dict[str, Any]]:
@@ -252,18 +350,7 @@ def rank_feed_posts(
     if now_ts is None:
         now_ts = time.time()
 
-    admin_ids = {str(user_id) for user_id in admin_user_ids}
-    membership_rows = list(club_memberships)
-    friendship_rows = list(friendships)
-    graph = _build_graph(
-        users=users,
-        clubs=clubs,
-        club_memberships=membership_rows,
-        friendships=friendship_rows,
-        admin_user_ids=admin_ids,
-    )
-    pagerank = _pagerank(graph)
-    follows = _friendship_lookup(friendship_rows, admin_user_ids=admin_ids)
+    pagerank = {node: _number(value) for node, value in nx.get_node_attributes(graph, "pagerank").items()}
 
     engagement_values = [_engagement_score(post) for post in posts]
     engagement_norms = _normalise(engagement_values)
@@ -291,15 +378,7 @@ def rank_feed_posts(
             if viewer_node == target_node:
                 s_social = 1.0
             elif target_node.startswith("user:") and viewer_user_id:
-                target_user_id = target_node.split(":", 1)[1]
-                viewer_follows_author = (str(viewer_user_id), target_user_id) in follows
-                author_follows_viewer = (target_user_id, str(viewer_user_id)) in follows
-                if viewer_follows_author and author_follows_viewer:
-                    s_social = MUTUAL_FOLLOW_EDGE_WEIGHT
-                elif viewer_follows_author:
-                    s_social = FOLLOWING_SOCIAL_WEIGHT
-                elif author_follows_viewer:
-                    s_social = FOLLOWER_SOCIAL_WEIGHT
+                s_social = FRIENDSHIP_EDGE_WEIGHT if graph.has_edge(viewer_node, target_node) else 0.0
             elif graph.has_edge(viewer_node, target_node):
                 s_social = min(max(_number(graph[viewer_node][target_node].get("weight")), 0.0), 1.0)
 

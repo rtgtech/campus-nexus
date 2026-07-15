@@ -73,7 +73,7 @@ class NotificationsTest(unittest.TestCase):
         self.assertEqual(self.client.delete("/api/notifications/1").status_code, 401)
         self.assertEqual(self.client.post(f"/api/posts/{post_id}/comments", json={"content": "Hi"}).status_code, 401)
 
-    def test_follow_creates_friend_request_notification(self) -> None:
+    def test_adding_friend_creates_notification(self) -> None:
         with backend_app.SessionLocal() as session:
             self.add_user(session, "actor", "actor", "Actor User")
             self.add_user(session, "target", "target", "Target User")
@@ -87,19 +87,41 @@ class NotificationsTest(unittest.TestCase):
         payload = self.notifications("target-token")
         self.assertEqual(payload["total"], 1)
         self.assertEqual(payload["unreadCount"], 1)
-        self.assertEqual(payload["items"][0]["type"], "friend_request")
+        self.assertEqual(payload["items"][0]["type"], "friend_accept")
         self.assertEqual(payload["items"][0]["actionLabel"], "View profile")
 
-    def test_normal_post_notifies_followers_not_author(self) -> None:
+    def test_friendship_is_bidirectional_and_lists_mutuals(self) -> None:
+        with backend_app.SessionLocal() as session:
+            for label in ("alice", "bob", "mutual"):
+                self.add_user(session, label, label, f"{label.title()} User")
+                self.add_token(session, f"{label}-token", label)
+            session.commit()
+
+        self.client.post(f"/api/users/{self.user_ids['bob']}/friends", headers=self.auth("alice-token"))
+        self.client.post(f"/api/users/{self.user_ids['mutual']}/friends", headers=self.auth("alice-token"))
+        self.client.post(f"/api/users/{self.user_ids['mutual']}/friends", headers=self.auth("bob-token"))
+
+        bob_view = self.client.get(
+            f"/api/users/{self.user_ids['alice']}/friends?includeLists=true",
+            headers=self.auth("bob-token"),
+        ).get_json()
+        self.assertTrue(bob_view["isFriend"])
+        self.assertEqual(bob_view["friends"], 2)
+        self.assertEqual({user["username"] for user in bob_view["mutualsList"]}, {"mutual"})
+
+        response = self.client.delete(f"/api/users/{self.user_ids['alice']}/friends", headers=self.auth("bob-token"))
+        self.assertFalse(response.get_json()["isFriend"])
+
+    def test_normal_post_notifies_friends_not_author(self) -> None:
         with backend_app.SessionLocal() as session:
             self.add_user(session, "author", "author", "Author User")
-            self.add_user(session, "follower", "follower", "Follower User")
+            self.add_user(session, "friend", "friend", "Friend User")
             self.add_token(session, "author-token", "author")
-            self.add_token(session, "follower-token", "follower")
+            self.add_token(session, "friend-token", "friend")
             session.add(
                 backend_app.Friendship(
-                    requester_id=self.user_ids["follower"],
-                    receiver_id=self.user_ids["author"],
+                    requester_id=min(self.user_ids["friend"], self.user_ids["author"]),
+                    receiver_id=max(self.user_ids["friend"], self.user_ids["author"]),
                     status="accepted",
                 )
             )
@@ -107,9 +129,9 @@ class NotificationsTest(unittest.TestCase):
 
         self.create_post("author-token")
 
-        follower_payload = self.notifications("follower-token")
+        friend_payload = self.notifications("friend-token")
         author_payload = self.notifications("author-token")
-        self.assertEqual([item["type"] for item in follower_payload["items"]], ["friend_post"])
+        self.assertEqual([item["type"] for item in friend_payload["items"]], ["friend_post"])
         self.assertEqual(author_payload["total"], 0)
 
     def test_club_post_notifies_deduped_club_audience_not_author(self) -> None:
@@ -185,6 +207,22 @@ class NotificationsTest(unittest.TestCase):
         posts = self.client.get("/api/clubs/robotics").get_json()["posts"]
         self.assertEqual({post["type"] for post in posts}, {1, 3})
         self.assertEqual(len(posts), 3)
+
+    def test_only_admin_can_delete_a_club(self) -> None:
+        with backend_app.SessionLocal() as session:
+            self.add_user(session, "student", "student", "Student User")
+            self.add_token(session, "student-token", "student")
+            club = backend_app.Club(name="Robotics", slug="robotics", description="", status="Open")
+            session.add(club)
+            session.commit()
+            club_id = club.club_id
+
+        endpoint = f"/api/clubs/items/{club_id}"
+        self.assertEqual(self.client.delete(endpoint, headers=self.auth("student-token")).status_code, 403)
+
+        admin_token = backend_app.create_auth_token(backend_app.AdminIdentity())
+        self.assertEqual(self.client.delete(endpoint, headers=self.auth(admin_token)).status_code, 204)
+        self.assertEqual(self.client.get("/api/clubs/robotics").status_code, 404)
 
     def test_like_creates_one_notification_excluding_self_likes(self) -> None:
         with backend_app.SessionLocal() as session:

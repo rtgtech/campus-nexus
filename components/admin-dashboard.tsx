@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AuthSessionControl } from "@/components/auth-session-control";
 import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
 import { EntityListItem, clubEntityHref, profileEntityHref } from "@/components/entity-list-item";
-import { API_BASE_URL, type CampusAuthSession, isAdminUser, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, type CampusAuthSession, isAdminUser, readAuthSession } from "@/lib/auth-client";
 import { type ClubDetailData, type ClubsData, type ClubMember } from "@/lib/app-data";
 
 type AdminDashboardProps = {
@@ -20,6 +20,7 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
   const [session, setSession] = useState<CampusAuthSession | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
+  const [deletingClub, setDeletingClub] = useState(false);
   const [memberMessage, setMemberMessage] = useState("");
 
   useEffect(() => {
@@ -56,13 +57,10 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
     setMemberMessage("");
 
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/api/clubs/${encodeURIComponent(selectedClub.club.slug)}/members/${member.id}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
         },
       );
 
@@ -77,6 +75,28 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
       setMemberMessage(error instanceof Error ? error.message : "Remove member failed");
     } finally {
       setRemovingMemberId(null);
+    }
+  }
+
+  async function deleteClub() {
+    const club = selectedClub?.club;
+    if (!session || !club?.id || !window.confirm(`Delete ${club.title}? This will remove it from Campus Nexus.`)) {
+      return;
+    }
+
+    setDeletingClub(true);
+    setMemberMessage("");
+    try {
+      const response = await authFetch(`${API_BASE_URL}/api/clubs/items/${club.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(typeof data.error === "string" ? data.error : "Delete club failed");
+      }
+      router.push("/admin");
+      router.refresh();
+    } catch (error) {
+      setMemberMessage(error instanceof Error ? error.message : "Delete club failed");
+      setDeletingClub(false);
     }
   }
 
@@ -236,12 +256,23 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
                             {selectedClub.club.title}
                           </h2>
                         </div>
-                        <Link
-                          href={clubEntityHref(selectedClub.club)}
-                          className="shrink-0 rounded-full bg-white/14 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-white backdrop-blur transition hover:bg-white/24"
-                        >
-                          View public
-                        </Link>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Link
+                            href={clubEntityHref(selectedClub.club)}
+                            className="rounded-full bg-white/14 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-white backdrop-blur transition hover:bg-white/24"
+                          >
+                            View public
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={deleteClub}
+                            disabled={deletingClub}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white disabled:opacity-50"
+                          >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                            {deletingClub ? "Deleting" : "Delete"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

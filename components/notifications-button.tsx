@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useMemo, useState } from "react";
-import { API_BASE_URL, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
 
 type NotificationItem = {
   id: string;
@@ -79,20 +79,18 @@ export function NotificationsButton() {
   }, []);
 
   useEffect(() => {
-    if (!session?.token) {
+    if (!session) {
       setItems([]);
       setUnreadCount(0);
       return;
     }
 
-    const token = session.token;
     const controller = new AbortController();
     setStatus("loading");
 
     async function loadNotifications() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/notifications`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await authFetch(`${API_BASE_URL}/api/notifications`, {
           signal: controller.signal,
         });
         const data = await response.json().catch(() => ({}));
@@ -146,7 +144,7 @@ export function NotificationsButton() {
   }, [open]);
 
   async function dismissNotification(item: NotificationItem) {
-    if (!session?.token) {
+    if (!session) {
       return;
     }
 
@@ -157,9 +155,8 @@ export function NotificationsButton() {
     setUnreadCount((count) => Math.max(0, count - (item.unread === false ? 0 : 1)));
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/notifications/${encodeURIComponent(item.id)}`, {
+      const response = await authFetch(`${API_BASE_URL}/api/notifications/${encodeURIComponent(item.id)}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session.token}` },
       });
 
       if (!response.ok) {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { API_BASE_URL, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
 
 type ClubFollowButtonProps = {
   clubSlug: string;
@@ -40,8 +40,7 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
 
     async function loadStatus() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(clubSlug)}/follow`, {
-          headers: { Authorization: `Bearer ${activeSession.token}` },
+        const response = await authFetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(clubSlug)}/follow`, {
           signal: controller.signal,
         });
         const data = await response.json().catch(() => ({}));
@@ -75,9 +74,8 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
     setMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(clubSlug)}/follow`, {
+      const response = await authFetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(clubSlug)}/follow`, {
         method: isFollowing ? "DELETE" : "POST",
-        headers: { Authorization: `Bearer ${session.token}` },
       });
       const data = await response.json().catch(() => ({}));
 

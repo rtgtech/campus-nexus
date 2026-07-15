@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ProfileNavLink } from "@/components/profile-nav-link";
+import { CreatePostLink } from "@/components/create-post-route";
 
-type NavKey = "feed" | "club" | "marketplace" | "games" | "messages" | "profile";
+type NavKey = "feed" | "clubs" | "marketplace" | "games" | "messages" | "profile";
 type NavItemKey = NavKey | "create-post";
 
 type CollapsibleSidebarProps = {
@@ -14,7 +15,7 @@ type CollapsibleSidebarProps = {
 const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
   { key: "create-post", label: "Create post", href: "/?=createpost", icon: "add" },
-  { key: "club", label: "Clubs", href: "/clubs", icon: "groups" },
+  { key: "clubs", label: "Clubs", href: "/clubs", icon: "groups" },
   { key: "marketplace", label: "Marketplace", href: "/marketplace", icon: "storefront" },
   { key: "messages", label: "Chat", href: "/chat", icon: "forum" },
   { key: "profile", label: "Profile", href: "/auth", icon: "person" },
@@ -94,8 +95,13 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
               );
             }
 
-            if (item.key === "create-post" && active !== "feed") {
-              return null
+            if (item.key === "create-post") {
+              return (
+                <CreatePostLink key={item.key} className={navClassName(item)} title={item.label}>
+                  {icon}
+                  {label}
+                </CreatePostLink>
+              );
             }
 
             return (

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EntityListItem, profileEntityHref } from "@/components/entity-list-item";
-import { API_BASE_URL, isAdminUser, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, isAdminUser, readAuthSession } from "@/lib/auth-client";
 import { type CampusUser } from "@/lib/app-data";
 
 type ClubMemberAdminPanelProps = {
@@ -99,11 +99,10 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
     setMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(clubSlug)}/members`, {
+      const response = await authFetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(clubSlug)}/members`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.token}`,
         },
         body: JSON.stringify({
           user_id: selectedUser.user_id,

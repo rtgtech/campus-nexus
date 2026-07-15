@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-32-characters"
@@ -14,7 +16,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 import app as backend_app  # noqa: E402
-from feed_ranker import _build_graph  # noqa: E402
+from feed_ranker import _build_graph, load_feed_graph, reset_feed_graph_cache  # noqa: E402
 
 
 class FeedRankingTest(unittest.TestCase):
@@ -32,10 +34,18 @@ class FeedRankingTest(unittest.TestCase):
             session.commit()
 
         backend_app._database_initialized = True
+        self.graph_directory = tempfile.TemporaryDirectory()
+        os.environ["FEED_GRAPH_PATH"] = str(Path(self.graph_directory.name) / "feed_graph.gpickle")
+        reset_feed_graph_cache()
         self.client = backend_app.app.test_client()
         self.user_ids: dict[str, int] = {}
         self.post_ids: dict[str, str] = {}
         self.tokens: dict[str, str] = {}
+
+    def tearDown(self) -> None:
+        reset_feed_graph_cache()
+        os.environ.pop("FEED_GRAPH_PATH", None)
+        self.graph_directory.cleanup()
 
     def user_id(self, label: str) -> int:
         return self.user_ids[label]
@@ -189,7 +199,7 @@ class FeedRankingTest(unittest.TestCase):
         self.assertIn("user:student_user", graph.nodes)
         self.assertFalse(any("admin_user" in node for edge in graph.edges for node in edge))
 
-    def test_outgoing_follow_boosts_social_signal(self) -> None:
+    def test_friendship_boosts_social_signal(self) -> None:
         with backend_app.SessionLocal() as session:
             self.add_user(session, "user_viewer", "viewer", "Viewer User")
             self.add_user(session, "user_followed", "followed", "Followed User")
@@ -215,6 +225,136 @@ class FeedRankingTest(unittest.TestCase):
             by_id[self.post_id("post_followed")]["rankingSignals"]["social"],
             by_id[self.post_id("post_unrelated")]["rankingSignals"]["social"],
         )
+
+    def test_repeated_feed_requests_reuse_persisted_graph(self) -> None:
+        with backend_app.SessionLocal() as session:
+            self.add_user(session, "user_author", "author", "Author User")
+            self.add_post(session, "post_author", "user_author", "Author post")
+            session.commit()
+
+        self.assertEqual(self.client.get("/api/feed").status_code, 200)
+        with patch("schema_app.build_database_feed_graph", side_effect=AssertionError("graph rebuilt")):
+            self.assertEqual(self.client.get("/api/feed").status_code, 200)
+
+    def test_friendship_mutations_refresh_persisted_graph_and_feed(self) -> None:
+        with backend_app.SessionLocal() as session:
+            self.add_user(session, "user_viewer", "viewer", "Viewer User")
+            self.add_user(session, "user_author", "author", "Author User")
+            self.add_token(session, "viewer-token", "user_viewer")
+            self.add_token(session, "author-token", "user_author")
+            self.add_post(session, "post_author", "user_author", "Author post")
+            session.commit()
+
+        self.assertEqual(self.client.get("/api/feed").status_code, 200)
+        response = self.client.post(
+            f"/api/users/{self.user_id('user_author')}/friends",
+            headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        graph = load_feed_graph()
+        viewer_node = f"user:{self.user_id('user_viewer')}"
+        author_node = f"user:{self.user_id('user_author')}"
+        self.assertEqual(graph[viewer_node][author_node]["weight"], 1.0)
+        feed_post = self.client.get(
+            "/api/feed", headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"}
+        ).get_json()["feedCards"][0]
+        self.assertEqual(feed_post["rankingSignals"]["social"], 1.0)
+
+        response = self.client.post(
+            f"/api/users/{self.user_id('user_viewer')}/friends",
+            headers={"Authorization": f"Bearer {self.tokens['author-token']}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(load_feed_graph()[viewer_node][author_node]["weight"], 1.0)
+
+    def test_club_follow_and_membership_refresh_the_same_edge(self) -> None:
+        with backend_app.SessionLocal() as session:
+            self.add_user(session, "user_viewer", "viewer", "Viewer User")
+            self.add_user(session, "user_president", "president", "President User")
+            self.add_club(session, 1, "robotics", "Robotics")
+            president = backend_app.ClubMember(
+                club_id=1,
+                user_id=self.user_id("user_president"),
+                role="president",
+                status="active",
+            )
+            session.add(president)
+            self.add_token(session, "viewer-token", "user_viewer")
+            self.add_token(session, "president-token", "user_president")
+            session.commit()
+
+        self.assertEqual(self.client.get("/api/feed").status_code, 200)
+        edge = (f"user:{self.user_id('user_viewer')}", "club:1")
+        self.assertEqual(load_feed_graph()[edge[0]][edge[1]]["weight"], 0.05)
+
+        response = self.client.post(
+            "/api/clubs/robotics/follow",
+            headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(load_feed_graph()[edge[0]][edge[1]]["weight"], 1.0)
+
+        response = self.client.post(
+            "/api/clubs/robotics/members",
+            json={"user_id": self.user_id("user_viewer"), "role": "member"},
+            headers={"Authorization": f"Bearer {self.tokens['president-token']}"},
+        )
+        self.assertEqual(response.status_code, 201)
+        member_id = response.get_json()["id"]
+        self.client.delete(
+            "/api/clubs/robotics/follow",
+            headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"},
+        )
+        self.assertEqual(load_feed_graph()[edge[0]][edge[1]]["weight"], 1.0)
+
+        response = self.client.delete(
+            f"/api/clubs/robotics/members/{member_id}",
+            headers={"Authorization": f"Bearer {self.tokens['president-token']}"},
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(load_feed_graph()[edge[0]][edge[1]]["weight"], 0.05)
+
+    def test_rebuild_repairs_stale_or_corrupt_graph(self) -> None:
+        with backend_app.SessionLocal() as session:
+            self.add_user(session, "user_viewer", "viewer", "Viewer User")
+            self.add_club(session, 1, "robotics", "Robotics")
+            session.commit()
+
+        self.assertEqual(self.client.get("/api/feed").status_code, 200)
+        with backend_app.SessionLocal() as session:
+            session.add(backend_app.ClubFollower(club_id=1, user_id=self.user_id("user_viewer")))
+            session.commit()
+            backend_app.rebuild_persisted_feed_graph(session)
+        edge = (f"user:{self.user_id('user_viewer')}", "club:1")
+        self.assertEqual(load_feed_graph()[edge[0]][edge[1]]["weight"], 1.0)
+
+        Path(os.environ["FEED_GRAPH_PATH"]).write_bytes(b"not a pickle")
+        reset_feed_graph_cache()
+        self.assertEqual(self.client.get("/api/feed").status_code, 200)
+        self.assertEqual(load_feed_graph()[edge[0]][edge[1]]["weight"], 1.0)
+
+    def test_graph_staging_failure_rolls_back_relationship(self) -> None:
+        with backend_app.SessionLocal() as session:
+            self.add_user(session, "user_viewer", "viewer", "Viewer User")
+            self.add_user(session, "user_author", "author", "Author User")
+            self.add_token(session, "viewer-token", "user_viewer")
+            session.commit()
+
+        with patch("schema_app.stage_feed_graph", side_effect=OSError("disk unavailable")):
+            with self.assertRaises(OSError):
+                self.client.post(
+                    f"/api/users/{self.user_id('user_author')}/friends",
+                    headers={"Authorization": f"Bearer {self.tokens['viewer-token']}"},
+                )
+        with backend_app.SessionLocal() as session:
+            self.assertIsNone(
+                session.scalar(
+                    backend_app.select(backend_app.Friendship).where(
+                        backend_app.Friendship.requester_id == self.user_id("user_viewer")
+                    )
+                )
+            )
 
 
 if __name__ == "__main__":

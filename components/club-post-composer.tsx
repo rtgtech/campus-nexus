@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { API_BASE_URL, readAuthSession } from "@/lib/auth-client";
+import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { type ClubMember } from "@/lib/app-data";
 
 const PUBLISHER_TITLES = new Set(["president", "chairman", "secretary"]);
@@ -42,9 +42,9 @@ export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; memb
     setMessage("");
     try {
       const mediaUrls = await Promise.all(files.map(readMedia));
-      const response = await fetch(`${API_BASE_URL}/api/posts`, {
+      const response = await authFetch(`${API_BASE_URL}/api/posts`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, clubSlug, caption: content.trim(), mediaUrls }),
       });
       const data = await response.json().catch(() => ({}));
