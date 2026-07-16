@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
+    CHECK (semester IS NULL OR semester BETWEEN 1 AND 4),
+    CHECK (department IS NULL OR department IN ('CS', 'Mech', 'ECE', 'Electrical')),
     CHECK (account_role = 'student'),
     CHECK (profile_visibility IN ('public', 'private'))
 );

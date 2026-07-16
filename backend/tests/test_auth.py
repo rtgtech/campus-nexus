@@ -74,6 +74,21 @@ class AuthTest(unittest.TestCase):
         self.assertEqual(logout.status_code, 204)
         self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
 
+    def test_signup_rejects_years_over_four_and_removed_departments(self) -> None:
+        payload = {
+            "name": "Test User",
+            "username": "tester",
+            "mail": "tester@example.edu",
+            "DOB": "2000-01-01",
+            "year": 2,
+            "department": "CS",
+            "password": "secret123",
+        }
+
+        self.assertEqual(self.client.post("/api/auth/signup", json={**payload, "year": 5}).status_code, 400)
+        for department in ("Architecture", "Design", "Business", "Civil"):
+            self.assertEqual(self.client.post("/api/auth/signup", json={**payload, "department": department}).status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

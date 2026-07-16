@@ -8,7 +8,7 @@ import { CampusAuthSession, authFetch, isAdminUser, readAuthSession } from "@/li
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://localhost:5000";
 
-const departmentOptions = ["CS", "Mech", "ECE", "Electrical", "Civil", "Architecture", "Design", "Business"];
+const departmentOptions = ["CS", "Mech", "ECE", "Electrical"];
 
 function fileToDataUrl(file: File | null) {
   if (!file) {

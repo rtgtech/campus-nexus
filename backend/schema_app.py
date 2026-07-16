@@ -78,6 +78,7 @@ CLUB_MEMBER_ROLES = {"president", "vice_president", "chairman", "vice_chairman",
 SINGLE_CLUB_MEMBER_ROLES = CLUB_MEMBER_ROLES - {"member"}
 CLUB_PUBLISHER_ROLES = {"president", "chairman", "secretary"}
 CLUB_POST_TYPES = {"club_post", "announcement"}
+DEPARTMENTS = {"CS", "Mech", "ECE", "Electrical"}
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")
 VIDEO_EXTENSIONS = (".mp4",)
 HASHTAG_RE = re.compile(r"(?<![\w])#([A-Za-z0-9_]+)")
@@ -110,6 +111,10 @@ def utcnow() -> datetime:
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("semester IS NULL OR semester BETWEEN 1 AND 4", name="ck_users_year"),
+        CheckConstraint("department IS NULL OR department IN ('CS', 'Mech', 'ECE', 'Electrical')", name="ck_users_department"),
+    )
 
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     full_name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -682,7 +687,7 @@ def edu_email(value: str) -> bool:
 
 def read_year_of_study(value: Any) -> Optional[int]:
     year = optional_int(value)
-    if year is None or year < 1 or year > 8:
+    if year is None or year < 1 or year > 4:
         return None
     return year
 
@@ -1576,8 +1581,8 @@ def validate_user_values(values: dict[str, Any]) -> Optional[str]:
         return "DOB is required"
     if values["year"] is None:
         return "year is required"
-    if not values["department"]:
-        return "department is required"
+    if values["department"] not in DEPARTMENTS:
+        return "valid department is required"
     return None
 
 

@@ -250,7 +250,7 @@ export default function AuthPage() {
                       <option value="" disabled>
                         Select year
                       </option>
-                      {[1, 2, 3, 4, 5].map((year) => (
+                      {[1, 2, 3, 4].map((year) => (
                         <option key={year} value={year}>
                           Year {year}
                         </option>
@@ -272,7 +272,7 @@ export default function AuthPage() {
                     <option value="" disabled>
                       Select department
                     </option>
-                    {["CS", "Mech", "ECE", "Electrical", "Civil", "Architecture", "Design", "Business"].map((department) => (
+                    {["CS", "Mech", "ECE", "Electrical"].map((department) => (
                       <option key={department} value={department}>
                         {department}
                       </option>
