@@ -89,6 +89,29 @@ class AuthTest(unittest.TestCase):
         for department in ("Architecture", "Design", "Business", "Civil"):
             self.assertEqual(self.client.post("/api/auth/signup", json={**payload, "department": department}).status_code, 400)
 
+    def test_only_admin_can_list_all_users(self) -> None:
+        signup = self.client.post(
+            "/api/auth/signup",
+            json={
+                "name": "Test User",
+                "username": "tester",
+                "mail": "tester@example.edu",
+                "DOB": "2000-01-01",
+                "year": 2,
+                "department": "CS",
+                "password": "secret123",
+            },
+        )
+        self.assertEqual(signup.status_code, 201)
+        self.assertEqual(self.client.get("/api/users").status_code, 403)
+        self.assertEqual(self.client.get("/api/users?username=tester").status_code, 200)
+
+        admin_client = backend_app.app.test_client()
+        self.assertEqual(admin_client.post("/api/auth/login", json={"login": "admin", "password": "12345678"}).status_code, 200)
+        users = admin_client.get("/api/users")
+        self.assertEqual(users.status_code, 200)
+        self.assertEqual(users.get_json()[0]["username"], "tester")
+
 
 if __name__ == "__main__":
     unittest.main()

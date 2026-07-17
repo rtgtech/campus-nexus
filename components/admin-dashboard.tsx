@@ -7,7 +7,7 @@ import { AuthSessionControl } from "@/components/auth-session-control";
 import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
 import { EntityListItem, clubEntityHref, profileEntityHref } from "@/components/entity-list-item";
 import { API_BASE_URL, authFetch, type CampusAuthSession, isAdminUser, readAuthSession } from "@/lib/auth-client";
-import { type ClubDetailData, type ClubsData, type ClubMember } from "@/lib/app-data";
+import { type CampusUser, type ClubDetailData, type ClubsData, type ClubMember } from "@/lib/app-data";
 
 type AdminDashboardProps = {
   clubsData: ClubsData;
@@ -22,6 +22,8 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
   const [deletingClub, setDeletingClub] = useState(false);
   const [memberMessage, setMemberMessage] = useState("");
+  const [users, setUsers] = useState<CampusUser[]>([]);
+  const [usersMessage, setUsersMessage] = useState("Loading users...");
 
   useEffect(() => {
     setSession(readAuthSession());
@@ -29,6 +31,30 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
   }, []);
 
   const isAdmin = isAdminUser(session?.user);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+
+    const controller = new AbortController();
+    authFetch(`${API_BASE_URL}/api/users`, { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json().catch(() => []);
+        if (!response.ok) {
+          throw new Error(typeof data.error === "string" ? data.error : "Loading users failed");
+        }
+        setUsers(Array.isArray(data) ? data : []);
+        setUsersMessage("");
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setUsersMessage(error instanceof Error ? error.message : "Loading users failed");
+        }
+      });
+    return () => controller.abort();
+  }, [isAdmin]);
+
   const clubCards = clubsData.clubCards;
   const stats = useMemo(
     () => [
@@ -147,7 +173,7 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
           <section className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Dashboard</p>
-              <h1 className="mt-2 font-headline-lg text-4xl text-on-background">Club administration</h1>
+              <h1 className="mt-2 font-headline-lg text-4xl text-on-background">Administration</h1>
             </div>
             <Link
               href="/admin?mode=createclub"
@@ -170,6 +196,44 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
                 </p>
               </div>
             ))}
+          </section>
+
+          <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Users</p>
+              <h2 className="mt-1 font-headline-md text-2xl text-on-background">All users ({users.length})</h2>
+            </div>
+
+            {usersMessage ? (
+              <p className="mt-5 rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">{usersMessage}</p>
+            ) : (
+              <div className="mt-5 overflow-x-auto rounded-2xl border border-outline-variant/60">
+                <table className="w-full min-w-[640px] text-left text-sm">
+                  <thead className="bg-surface-container-low text-xs uppercase tracking-[0.14em] text-on-surface-variant">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Name</th>
+                      <th className="px-4 py-3 font-semibold">User ID</th>
+                      <th className="px-4 py-3 font-semibold">Year</th>
+                      <th className="px-4 py-3 font-semibold">Department</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/60">
+                    {users.map((user) => (
+                      <tr key={user.user_id} className="text-on-surface">
+                        <td className="px-4 py-3 font-semibold">
+                          <Link href={profileEntityHref(user)} className="hover:text-primary hover:underline">
+                            {user.name}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{user.user_id}</td>
+                        <td className="px-4 py-3">{user.yearOfStudy}</td>
+                        <td className="px-4 py-3">{user.department}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">

@@ -2065,6 +2065,10 @@ def global_search():
 def users_collection():
     if request.method == "GET":
         username_query = normalize_username(request.args.get("username"))
+        if not username_query:
+            admin_error = require_admin_user()
+            if admin_error is not None:
+                return admin_error
         statement = select(User).where(User.is_active.is_(True))
         if username_query:
             statement = statement.where(User.username.contains(username_query)).limit(10)
