@@ -21,11 +21,6 @@ function readForm(form: HTMLFormElement, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function usesEduEmail(value: string) {
-  const domain = value.toLowerCase().split("@").at(-1) ?? "";
-  return domain === "edu" || domain.endsWith(".edu");
-}
-
 export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
@@ -72,20 +67,17 @@ export default function AuthPage() {
 
     try {
       const endpoint = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
-      const signupMail = readForm(form, "mail");
-      if (mode === "signup" && !usesEduEmail(signupMail)) {
-        throw new Error("Mail must use a .edu domain.");
-      }
+      const signupEmail = readForm(form, "email");
 
       const payload =
         mode === "signup"
           ? {
               name: readForm(form, "name"),
               username: readForm(form, "username"),
-              mail: signupMail,
-              DOB: readForm(form, "dateOfBirth"),
+              email: signupEmail,
+              dateOfBirth: readForm(form, "dateOfBirth"),
               department: readForm(form, "department"),
-              year: Number(readForm(form, "yearOfStudy")),
+              yearOfStudy: Number(readForm(form, "yearOfStudy")),
               password: readForm(form, "password"),
             }
           : {
@@ -215,16 +207,16 @@ export default function AuthPage() {
 
               <label className="block space-y-2">
                 <span className="text-sm font-semibold text-on-surface">
-                  {mode === "login" ? "Mail or username" : "Mail"}
+                  {mode === "login" ? "Email or username" : "Email"}
                 </span>
                 <input
                   required
                   autoComplete={mode === "login" ? "username" : "email"}
                   className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
-                  name={mode === "login" ? "login" : "mail"}
+                  name={mode === "login" ? "login" : "email"}
                   type={mode === "login" ? "text" : "email"}
                 />
-                {mode === "signup" ? <span className="text-xs text-on-surface-variant">Use your institutional .edu email.</span> : null}
+                {mode === "signup" ? <span className="text-xs text-on-surface-variant">Use an approved institutional email.</span> : null}
               </label>
 
               {mode === "signup" ? (

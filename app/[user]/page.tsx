@@ -39,7 +39,7 @@ async function getProfileUser(user: string): Promise<CampusUser | null> {
     }
 
     const users = (await usernameResponse.json()) as CampusUser[];
-    return users.find((candidate) => candidate.username === user || candidate.user_id === user || candidate.userId === user) ?? null;
+    return users.find((candidate) => candidate.username === user || candidate.userId === user) ?? null;
   } catch {
     return null;
   }
@@ -53,7 +53,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const profile = await getCampusData<ProfileData>(`/api/profile/${encodeURIComponent(user)}`, fallbackProfile);
   const feedData = await getCampusData<FeedData>("/api/feed", fallbackFeed);
   const userPosts = profileUser
-    ? feedData.feedCards.filter((post) => (post.author_id ?? post.authorId) === profileUser.user_id)
+    ? feedData.feedCards.filter((post) => post.authorId === profileUser.userId)
     : [];
 
   return (
@@ -78,7 +78,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">{profile.bio}</p>
               <div className="mt-6 flex flex-wrap gap-3">
                 {profileUser ? (
-                  <FriendButton targetUserId={profileUser.user_id} targetName={displayName} />
+                  <FriendButton targetUserId={profileUser.userId} targetName={displayName} />
                 ) : (
                   <button className="rounded-full bg-surface-container px-6 py-3 text-sm font-semibold text-on-surface-variant" disabled>
                     Profile unavailable
@@ -106,7 +106,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           />
           <div className="mt-6">
             {profileUser && userPosts.length > 0 ? (
-              <ProfilePostsGrid ownerUserId={profileUser.user_id} posts={userPosts} />
+              <ProfilePostsGrid ownerUserId={profileUser.userId} posts={userPosts} />
             ) : (
               <EmptyState title="No posts yet" description="Profile posts will appear here when this user publishes content." />
             )}

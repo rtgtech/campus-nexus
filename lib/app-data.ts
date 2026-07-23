@@ -1,8 +1,6 @@
 export type FeedCard = {
-  post_id?: string;
-  author_id?: string;
+  postId?: string;
   authorId?: string;
-  club_id?: number | null;
   clubId?: number | null;
   clubSlug?: string | null;
   author: string;
@@ -24,7 +22,6 @@ export type FeedCard = {
   description?: string | null;
   createdAt?: string;
   likedByCurrentUser?: boolean;
-  liked_by_current_user?: boolean;
   viewerHasLiked?: boolean;
 };
 
@@ -40,19 +37,13 @@ export type SuggestedPerson = {
 };
 
 export type CampusUser = {
-  user_id: string;
   userId: string;
-  id: string;
   name: string;
   username: string;
-  mail: string;
   email: string;
-  DOB: string;
   dateOfBirth: string;
-  year: number;
   yearOfStudy: number;
   department: string;
-  acronym: string;
   initials: string;
 };
 
@@ -92,16 +83,16 @@ export type ClubCard = {
 
 export type ClubMember = {
   id: number;
-  club_id: number;
   clubId: number;
-  user_id: string;
   userId: string;
   title: string;
   createdAt: string;
   name: string;
   username: string;
-  mail: string;
+  email: string;
   initials: string;
+  canPost: boolean;
+  canCreateAnnouncement: boolean;
 };
 
 export type StatCard = {
@@ -160,7 +151,6 @@ export type LeaderboardEntry = {
   rank: number;
   acronym: string;
   name: string;
-  user_id: string;
   userId: string;
   totalXp: number;
 };
@@ -196,7 +186,7 @@ export type MessagesData = {
 
 export type MarketplaceItem = {
   id?: string;
-  post_id?: string;
+  postId?: string;
   title: string;
   owner: string;
   mode: string;

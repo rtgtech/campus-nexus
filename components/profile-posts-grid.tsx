@@ -24,15 +24,15 @@ function postMedia(post: FeedCard) {
 }
 
 function postId(post: FeedCard) {
-  return post.post_id || "";
+  return post.postId || "";
 }
 
 function postAuthorId(post: FeedCard) {
-  return post.author_id || post.authorId || "";
+  return post.authorId || "";
 }
 
 function sessionUserId(session: CampusAuthSession | null) {
-  return session?.user.user_id || session?.user.userId || session?.user.id || "";
+  return session?.user.userId || "";
 }
 
 export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) {
@@ -126,7 +126,7 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
 
             return (
               <button
-                key={post.post_id ?? `${post.authorId}-${title}`}
+                key={post.postId ?? `${post.authorId}-${title}`}
                 className="group relative aspect-square overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-low text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
                 type="button"
                 onClick={() => openPost(post)}

@@ -70,7 +70,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
         }
 
         const users = (await response.json()) as CampusUser[];
-        setResults(users.filter((user) => !existingUserIds.includes(user.user_id)));
+        setResults(users.filter((user) => !existingUserIds.includes(user.userId)));
         setStatus("idle");
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -105,7 +105,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_id: selectedUser.user_id,
+          userId: selectedUser.userId,
           title,
         }),
       });
@@ -216,7 +216,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                   title={selectedUser.name}
                   subtitle={`@${selectedUser.username}`}
                   kind="user"
-                  initials={selectedUser.initials || selectedUser.acronym}
+                  initials={selectedUser.initials}
                   className="flex min-w-0 items-center gap-3 rounded-2xl bg-primary-fixed/70 p-3"
                   avatarClassName="rounded-full bg-primary text-on-primary"
                   trailing={
@@ -239,12 +239,12 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                 <div className="grid gap-2 sm:grid-cols-2">
                   {results.map((user) => (
                     <EntityListItem
-                      key={user.user_id}
+                      key={user.userId}
                       href={profileEntityHref(user)}
                       title={user.name}
                       subtitle={`@${user.username}`}
                       kind="user"
-                      initials={user.initials || user.acronym}
+                      initials={user.initials}
                       trailing={
                         <button
                           className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:text-secondary"

@@ -14,6 +14,8 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 import app as backend_app  # noqa: E402
+import schema_app as backend_schema  # noqa: E402
+from fake_graph import FakeGraph  # noqa: E402
 
 
 class NotificationsTest(unittest.TestCase):
@@ -26,23 +28,29 @@ class NotificationsTest(unittest.TestCase):
         backend_app.ensure_app_schema()
         backend_app.ensure_app_indexes()
         backend_app._database_initialized = True
+        self.graph = FakeGraph()
+        self.graph_patcher = self.graph.patch_backend(backend_schema)
+        self.graph_patcher.start()
         self.client = backend_app.app.test_client()
         self.user_ids: dict[str, int] = {}
         self.tokens: dict[str, str] = {}
 
+    def tearDown(self) -> None:
+        self.graph_patcher.stop()
+
     def add_user(self, session, label: str, username: str, name: str) -> backend_app.User:
         user = backend_app.User(
-            full_name=name,
+            fullName=name,
             username=username,
             email=f"{username}@example.edu",
-            date_of_birth=datetime(2000, 1, 1).date(),
+            dateOfBirth=datetime(2000, 1, 1).date(),
             semester=2,
             department="CS",
-            password_hash="test",
+            passwordHash="test",
         )
         session.add(user)
         session.flush()
-        self.user_ids[label] = user.user_id
+        self.user_ids[label] = user.userId
         return user
 
     def add_token(self, session, token: str, label: str) -> None:
@@ -60,18 +68,20 @@ class NotificationsTest(unittest.TestCase):
         payload = {"type": 0, "caption": caption, **(extra or {})}
         response = self.client.post("/api/posts", json=payload, headers=self.auth(token))
         self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
-        return response.get_json()
+        post = response.get_json()
+        self.assertTrue(post["createdAt"].endswith("+00:00"))
+        return post
 
     def test_auth_required_for_notifications_and_comments(self) -> None:
         with backend_app.SessionLocal() as session:
             self.add_user(session, "owner", "owner", "Owner User")
-            session.add(backend_app.Post(author_id=self.user_ids["owner"], content="Post"))
+            session.add(backend_app.Post(authorId=self.user_ids["owner"], content="Post"))
             session.commit()
-            post_id = session.scalar(backend_app.select(backend_app.Post.post_id))
+            postId = session.scalar(backend_app.select(backend_app.Post.postId))
 
         self.assertEqual(self.client.get("/api/notifications").status_code, 401)
         self.assertEqual(self.client.delete("/api/notifications/1").status_code, 401)
-        self.assertEqual(self.client.post(f"/api/posts/{post_id}/comments", json={"content": "Hi"}).status_code, 401)
+        self.assertEqual(self.client.post(f"/api/posts/{postId}/comments", json={"content": "Hi"}).status_code, 401)
 
     def test_adding_friend_creates_notification(self) -> None:
         with backend_app.SessionLocal() as session:
@@ -109,6 +119,13 @@ class NotificationsTest(unittest.TestCase):
         self.assertEqual(bob_view["friends"], 2)
         self.assertEqual({user["username"] for user in bob_view["mutualsList"]}, {"mutual"})
 
+        self_view = self.client.get(
+            f"/api/users/{self.user_ids['alice']}/friends?includeLists=true",
+            headers=self.auth("alice-token"),
+        ).get_json()
+        self.assertTrue(self_view["isSelf"])
+        self.assertEqual(len(self_view["friendsList"]), 2)
+
         response = self.client.delete(f"/api/users/{self.user_ids['alice']}/friends", headers=self.auth("bob-token"))
         self.assertFalse(response.get_json()["isFriend"])
 
@@ -118,14 +135,8 @@ class NotificationsTest(unittest.TestCase):
             self.add_user(session, "friend", "friend", "Friend User")
             self.add_token(session, "author-token", "author")
             self.add_token(session, "friend-token", "friend")
-            session.add(
-                backend_app.Friendship(
-                    requester_id=min(self.user_ids["friend"], self.user_ids["author"]),
-                    receiver_id=max(self.user_ids["friend"], self.user_ids["author"]),
-                    status="accepted",
-                )
-            )
             session.commit()
+        self.graph.create_friendship(self.user_ids["friend"], self.user_ids["author"])
 
         self.create_post("author-token")
 
@@ -147,22 +158,22 @@ class NotificationsTest(unittest.TestCase):
             session.flush()
             session.add_all(
                 [
-                    backend_app.ClubMember(club_id=club.club_id, user_id=self.user_ids["author"], role="president", status="active"),
-                    backend_app.ClubMember(club_id=club.club_id, user_id=self.user_ids["member"], status="active"),
-                    backend_app.ClubFollower(club_id=club.club_id, user_id=self.user_ids["member"]),
-                    backend_app.ClubFollower(club_id=club.club_id, user_id=self.user_ids["follower"]),
+                    backend_app.ClubMember(clubId=club.clubId, userId=self.user_ids["author"], role="president", status="active"),
+                    backend_app.ClubMember(clubId=club.clubId, userId=self.user_ids["member"], status="active"),
+                    backend_app.ClubFollower(clubId=club.clubId, userId=self.user_ids["member"]),
+                    backend_app.ClubFollower(clubId=club.clubId, userId=self.user_ids["follower"]),
                 ]
             )
             session.commit()
-            club_id = club.club_id
+            clubId = club.clubId
 
-        self.create_post("author-token", "Robotics update", {"type": 1, "club_id": club_id})
+        self.create_post("author-token", "Robotics update", {"type": 1, "clubId": clubId})
 
         self.assertEqual([item["type"] for item in self.notifications("member-token")["items"]], ["club_post"])
         self.assertEqual([item["type"] for item in self.notifications("follower-token")["items"]], ["club_post"])
         self.assertEqual(self.notifications("author-token")["total"], 0)
 
-    def test_only_club_leaders_can_publish_posts_and_announcements(self) -> None:
+    def test_admin_can_grant_a_member_posting_privilege(self) -> None:
         with backend_app.SessionLocal() as session:
             for role in ("president", "chairman", "secretary", "member"):
                 self.add_user(session, role, role, role.title())
@@ -170,19 +181,24 @@ class NotificationsTest(unittest.TestCase):
             club = backend_app.Club(name="Robotics", slug="robotics", description="", status="Open")
             session.add(club)
             session.flush()
+            members = []
             for role in ("president", "chairman", "secretary", "member"):
-                session.add(backend_app.ClubMember(club_id=club.club_id, user_id=self.user_ids[role], role=role, status="active"))
+                member = backend_app.ClubMember(clubId=club.clubId, userId=self.user_ids[role], role=role, status="active")
+                session.add(member)
+                members.append(member)
+            session.flush()
+            member_id = members[-1].clubMemberId
             session.commit()
 
         created_posts = []
-        for role, post_type, media_urls in (
+        for role, postType, mediaUrls in (
             ("president", 1, ["data:image/png;base64,cGhvdG8=", "data:video/mp4;base64,dmlkZW8="]),
             ("chairman", 3, ["data:image/png;base64,cG9zdGVy"]),
             ("secretary", 1, []),
         ):
             response = self.client.post(
                 "/api/posts",
-                json={"type": post_type, "clubSlug": "robotics", "caption": f"{role} update", "mediaUrls": media_urls},
+                json={"type": postType, "clubSlug": "robotics", "caption": f"{role} update", "mediaUrls": mediaUrls},
                 headers=self.auth(f"{role}-token"),
             )
             self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
@@ -204,9 +220,34 @@ class NotificationsTest(unittest.TestCase):
         )
         self.assertEqual(denied.status_code, 403)
 
+        admin_token = backend_app.create_auth_token(backend_app.AdminIdentity())
+        granted = self.client.patch(
+            f"/api/clubs/robotics/members/{member_id}",
+            json={"canPost": True},
+            headers=self.auth(admin_token),
+        )
+        self.assertEqual(granted.status_code, 200)
+        self.assertTrue(granted.get_json()["canPost"])
+        self.assertEqual(
+            self.client.post(
+                "/api/posts",
+                json={"type": 1, "clubSlug": "robotics", "caption": "member update"},
+                headers=self.auth("member-token"),
+            ).status_code,
+            201,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/posts",
+                json={"type": 3, "clubSlug": "robotics", "caption": "member announcement", "mediaUrls": ["poster.jpg"]},
+                headers=self.auth("member-token"),
+            ).status_code,
+            403,
+        )
+
         posts = self.client.get("/api/clubs/robotics").get_json()["posts"]
         self.assertEqual({post["type"] for post in posts}, {1, 3})
-        self.assertEqual(len(posts), 3)
+        self.assertEqual(len(posts), 4)
 
     def test_only_admin_can_delete_a_club(self) -> None:
         with backend_app.SessionLocal() as session:
@@ -215,9 +256,9 @@ class NotificationsTest(unittest.TestCase):
             club = backend_app.Club(name="Robotics", slug="robotics", description="", status="Open")
             session.add(club)
             session.commit()
-            club_id = club.club_id
+            clubId = club.clubId
 
-        endpoint = f"/api/clubs/items/{club_id}"
+        endpoint = f"/api/clubs/items/{clubId}"
         self.assertEqual(self.client.delete(endpoint, headers=self.auth("student-token")).status_code, 403)
 
         admin_token = backend_app.create_auth_token(backend_app.AdminIdentity())
@@ -233,11 +274,11 @@ class NotificationsTest(unittest.TestCase):
             session.commit()
 
         post = self.create_post("owner-token")
-        post_id = post["post_id"]
+        postId = post["postId"]
 
-        self.assertEqual(self.client.post(f"/api/posts/{post_id}/like", headers=self.auth("actor-token")).status_code, 201)
-        self.assertEqual(self.client.post(f"/api/posts/{post_id}/like", headers=self.auth("actor-token")).status_code, 200)
-        self.assertEqual(self.client.post(f"/api/posts/{post_id}/like", headers=self.auth("owner-token")).status_code, 201)
+        self.assertEqual(self.client.post(f"/api/posts/{postId}/like", headers=self.auth("actor-token")).status_code, 201)
+        self.assertEqual(self.client.post(f"/api/posts/{postId}/like", headers=self.auth("actor-token")).status_code, 200)
+        self.assertEqual(self.client.post(f"/api/posts/{postId}/like", headers=self.auth("owner-token")).status_code, 201)
 
         payload = self.notifications("owner-token")
         self.assertEqual([item["type"] for item in payload["items"]], ["post_like"])
@@ -251,17 +292,17 @@ class NotificationsTest(unittest.TestCase):
             session.commit()
 
         post = self.create_post("owner-token")
-        post_id = post["post_id"]
+        postId = post["postId"]
 
         response = self.client.post(
-            f"/api/posts/{post_id}/comments",
+            f"/api/posts/{postId}/comments",
             json={"content": "Nice post"},
             headers=self.auth("actor-token"),
         )
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.get_json()["comments"], 1)
-        self.assertEqual(self.client.get(f"/api/posts/{post_id}/comments").get_json()["total"], 1)
+        self.assertEqual(self.client.get(f"/api/posts/{postId}/comments").get_json()["total"], 1)
         self.assertEqual([item["type"] for item in self.notifications("owner-token")["items"]], ["post_comment"])
 
     def test_delete_notification_only_works_for_owner(self) -> None:
@@ -275,15 +316,15 @@ class NotificationsTest(unittest.TestCase):
             session.commit()
 
         post = self.create_post("owner-token")
-        self.client.post(f"/api/posts/{post['post_id']}/like", headers=self.auth("actor-token"))
-        notification_id = self.notifications("owner-token")["items"][0]["id"]
+        self.client.post(f"/api/posts/{post['postId']}/like", headers=self.auth("actor-token"))
+        notificationId = self.notifications("owner-token")["items"][0]["id"]
 
         self.assertEqual(
-            self.client.delete(f"/api/notifications/{notification_id}", headers=self.auth("other-token")).status_code,
+            self.client.delete(f"/api/notifications/{notificationId}", headers=self.auth("other-token")).status_code,
             404,
         )
         self.assertEqual(
-            self.client.delete(f"/api/notifications/{notification_id}", headers=self.auth("owner-token")).status_code,
+            self.client.delete(f"/api/notifications/{notificationId}", headers=self.auth("owner-token")).status_code,
             204,
         )
         self.assertEqual(self.notifications("owner-token")["total"], 0)

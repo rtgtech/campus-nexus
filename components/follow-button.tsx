@@ -6,7 +6,6 @@ import { EntityListItem, profileEntityHref } from "@/components/entity-list-item
 import { API_BASE_URL, authFetch, type CampusAuthSession, readAuthSession } from "@/lib/auth-client";
 
 type FriendshipUser = {
-  user_id: string;
   userId: string;
   name: string;
   username?: string | null;
@@ -42,7 +41,7 @@ function UserRow({
   onUnfriend: (userId: string) => void;
   user: FriendshipUser;
 }) {
-  const userId = user.user_id || user.userId;
+  const userId = user.userId;
 
   return (
     <EntityListItem
@@ -211,7 +210,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
     );
   }
 
-  const isSelf = Boolean(friendship?.isSelf || session.user.user_id === targetUserId || session.user.userId === targetUserId);
+  const isSelf = Boolean(friendship?.isSelf || session.user.userId === targetUserId);
   const isFriend = Boolean(friendship?.isFriend);
   const activeRows = activeTab === "friends" ? friendsList : mutualsList;
 
@@ -301,9 +300,9 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
                   {activeRows.length ? (
                     activeRows.map((user) => (
                       <UserRow
-                        key={user.user_id || user.userId}
+                        key={user.userId}
                         canUnfriend={Boolean(friendship?.isSelf && activeTab === "friends")}
-                        isSaving={unfriendingId === (user.user_id || user.userId)}
+                        isSaving={unfriendingId === user.userId}
                         user={user}
                         onUnfriend={unfriendFromList}
                       />

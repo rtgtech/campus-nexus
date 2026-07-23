@@ -20,6 +20,7 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
   const [session, setSession] = useState<CampusAuthSession | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
+  const [updatingMemberId, setUpdatingMemberId] = useState<number | null>(null);
   const [deletingClub, setDeletingClub] = useState(false);
   const [memberMessage, setMemberMessage] = useState("");
   const [users, setUsers] = useState<CampusUser[]>([]);
@@ -101,6 +102,32 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
       setMemberMessage(error instanceof Error ? error.message : "Remove member failed");
     } finally {
       setRemovingMemberId(null);
+    }
+  }
+
+  async function togglePosting(member: ClubMember) {
+    if (!session || !selectedClub) return;
+
+    setUpdatingMemberId(member.id);
+    setMemberMessage("");
+    try {
+      const response = await authFetch(
+        `${API_BASE_URL}/api/clubs/${encodeURIComponent(selectedClub.club.slug)}/members/${member.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ canPost: !member.canPost }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Updating posting privilege failed");
+
+      setMemberMessage(`${member.name} ${member.canPost ? "can no longer post" : "can now post"}.`);
+      router.refresh();
+    } catch (error) {
+      setMemberMessage(error instanceof Error ? error.message : "Updating posting privilege failed");
+    } finally {
+      setUpdatingMemberId(null);
     }
   }
 
@@ -219,13 +246,13 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
                   </thead>
                   <tbody className="divide-y divide-outline-variant/60">
                     {users.map((user) => (
-                      <tr key={user.user_id} className="text-on-surface">
+                      <tr key={user.userId} className="text-on-surface">
                         <td className="px-4 py-3 font-semibold">
                           <Link href={profileEntityHref(user)} className="hover:text-primary hover:underline">
                             {user.name}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{user.user_id}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{user.userId}</td>
                         <td className="px-4 py-3">{user.yearOfStudy}</td>
                         <td className="px-4 py-3">{user.department}</td>
                       </tr>
@@ -350,7 +377,7 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
                     </div>
                     <ClubMemberAdminPanel
                       clubSlug={selectedClub.club.slug}
-                      existingUserIds={selectedClub.members.map((member) => member.user_id)}
+                      existingUserIds={selectedClub.members.map((member) => member.userId)}
                       existingTitles={selectedClub.members.map((member) => member.title || "Member")}
                     />
                   </div>
@@ -370,15 +397,28 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
                           kind="user"
                           initials={member.initials}
                           trailing={
-                            <button
-                              aria-label={`Remove ${member.name}`}
-                              className="rounded-full p-2 text-on-surface-variant transition hover:bg-white hover:text-secondary disabled:opacity-50"
-                              disabled={removingMemberId === member.id}
-                              type="button"
-                              onClick={() => removeMember(member)}
-                            >
-                              <span className="material-symbols-outlined text-lg">close</span>
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {member.title.toLowerCase() === "member" ? (
+                                <button
+                                  aria-label={`${member.canPost ? "Revoke" : "Grant"} posting privilege for ${member.name}`}
+                                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${member.canPost ? "bg-primary text-white" : "bg-white text-primary hover:bg-primary-fixed"}`}
+                                  disabled={updatingMemberId === member.id}
+                                  type="button"
+                                  onClick={() => togglePosting(member)}
+                                >
+                                  {member.canPost ? "Can post" : "Allow posting"}
+                                </button>
+                              ) : null}
+                              <button
+                                aria-label={`Remove ${member.name}`}
+                                className="rounded-full p-2 text-on-surface-variant transition hover:bg-white hover:text-secondary disabled:opacity-50"
+                                disabled={removingMemberId === member.id}
+                                type="button"
+                                onClick={() => removeMember(member)}
+                              >
+                                <span className="material-symbols-outlined text-lg">close</span>
+                              </button>
+                            </div>
                           }
                         />
                       ))

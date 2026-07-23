@@ -1,17 +1,11 @@
 export type CampusAuthUser = {
-  user_id: string;
   userId: string;
-  id: string;
-  mail: string;
   email: string;
   username?: string | null;
   name: string;
-  DOB: string;
   dateOfBirth: string;
-  year: number;
   department: string;
   yearOfStudy: number;
-  acronym: string;
   initials: string;
 };
 
@@ -55,5 +49,5 @@ export function authFetch(input: RequestInfo | URL, init?: RequestInit) {
 }
 
 export function isAdminUser(user: CampusAuthUser | null | undefined) {
-  return user?.username === "admin" && user.mail === "admin@cn.nhce";
+  return user?.username === "admin" && user.email === "admin@cn.nhce";
 }

@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { type ClubMember } from "@/lib/app-data";
 
-const PUBLISHER_TITLES = new Set(["president", "chairman", "secretary"]);
-
 function readMedia(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -18,19 +16,20 @@ function readMedia(file: File) {
 
 export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; members: ClubMember[] }) {
   const router = useRouter();
-  const [canPublish, setCanPublish] = useState(false);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<1 | 3>(1);
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [permissions, setPermissions] = useState({ canPost: false, canCreateAnnouncement: false });
 
   useEffect(() => {
-    const userId = readAuthSession()?.user.user_id;
-    setCanPublish(
-      Boolean(userId && members.some((member) => member.user_id === userId && PUBLISHER_TITLES.has(member.title.toLowerCase())))
-    );
+    const userId = readAuthSession()?.user.userId;
+    const member = members.find((item) => item.userId === userId);
+    setPermissions({ canPost: Boolean(member?.canPost), canCreateAnnouncement: Boolean(member?.canCreateAnnouncement) });
+    if (member?.canPost && !member.canCreateAnnouncement) setType(1);
+    if (!member?.canPost && member?.canCreateAnnouncement) setType(3);
   }, [members]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -69,7 +68,7 @@ export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; memb
     setStatus("idle");
   }
 
-  if (!canPublish) return null;
+  if (!permissions.canPost && !permissions.canCreateAnnouncement) return null;
 
   return (
     <>
@@ -93,7 +92,9 @@ export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; memb
             </div>
 
             <div className="mt-5 inline-flex rounded-lg bg-surface-container p-1" aria-label="Content type">
-              {([[1, "Post"], [3, "Announcement"]] as const).map(([value, label]) => (
+              {([[1, "Post", permissions.canPost], [3, "Announcement", permissions.canCreateAnnouncement]] as const)
+                .filter(([, , allowed]) => allowed)
+                .map(([value, label]) => (
                 <button
                   key={value}
                   type="button"

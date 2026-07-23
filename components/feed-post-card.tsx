@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
+import { formatPostTime } from "@/lib/post-time";
 
 type FeedPostCardProps = {
   post: FeedCard;
@@ -39,60 +40,18 @@ function formatMetricCount(value: number) {
   return new Intl.NumberFormat("en").format(Math.max(0, value));
 }
 
-function pluralize(value: number, unit: string) {
-  return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
-}
-
-function formatPostTime(value?: string) {
-  if (!value) {
-    return "";
-  }
-
-  const parsedTime = new Date(value).getTime();
-  if (!Number.isFinite(parsedTime)) {
-    return value;
-  }
-
-  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - parsedTime) / 1000));
-  if (elapsedSeconds < 60) {
-    return "Just now";
-  }
-
-  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-  if (elapsedMinutes < 60) {
-    return pluralize(elapsedMinutes, "minute");
-  }
-
-  const elapsedHours = Math.floor(elapsedMinutes / 60);
-  if (elapsedHours < 24) {
-    return pluralize(elapsedHours, "hour");
-  }
-
-  const elapsedDays = Math.floor(elapsedHours / 24);
-  if (elapsedDays < 30) {
-    return pluralize(elapsedDays, "day");
-  }
-
-  const elapsedMonths = Math.floor(elapsedDays / 30);
-  if (elapsedMonths < 12) {
-    return pluralize(elapsedMonths, "month");
-  }
-
-  const elapsedYears = Math.floor(elapsedDays / 365);
-  return pluralize(elapsedYears, "year");
-}
-
 function profileHref(post: FeedCard) {
-  const authorKey = post.author_id || post.authorId || post.author.trim().toLowerCase().replace(/\s+/g, "-");
+  const authorKey = post.authorId || post.author.trim().toLowerCase().replace(/\s+/g, "-");
   return `/${encodeURIComponent(authorKey)}`;
 }
 
 export function FeedPostCard({ post }: FeedPostCardProps) {
   const initialLiked =
-    post.likedByCurrentUser ?? post.liked_by_current_user ?? post.viewerHasLiked ?? false;
+    post.likedByCurrentUser ?? post.viewerHasLiked ?? false;
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(readMetricCount(post.likes));
   const [isLikePending, setIsLikePending] = useState(false);
+  const [now, setNow] = useState(0);
   const mediaUrl = post.mediaUrl || post.image;
   const mediaUrls = post.mediaUrls?.length ? post.mediaUrls : mediaUrl ? [mediaUrl] : [];
   const title = post.title || post.caption || "Untitled post";
@@ -101,15 +60,23 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   const primaryTag = post.hashtags?.[0] || post.tag;
   const hasMedia = mediaUrls.length > 0;
   const authorHref = profileHref(post);
-  const postedAt = formatPostTime(post.createdAt || post.meta);
+  const postTimestamp = post.createdAt || post.meta;
+  const postedAt = now ? formatPostTime(postTimestamp, now) : "";
   const commentsCount = readMetricCount(post.comments);
   const sharesCount = readMetricCount(post.shares);
   const isMarketplacePost = post.type === 2;
   const isAnnouncement = post.type === 3;
   const clubHref = post.clubSlug ? `/clubs/${encodeURIComponent(post.clubSlug)}` : null;
 
+  useEffect(() => {
+    setNow(Date.now());
+    // ponytail: one timer per card; hoist a shared clock if feed size makes this measurable.
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   async function handleLike() {
-    if (!post.post_id || isLikePending) {
+    if (!post.postId || isLikePending) {
       return;
     }
 
@@ -127,7 +94,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
     setLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
 
     try {
-      const response = await authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(post.post_id)}/like`, {
+      const response = await authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(post.postId)}/like`, {
         method: nextLiked ? "POST" : "DELETE",
       });
 
@@ -147,7 +114,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   }
 
   async function handleShare() {
-    const shareUrl = `${window.location.origin}${window.location.pathname}${post.post_id ? `#${post.post_id}` : ""}`;
+    const shareUrl = `${window.location.origin}${window.location.pathname}${post.postId ? `#${post.postId}` : ""}`;
     const shareData = { title, text: detailText || captionText || title, url: shareUrl };
 
     if (navigator.share) {
@@ -160,7 +127,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
 
   return (
     <article
-      id={post.post_id}
+      id={post.postId}
       className="scroll-mt-24 overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white shadow-[0_16px_40px_rgba(27,27,35,0.08)]"
     >
       <div className="flex items-center justify-between px-5 py-4 md:px-6">
@@ -186,7 +153,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
                 </Link>
               ) : null}
               {isAnnouncement ? <span className="rounded bg-secondary/10 px-1.5 py-0.5 text-secondary">Announcement</span> : null}
-              {postedAt ? <span>{postedAt}</span> : null}
+              {postedAt ? <time dateTime={postTimestamp}>{postedAt}</time> : null}
             </div>
           </div>
         </div>
@@ -296,7 +263,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
           >
             View discussion
           </button>
-          {postedAt ? <span>{postedAt}</span> : <span>Campus Nexus</span>}
+          <span>Campus Nexus</span>
         </div>
       </div>
     </article>

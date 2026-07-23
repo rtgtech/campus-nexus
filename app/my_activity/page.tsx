@@ -29,11 +29,11 @@ async function getCurrentUser(token: string | undefined): Promise<CampusUser | n
 }
 
 function belongsToUser(post: FeedCard, user: CampusUser) {
-  return (post.author_id ?? post.authorId) === user.user_id;
+  return post.authorId === user.userId;
 }
 
 function isLikedByViewer(post: FeedCard) {
-  return Boolean(post.likedByCurrentUser ?? post.liked_by_current_user ?? post.viewerHasLiked);
+  return Boolean(post.likedByCurrentUser ?? post.viewerHasLiked);
 }
 
 export default async function MyActivityPage() {
@@ -46,7 +46,7 @@ export default async function MyActivityPage() {
   );
   const myPosts = currentUser ? feedData.feedCards.filter((post) => belongsToUser(post, currentUser)) : [];
   const likedPosts = feedData.feedCards.filter(isLikedByViewer);
-  const profileKey = currentUser?.username || currentUser?.user_id;
+  const profileKey = currentUser?.username || currentUser?.userId;
 
   return (
     <CampusShell active="profile">
@@ -81,7 +81,7 @@ export default async function MyActivityPage() {
             {myPosts.length > 0 ? (
               <div className="grid gap-6 lg:grid-cols-2">
                 {myPosts.map((post) => (
-                  <FeedPostCard key={post.post_id ?? post.title} post={post} />
+                  <FeedPostCard key={post.postId ?? post.title} post={post} />
                 ))}
               </div>
             ) : (
@@ -121,7 +121,7 @@ export default async function MyActivityPage() {
             {likedPosts.length > 0 ? (
               <div className="grid gap-6 lg:grid-cols-2">
                 {likedPosts.map((post) => (
-                  <FeedPostCard key={post.post_id ?? post.title} post={post} />
+                  <FeedPostCard key={post.postId ?? post.title} post={post} />
                 ))}
               </div>
             ) : (

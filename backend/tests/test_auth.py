@@ -5,9 +5,11 @@ import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-32-characters"
+os.environ["ALLOWED_EMAIL_DOMAINS"] = "example.edu,@campus.example"
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
@@ -23,15 +25,37 @@ class AuthTest(unittest.TestCase):
         backend_app._database_initialized = True
         self.client = backend_app.app.test_client()
 
+    def test_account_creation_does_not_touch_neo4j(self) -> None:
+        payload = {
+            "name": "Test User",
+            "username": "tester",
+            "email": "tester@example.edu",
+            "dateOfBirth": "2000-01-01",
+            "yearOfStudy": 2,
+            "department": "CS",
+            "password": "secret123",
+        }
+
+        with patch("graph_store._get_driver", side_effect=AssertionError("account creation touched Neo4j")):
+            self.assertEqual(self.client.post("/api/auth/signup", json=payload).status_code, 201)
+            self.assertEqual(
+                self.client.post(
+                    "/api/users",
+                    json={**payload, "username": "second", "email": "second@example.edu"},
+                    headers={"Origin": backend_app.CORS_ORIGIN},
+                ).status_code,
+                201,
+            )
+
     def test_signup_returns_a_verified_jwt_and_rejects_tampering(self) -> None:
         response = self.client.post(
             "/api/auth/signup",
             json={
                 "name": "Test User",
                 "username": "tester",
-                "mail": "tester@example.edu",
-                "DOB": "2000-01-01",
-                "year": 2,
+                "email": "tester@example.edu",
+                "dateOfBirth": "2000-01-01",
+                "yearOfStudy": 2,
                 "department": "CS",
                 "password": "secret123",
             },
@@ -67,7 +91,7 @@ class AuthTest(unittest.TestCase):
         response = self.client.post("/api/auth/login", json={"login": "admin", "password": "12345678"})
         self.assertEqual(response.status_code, 200)
         me = self.client.get("/api/auth/me")
-        self.assertEqual(me.get_json()["user"]["user_id"], "admin")
+        self.assertEqual(me.get_json()["user"]["userId"], "admin")
 
         self.assertEqual(self.client.post("/api/auth/logout").status_code, 403)
         logout = self.client.post("/api/auth/logout", headers={"Origin": backend_app.CORS_ORIGIN})
@@ -78,16 +102,36 @@ class AuthTest(unittest.TestCase):
         payload = {
             "name": "Test User",
             "username": "tester",
-            "mail": "tester@example.edu",
-            "DOB": "2000-01-01",
-            "year": 2,
+            "email": "tester@example.edu",
+            "dateOfBirth": "2000-01-01",
+            "yearOfStudy": 2,
             "department": "CS",
             "password": "secret123",
         }
 
-        self.assertEqual(self.client.post("/api/auth/signup", json={**payload, "year": 5}).status_code, 400)
+        self.assertEqual(self.client.post("/api/auth/signup", json={**payload, "yearOfStudy": 5}).status_code, 400)
         for department in ("Architecture", "Design", "Business", "Civil"):
             self.assertEqual(self.client.post("/api/auth/signup", json={**payload, "department": department}).status_code, 400)
+
+    def test_signup_only_allows_configured_email_domains(self) -> None:
+        payload = {
+            "name": "Test User",
+            "username": "tester",
+            "email": "tester@campus.example",
+            "dateOfBirth": "2000-01-01",
+            "yearOfStudy": 2,
+            "department": "CS",
+            "password": "secret123",
+        }
+
+        self.assertEqual(self.client.post("/api/auth/signup", json=payload).status_code, 201)
+        rejected = self.client.post(
+            "/api/auth/signup",
+            json={**payload, "username": "outsider", "email": "outsider@other.example"},
+            headers={"Origin": backend_app.CORS_ORIGIN},
+        )
+        self.assertEqual(rejected.status_code, 400)
+        self.assertEqual(rejected.get_json()["error"], "email domain is not allowed")
 
     def test_only_admin_can_list_all_users(self) -> None:
         signup = self.client.post(
@@ -95,9 +139,9 @@ class AuthTest(unittest.TestCase):
             json={
                 "name": "Test User",
                 "username": "tester",
-                "mail": "tester@example.edu",
-                "DOB": "2000-01-01",
-                "year": 2,
+                "email": "tester@example.edu",
+                "dateOfBirth": "2000-01-01",
+                "yearOfStudy": 2,
                 "department": "CS",
                 "password": "secret123",
             },

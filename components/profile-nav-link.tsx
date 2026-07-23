@@ -15,7 +15,7 @@ type ProfileNavLinkProps = {
 function profileHref() {
   const session = readAuthSession();
   const user = session?.user;
-  const profileKey = user?.username || user?.user_id || user?.userId || user?.id;
+  const profileKey = user?.username || user?.userId;
   return profileKey ? `/${encodeURIComponent(profileKey)}` : "/auth";
 }
 

@@ -68,6 +68,11 @@ The app works with defaults for local development.
 | `CAMPUS_NEXUS_API_URL` | Next.js server components | `http://127.0.0.1:5000` | Backend base URL for server-side data fetches. |
 | `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` | Browser/client components | `http://localhost:5000` | Backend base URL for form submissions from the browser. |
 | `DATABASE_URL` | Flask backend, from `backend/.env` | `postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus` | SQLAlchemy database URL for persisted API data. |
+| `NEO4J_URI` | Flask backend, from `backend/.env` | required | Neo4j or Aura Bolt URI for friendships and feed graph signals. |
+| `NEO4J_USERNAME` | Flask backend, from `backend/.env` | required | Neo4j username. |
+| `NEO4J_PASSWORD` | Flask backend, from `backend/.env` | required | Neo4j password. |
+| `NEO4J_DATABASE` | Flask backend, from `backend/.env` | `neo4j` | Neo4j database name. |
+| `ALLOWED_EMAIL_DOMAINS` | Flask backend, from `backend/.env` | required | Comma-separated email domains accepted at signup. |
 | `PORT` | Flask backend | `5000` | Backend port. |
 | `FLASK_DEBUG` | Flask backend | unset | Set to `1` to enable Flask debug mode. |
 | `CORS_ORIGIN` | Flask backend | `*` | Allowed CORS origin returned by the API. |
@@ -126,6 +131,8 @@ password: 12345678
 ## Backend Overview
 
 The backend is a Flask app in `backend/app.py`. It exposes JSON endpoints for the frontend, creates missing PostgreSQL tables on startup, and starts content tables empty. The only startup seed is the common `admin` account.
+
+After configuring Neo4j, initialize the relationship graph once with `backend\venv\Scripts\python.exe backend\update_feed_graph.py --bootstrap`. Run the same command without `--bootstrap` whenever PostgreSQL-backed graph data and PageRank should be refreshed.
 
 | Method | Endpoint | Description |
 | --- | --- | --- |

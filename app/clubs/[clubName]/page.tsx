@@ -13,7 +13,7 @@ import { fallbackClubDetail, type ClubDetailData } from "@/lib/app-data";
 
 type ClubDetailPageProps = {
   params: Promise<{
-    club_name: string;
+    clubName: string;
   }>;
 };
 
@@ -38,7 +38,7 @@ async function getClubDetail(slug: string): Promise<ClubDetailData | null> {
 }
 
 export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
-  const { club_name: clubName } = await params;
+  const { clubName } = await params;
   const detail = await getClubDetail(clubName);
 
   if (detail === null || !detail.club.slug) {
@@ -134,7 +134,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
               ) : (
                 <div className="space-y-6">
                   {posts.map((post) => (
-                    <FeedPostCard key={post.post_id ?? post.title} post={post} />
+                    <FeedPostCard key={post.postId ?? post.title} post={post} />
                   ))}
                 </div>
               )}

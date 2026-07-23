@@ -43,7 +43,7 @@ export default async function HomePage() {
               <div className="grid gap-6 lg:grid-cols-2">
                 {feedData.feedCards.map((card) => (
                   <FeedPostCard
-                    key={card.post_id ?? card.title}
+                    key={card.postId ?? card.title}
                     post={card}
                   />
                 ))}

@@ -48,7 +48,7 @@ export function AuthSessionControl({ compact = false }: AuthSessionControlProps)
     );
   }
 
-  const profileSlug = session.user.username || session.user.user_id || session.user.id;
+  const profileSlug = session.user.username || session.user.userId;
 
   return (
     <div className="flex items-center gap-2">
@@ -57,7 +57,7 @@ export function AuthSessionControl({ compact = false }: AuthSessionControlProps)
           aria-label={`${session.user.name} profile`}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-primary-fixed text-xs font-bold text-primary"
         >
-          {session.user.acronym || session.user.initials || getInitials(session.user.name)}
+          {session.user.initials || getInitials(session.user.name)}
         </span>
         <span className={compact ? "hidden max-w-28 truncate text-sm font-semibold text-on-surface md:inline" : "max-w-32 truncate text-sm font-semibold text-on-surface"}>
           {session.user.name}

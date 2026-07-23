@@ -36,23 +36,47 @@ npm run dev:backend
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | `postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus` | SQLAlchemy database URL loaded from `backend/.env`. |
-| `FEED_GRAPH_PATH` | `backend/.cache/feed_graph.gpickle` | Optional path for the persisted feed-ranking graph. |
+| `NEO4J_URI` | required | Neo4j or Aura Bolt URI. |
+| `NEO4J_USERNAME` | required | Neo4j username. |
+| `NEO4J_PASSWORD` | required | Neo4j password. |
+| `NEO4J_DATABASE` | `neo4j` | Neo4j database name. |
 | `PORT` | `5000` | Flask port. |
 | `FLASK_DEBUG` | unset | Set to `1` to enable Flask debug mode. |
 | `CORS_ORIGIN` | `http://localhost:3000` | Exact frontend origin allowed to send the auth cookie. |
 | `JWT_SECRET` | required | Secret used to sign JWTs; use at least 32 random characters. |
 | `JWT_EXPIRES_HOURS` | `24` | JWT lifetime in hours. |
 | `JWT_COOKIE_SECURE` | `0` | Set to `1` when serving the frontend and backend over HTTPS. |
+| `ALLOWED_EMAIL_DOMAINS` | required | Comma-separated signup email domains; entries may optionally include `@` or a sample address. |
+
+## Existing database migration
+
+Apply the camelCase column migration once before deploying this version:
+
+```powershell
+psql $env:DATABASE_URL -f backend/migrations/001_camel_case_columns.sql
+```
+
+Apply the matching Neo4j property migration with Neo4j Browser or `cypher-shell`:
+
+```powershell
+cypher-shell -f backend/migrations/002_neo4j_camel_case.cypher
+```
 
 ## Feed graph maintenance
 
-The API updates the persisted feed graph when users, clubs, friendships, or club memberships change. Reconcile it after direct database edits with:
+Neo4j is the friendship source of truth. Bootstrap the graph once to import existing accepted PostgreSQL friendships:
+
+```powershell
+backend\venv\Scripts\python.exe backend\update_feed_graph.py --bootstrap
+```
+
+Run the normal update whenever PostgreSQL-backed users, clubs, memberships, followers, relationship weights, and PageRank should be reconciled:
 
 ```powershell
 backend\venv\Scripts\python.exe backend\update_feed_graph.py
 ```
 
-Keep the gpickle file application-owned; Python pickle files must never be accepted from users.
+Friend and unfriend requests update Neo4j immediately. Other graph topology changes appear after the next normal update. Feed requests fall back to engagement and recency ranking when Neo4j is unavailable; friendship endpoints return `503`.
 
 ## Aggregate Endpoints
 
@@ -66,7 +90,7 @@ Keep the gpickle file application-owned; Python pickle files must never be accep
 | `GET` | `/api/games` | Game cards, top-rated games, and recent activity. |
 | `GET` | `/api/marketplace` | Marketplace listings. |
 | `GET` | `/api/messages` | Conversations and chat messages. |
-| `POST` | `/api/auth/signup` | Create a student account with mail, username, name, date of birth, department, year, and password. |
+| `POST` | `/api/auth/signup` | Create a student account with `email`, `username`, `name`, `dateOfBirth`, `department`, `yearOfStudy`, and `password`. |
 | `POST` | `/api/auth/login` | Login with email or username and password. |
 | `GET` | `/api/auth/me` | Return the authenticated user for a bearer token. |
 | `POST` | `/api/auth/logout` | Acknowledge client-side logout. JWTs expire automatically. |
@@ -114,5 +138,5 @@ Compatibility aliases are preserved:
 
 `POST`, `PATCH`, `PUT`, and `DELETE` requests for `/api/clubs`, `/api/clubs/items`, `/api/clubs/spotlight`, and `/api/clubs/stats` require admin access.
 Club member create, update, and delete requests under `/api/clubs/<slug>/members` also require admin access.
-Club posts and announcements use `/api/posts` with `type: 1` or `type: 3` plus `clubSlug` or `club_id`; the authenticated author must be that club's president, chairman, or secretary.
+Club posts and announcements use `/api/posts` with `type: 1` or `type: 3` plus `clubSlug` or `clubId`; club leaders can publish both, and admins can grant or revoke a member's post access with `PATCH /api/clubs/<slug>/members/<id>` and `{"canPost": true|false}`.
 Regular posts accept mixed image/MP4 arrays in `mediaUrls`; announcements require exactly one image in `mediaUrls` as their poster.

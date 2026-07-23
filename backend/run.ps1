@@ -20,7 +20,7 @@ if (-not (Test-Path $EnvFile) -and (Test-Path $EnvExample)) {
     Copy-Item $EnvExample $EnvFile
 }
 
-& $PythonExe -c "import flask, sqlalchemy, psycopg" 2>$null
+& $PythonExe -c "import flask, sqlalchemy, psycopg, neo4j" 2>$null
 if ($LASTEXITCODE -ne 0) {
     & $PythonExe -m pip install -r $Requirements
 }

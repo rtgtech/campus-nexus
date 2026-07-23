@@ -8,7 +8,6 @@ type EntityKind = "user" | "club" | "post" | "product";
 
 type ProfileLike = {
   username?: string | null;
-  user_id?: string | null;
   userId?: string | null;
   id?: string | number | null;
 };
@@ -44,7 +43,7 @@ const defaultIcons: Record<EntityKind, string> = {
 };
 
 export function profileEntityHref(profile: ProfileLike) {
-  return `/${encodeURIComponent(profile.username || profile.user_id || profile.userId || profile.id || "")}`;
+  return `/${encodeURIComponent(profile.username || profile.userId || profile.id || "")}`;
 }
 
 export function clubEntityHref(club: ClubLike) {

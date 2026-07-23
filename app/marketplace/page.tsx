@@ -189,8 +189,8 @@ export default async function MarketplacePage({ searchParams }: MarketplacePageP
             <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
               {marketplaceData.items.map((item) => (
               <article
-                key={item.post_id ?? item.id ?? item.title}
-                id={item.post_id ?? item.id}
+                key={item.postId ?? item.id ?? item.title}
+                id={item.postId ?? item.id}
                 className="overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition hover:shadow-xl"
               >
                 <div className="relative h-44 overflow-hidden bg-primary-fixed">

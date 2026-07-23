@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import pickle
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -34,20 +33,34 @@ from werkzeug.security import check_password_hash, generate_password_hash
 try:
     from .feed_ranker import (
         build_feed_graph,
-        load_feed_graph,
-        persist_feed_graph,
-        publish_staged_feed_graph,
         rank_feed_posts,
-        stage_feed_graph,
+    )
+    from .graph_store import (
+        GraphUnavailable,
+        create_friendship as graph_create_friendship,
+        delete_friendship as graph_delete_friendship,
+        ensure_constraints as ensure_graph_constraints,
+        feed_signals,
+        friend_rows as graph_friend_rows,
+        get_friendship as graph_get_friendship,
+        replace_graph,
+        stored_friendships,
     )
 except ImportError:
     from feed_ranker import (
         build_feed_graph,
-        load_feed_graph,
-        persist_feed_graph,
-        publish_staged_feed_graph,
         rank_feed_posts,
-        stage_feed_graph,
+    )
+    from graph_store import (
+        GraphUnavailable,
+        create_friendship as graph_create_friendship,
+        delete_friendship as graph_delete_friendship,
+        ensure_constraints as ensure_graph_constraints,
+        feed_signals,
+        friend_rows as graph_friend_rows,
+        get_friendship as graph_get_friendship,
+        replace_graph,
+        stored_friendships,
     )
 
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -59,16 +72,22 @@ try:
 except ImportError:
     pass
 
+ALLOWED_EMAIL_DOMAINS = frozenset(
+    entry.strip().lower().rsplit("@", 1)[-1]
+    for entry in os.getenv("ALLOWED_EMAIL_DOMAINS", "").split(",")
+    if entry.strip()
+)
+
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus"
 PROFILE_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='64' fill='%23e9e7f3'/%3E%3Ccircle cx='64' cy='48' r='24' fill='%23777d86'/%3E%3Cpath d='M24 116c6-27 22-41 40-41s34 14 40 41' fill='%23777d86'/%3E%3C/svg%3E"
 
 DEFAULT_ADMIN_USER = {
-    "mail": "admin@cn.nhce",
+    "email": "admin@cn.nhce",
     "username": "admin",
     "name": "Admin",
-    "DOB": "2000-01-01",
+    "dateOfBirth": "2000-01-01",
     "department": "CS",
-    "year": 1,
+    "yearOfStudy": 1,
     "password": "12345678",
 }
 
@@ -116,44 +135,38 @@ class User(Base):
         CheckConstraint("department IS NULL OR department IN ('CS', 'Mech', 'ECE', 'Electrical')", name="ck_users_department"),
     )
 
-    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    full_name: Mapped[str] = mapped_column(Text, nullable=False)
+    userId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    fullName: Mapped[str] = mapped_column(Text, nullable=False)
     username: Mapped[str] = mapped_column(Text, unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(Text, unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    account_role: Mapped[str] = mapped_column(Text, default="student", nullable=False)
-    date_of_birth: Mapped[Optional[date]] = mapped_column(nullable=True)
+    passwordHash: Mapped[str] = mapped_column(Text, nullable=False)
+    accountRole: Mapped[str] = mapped_column(Text, default="student", nullable=False)
+    dateOfBirth: Mapped[Optional[date]] = mapped_column(nullable=True)
     department: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     semester: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    batch_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    batchYear: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    profile_photo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    profile_visibility: Mapped[str] = mapped_column(Text, default="public", nullable=False)
-    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    reputation_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    safety_score: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    profilePhotoUrl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    profileVisibility: Mapped[str] = mapped_column(Text, default="public", nullable=False)
+    notificationsEnabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    reputationScore: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    safetyScore: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    isActive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     def to_dict(self) -> dict[str, Any]:
-        name = self.full_name
-        dob = self.date_of_birth.isoformat() if self.date_of_birth else ""
+        name = self.fullName
+        dob = self.dateOfBirth.isoformat() if self.dateOfBirth else ""
         year = self.semester or 1
         return {
-            "user_id": str(self.user_id),
-            "userId": str(self.user_id),
-            "id": str(self.user_id),
+            "userId": str(self.userId),
             "name": name,
             "username": self.username,
-            "mail": self.email,
             "email": self.email,
-            "DOB": dob,
             "dateOfBirth": dob,
-            "year": year,
             "yearOfStudy": year,
             "department": self.department or "",
-            "acronym": initials_for_name(name),
             "initials": initials_for_name(name),
         }
 
@@ -161,30 +174,27 @@ class User(Base):
 class Friendship(Base):
     __tablename__ = "friendships"
     __table_args__ = (
-        CheckConstraint("requester_id < receiver_id", name="ck_friendships_canonical_pair"),
-        UniqueConstraint("requester_id", "receiver_id", name="uq_friendships_requester_receiver"),
+        CheckConstraint('"requesterId" < "receiverId"', name="ck_friendships_canonical_pair"),
+        UniqueConstraint("requesterId", "receiverId", name="uq_friendships_requester_receiver"),
     )
 
-    friendship_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    requester_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
-    receiver_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
+    friendshipId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    requesterId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
+    receiverId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     status: Mapped[str] = mapped_column(Text, default="accepted", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
-        return self.friendship_id
+        return self.friendshipId
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.friendship_id,
-            "user_a_id": str(self.requester_id),
-            "userAId": str(self.requester_id),
-            "user_b_id": str(self.receiver_id),
-            "userBId": str(self.receiver_id),
-            "created_at": self.created_at.isoformat(),
-            "createdAt": self.created_at.isoformat(),
+            "id": self.friendshipId,
+            "userAId": str(self.requesterId),
+            "userBId": str(self.receiverId),
+            "createdAt": self.createdAt.isoformat(),
         }
 
 
@@ -194,20 +204,20 @@ UserFriendship = Friendship
 class Club(Base):
     __tablename__ = "clubs"
 
-    club_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    clubId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     slug: Mapped[str] = mapped_column(Text, unique=True, index=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    logo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    logoUrl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, default="Open", nullable=False)
-    created_by_service: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdByService: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    isActive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
-        return self.club_id
+        return self.clubId
 
     @property
     def title(self) -> str:
@@ -219,7 +229,7 @@ class Club(Base):
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.club_id,
+            "id": self.clubId,
             "title": self.name,
             "slug": self.slug,
             "description": self.description or "",
@@ -227,7 +237,7 @@ class Club(Base):
             "icon": "groups",
             "iconBg": "bg-primary",
             "bannerBg": "bg-primary-fixed/20",
-            "bannerImage": self.logo_url or "",
+            "bannerImage": self.logoUrl or "",
             "extraMembers": "0",
             "extraMembersClass": "bg-primary-container text-white",
             "avatars": [],
@@ -240,23 +250,23 @@ ClubCard = Club
 
 class ClubMember(Base):
     __tablename__ = "club_members"
-    __table_args__ = (UniqueConstraint("club_id", "user_id", name="uq_club_members_club_user"),)
+    __table_args__ = (UniqueConstraint("clubId", "userId", name="uq_club_members_club_user"),)
 
-    club_member_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    club_id: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.club_id"), index=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
+    clubMemberId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    clubId: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.clubId"), index=True, nullable=False)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     role: Mapped[str] = mapped_column(Text, default="member", nullable=False)
-    can_post: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    can_publish_event: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    can_create_announcement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    can_manage_members: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    canPost: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    canPublishEvent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    canCreateAnnouncement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    canManageMembers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[str] = mapped_column(Text, default="active", nullable=False)
-    added_by_service: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    joined_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    addedByService: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    joinedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
-        return self.club_member_id
+        return self.clubMemberId
 
     @property
     def title(self) -> str:
@@ -267,64 +277,61 @@ class ClubMember(Base):
         self.role = role_value(value)
 
     @property
-    def created_at(self) -> datetime:
-        return self.joined_at
+    def createdAt(self) -> datetime:
+        return self.joinedAt
 
 
 class ClubFollower(Base):
     __tablename__ = "club_followers"
 
-    club_id: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.club_id"), primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    clubId: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.clubId"), primary_key=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), primary_key=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     @property
     def id(self) -> str:
-        return f"{self.club_id}:{self.user_id}"
+        return f"{self.clubId}:{self.userId}"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
-            "club_id": self.club_id,
-            "clubId": self.club_id,
-            "user_id": str(self.user_id),
-            "userId": str(self.user_id),
-            "created_at": self.created_at.isoformat(),
-            "createdAt": self.created_at.isoformat(),
+            "clubId": self.clubId,
+            "userId": str(self.userId),
+            "createdAt": self.createdAt.isoformat(),
         }
 
 
 class Post(Base):
     __tablename__ = "posts"
 
-    post_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    author_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
-    club_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.club_id"), index=True, nullable=True)
-    post_type: Mapped[str] = mapped_column(Text, default="normal", nullable=False)
+    postId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    authorId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
+    clubId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.clubId"), index=True, nullable=True)
+    postType: Mapped[str] = mapped_column(Text, default="normal", nullable=False)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    media_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    media_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    original_post_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("posts.post_id"), nullable=True)
+    mediaUrl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    mediaType: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    originalPostId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("posts.postId"), nullable=True)
     visibility: Mapped[str] = mapped_column(Text, default="public", nullable=False)
-    event_title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    event_start_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    event_end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    event_location: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    registration_link: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    like_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    comment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    share_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    bookmark_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    repost_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    report_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    engagement_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    eventTitle: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    eventStartTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    eventEndTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    eventLocation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    registrationLink: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    likeCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    commentCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    shareCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    bookmarkCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    repostCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reportCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    engagementScore: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    isDeleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     @property
     def type_code(self) -> int:
-        return POST_TYPE_TO_CODE.get(self.post_type, 0)
+        return POST_TYPE_TO_CODE.get(self.postType, 0)
 
     @property
     def caption(self) -> str:
@@ -336,224 +343,212 @@ class Post(Base):
 
     @property
     def likes(self) -> int:
-        return self.like_count
+        return self.likeCount
 
     @likes.setter
     def likes(self, value: int) -> None:
-        self.like_count = max(int(value), 0)
+        self.likeCount = max(int(value), 0)
 
     @property
     def shares(self) -> int:
-        return self.share_count
+        return self.shareCount
 
     @shares.setter
     def shares(self, value: int) -> None:
-        self.share_count = max(int(value), 0)
+        self.shareCount = max(int(value), 0)
 
     def to_dict(
         self,
         author_name: Optional[str] = None,
         club_slug: Optional[str] = None,
-        media_urls: Optional[list[str]] = None,
+        mediaUrls: Optional[list[str]] = None,
     ) -> dict[str, Any]:
-        created_at = self.created_at.isoformat()
+        createdAt = self.createdAt
+        if createdAt.tzinfo is None:
+            createdAt = createdAt.replace(tzinfo=timezone.utc)
+        createdAt = createdAt.astimezone(timezone.utc).isoformat()
         caption = self.caption
         hashtags = extract_hashtags(caption)
         title = caption[:72] or "Untitled post"
-        media_urls = media_urls if media_urls is not None else ([self.media_url] if self.media_url else [])
-        primary_media = media_urls[0] if media_urls else ""
+        mediaUrls = mediaUrls if mediaUrls is not None else ([self.mediaUrl] if self.mediaUrl else [])
+        primary_media = mediaUrls[0] if mediaUrls else ""
         return {
-            "post_id": str(self.post_id),
-            "postId": str(self.post_id),
-            "id": str(self.post_id),
-            "author_id": str(self.author_id),
-            "authorId": str(self.author_id),
-            "author": author_name or str(self.author_id),
-            "club_id": self.club_id,
-            "clubId": self.club_id,
+            "postId": str(self.postId),
+            "id": str(self.postId),
+            "authorId": str(self.authorId),
+            "author": author_name or str(self.authorId),
+            "clubId": self.clubId,
             "clubSlug": club_slug,
             "type": self.type_code,
-            "postType": self.post_type,
-            "media_url": primary_media,
+            "postType": self.postType,
             "mediaUrl": primary_media,
-            "media_urls": media_urls,
-            "mediaUrls": media_urls,
+            "mediaUrls": mediaUrls,
             "caption": caption,
-            "likes": self.like_count,
-            "shares": self.share_count,
+            "likes": self.likeCount,
+            "shares": self.shareCount,
             "hashtags": hashtags,
             "mentions": extract_mentions(caption),
             "price": None,
             "description": None,
-            "created_at": created_at,
-            "createdAt": created_at,
-            "meta": created_at,
+            "createdAt": createdAt,
+            "meta": createdAt,
             "title": title,
             "body": caption,
             "image": primary_media,
             "tag": hashtags[0] if hashtags else "#campusnexus",
-            "comments": self.comment_count,
-            "engagement_score": self.engagement_score or float(self.like_count + self.share_count * 2),
+            "comments": self.commentCount,
+            "engagementScore": self.engagementScore or float(self.likeCount + self.shareCount * 2),
         }
 
 
 class PostMedia(Base):
     __tablename__ = "post_media"
 
-    media_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    post_id: Mapped[int] = mapped_column(Integer, ForeignKey("posts.post_id", ondelete="CASCADE"), index=True, nullable=False)
-    media_url: Mapped[str] = mapped_column(Text, nullable=False)
-    media_type: Mapped[str] = mapped_column(Text, nullable=False)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    mediaId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    postId: Mapped[int] = mapped_column(Integer, ForeignKey("posts.postId", ondelete="CASCADE"), index=True, nullable=False)
+    mediaUrl: Mapped[str] = mapped_column(Text, nullable=False)
+    mediaType: Mapped[str] = mapped_column(Text, nullable=False)
+    sortOrder: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class PostLike(Base):
     __tablename__ = "post_likes"
 
-    post_id: Mapped[int] = mapped_column(Integer, ForeignKey("posts.post_id"), primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    postId: Mapped[int] = mapped_column(Integer, ForeignKey("posts.postId"), primary_key=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), primary_key=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     @property
     def id(self) -> str:
-        return f"{self.post_id}:{self.user_id}"
+        return f"{self.postId}:{self.userId}"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
-            "post_id": str(self.post_id),
-            "postId": str(self.post_id),
-            "user_id": str(self.user_id),
-            "userId": str(self.user_id),
-            "created_at": self.created_at.isoformat(),
-            "createdAt": self.created_at.isoformat(),
+            "postId": str(self.postId),
+            "userId": str(self.userId),
+            "createdAt": self.createdAt.isoformat(),
         }
 
 
 class Comment(Base):
     __tablename__ = "comments"
 
-    comment_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    post_id: Mapped[int] = mapped_column(Integer, ForeignKey("posts.post_id"), index=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
+    commentId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    postId: Mapped[int] = mapped_column(Integer, ForeignKey("posts.postId"), index=True, nullable=False)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    isDeleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
 class Notification(Base):
     __tablename__ = "notifications"
 
-    notification_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
-    actor_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
+    notificationId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
+    actorId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     type: Mapped[str] = mapped_column(Text, index=True, nullable=False)
-    target_type: Mapped[str] = mapped_column(Text, nullable=False)
-    target_id: Mapped[str] = mapped_column(Text, nullable=False)
+    targetType: Mapped[str] = mapped_column(Text, nullable=False)
+    targetId: Mapped[str] = mapped_column(Text, nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    isRead: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
 class MarketplaceItem(Base):
     __tablename__ = "marketplace_items"
 
-    item_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
+    itemId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sellerId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
-    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    imageUrl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, default="available", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
 
 class Game(Base):
     __tablename__ = "games"
 
-    game_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    gameId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    startDate: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    endDate: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    isActive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
-        return self.game_id
+        return self.gameId
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.game_id, "title": self.name, "image": "", "online": "0", "rating": "0"}
+        return {"id": self.gameId, "title": self.name, "image": "", "online": "0", "rating": "0"}
 
 
 class UserPoint(Base):
     __tablename__ = "user_points"
 
-    point_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), index=True, nullable=False)
-    game_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("games.game_id"), nullable=True)
+    pointId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
+    gameId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("games.gameId"), nullable=True)
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
 class ChatThread(Base):
     __tablename__ = "chat_threads"
 
-    thread_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    thread_type: Mapped[str] = mapped_column(Text, default="direct", nullable=False)
-    club_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.club_id"), nullable=True)
-    marketplace_item_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("marketplace_items.item_id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    threadId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    threadType: Mapped[str] = mapped_column(Text, default="direct", nullable=False)
+    clubId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.clubId"), nullable=True)
+    marketplaceItemId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("marketplace_items.itemId"), nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
 class ChatParticipant(Base):
     __tablename__ = "chat_participants"
 
-    thread_id: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.thread_id"), primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), primary_key=True)
-    joined_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    last_read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    threadId: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.threadId"), primary_key=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), primary_key=True)
+    joinedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    lastReadAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
-    message_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    thread_id: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.thread_id"), index=True, nullable=False)
-    sender_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), nullable=False)
+    messageId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    threadId: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.threadId"), index=True, nullable=False)
+    senderId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), nullable=False)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    isDeleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
 @dataclass(frozen=True)
 class AdminIdentity:
-    user_id: str = "admin"
+    userId: str = "admin"
     username: str = "admin"
     email: str = "admin@cn.nhce"
-    full_name: str = "Admin"
+    fullName: str = "Admin"
     department: str = "CS"
     semester: int = 1
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "user_id": self.user_id,
-            "userId": self.user_id,
-            "id": self.user_id,
-            "name": self.full_name,
+            "userId": self.userId,
+            "name": self.fullName,
             "username": self.username,
-            "mail": self.email,
             "email": self.email,
-            "DOB": DEFAULT_ADMIN_USER["DOB"],
-            "dateOfBirth": DEFAULT_ADMIN_USER["DOB"],
-            "year": self.semester,
+            "dateOfBirth": DEFAULT_ADMIN_USER["dateOfBirth"],
             "yearOfStudy": self.semester,
             "department": self.department,
-            "acronym": "AD",
             "initials": "AD",
         }
 
@@ -678,13 +673,6 @@ def valid_email(value: str) -> bool:
     return "@" in value and "." in value.rsplit("@", 1)[-1]
 
 
-def edu_email(value: str) -> bool:
-    if not valid_email(value):
-        return False
-    domain = value.rsplit("@", 1)[-1].lower()
-    return domain == "edu" or domain.endswith(".edu")
-
-
 def read_year_of_study(value: Any) -> Optional[int]:
     year = optional_int(value)
     if year is None or year < 1 or year > 4:
@@ -771,8 +759,8 @@ def extract_mentions(caption: str) -> list[str]:
     return unique_preserving_order(f"@{match.group(1)}" for match in MENTION_RE.finditer(caption))
 
 
-def media_kind(media_url: str) -> Optional[str]:
-    url = media_url.strip().lower().split("?", 1)[0].split("#", 1)[0]
+def media_kind(mediaUrl: str) -> Optional[str]:
+    url = mediaUrl.strip().lower().split("?", 1)[0].split("#", 1)[0]
     if not url:
         return None
     if url.startswith("data:image/") or url.endswith(IMAGE_EXTENSIONS):
@@ -782,8 +770,8 @@ def media_kind(media_url: str) -> Optional[str]:
     return "unknown"
 
 
-def media_error(media_url: str, post_type_code: int) -> Optional[str]:
-    kind = media_kind(media_url)
+def media_error(mediaUrl: str, post_type_code: int) -> Optional[str]:
+    kind = media_kind(mediaUrl)
     if kind is None:
         return None
     if kind == "unknown":
@@ -794,27 +782,27 @@ def media_error(media_url: str, post_type_code: int) -> Optional[str]:
 
 
 def read_media_urls(data: dict[str, Any]) -> list[str]:
-    if "mediaUrls" in data or "media_urls" in data:
-        return read_string_list(get_first(data, "mediaUrls", "media_urls"))
-    media_url = text_value(get_first(data, "media_url", "mediaUrl", "image"))
-    return [media_url] if media_url else []
+    if "mediaUrls" in data:
+        return read_string_list(data.get("mediaUrls"))
+    mediaUrl = text_value(get_first(data, "mediaUrl", "image"))
+    return [mediaUrl] if mediaUrl else []
 
 
 def post_media_urls(post: Post) -> list[str]:
     # ponytail: per-post lookup is sufficient at current feed size; eager-load if feed volume grows.
     rows = db().scalars(
-        select(PostMedia).where(PostMedia.post_id == post.post_id).order_by(PostMedia.sort_order.asc(), PostMedia.media_id.asc())
+        select(PostMedia).where(PostMedia.postId == post.postId).order_by(PostMedia.sortOrder.asc(), PostMedia.mediaId.asc())
     ).all()
-    return [row.media_url for row in rows] or ([post.media_url] if post.media_url else [])
+    return [row.mediaUrl for row in rows] or ([post.mediaUrl] if post.mediaUrl else [])
 
 
-def replace_post_media(post: Post, media_urls: list[str]) -> None:
-    for row in db().scalars(select(PostMedia).where(PostMedia.post_id == post.post_id)).all():
+def replace_post_media(post: Post, mediaUrls: list[str]) -> None:
+    for row in db().scalars(select(PostMedia).where(PostMedia.postId == post.postId)).all():
         db().delete(row)
-    for index, media_url in enumerate(media_urls):
-        db().add(PostMedia(post_id=post.post_id, media_url=media_url, media_type=media_kind(media_url) or "", sort_order=index))
-    post.media_url = media_urls[0] if media_urls else None
-    post.media_type = media_kind(post.media_url or "")
+    for index, mediaUrl in enumerate(mediaUrls):
+        db().add(PostMedia(postId=post.postId, mediaUrl=mediaUrl, mediaType=media_kind(mediaUrl) or "", sortOrder=index))
+    post.mediaUrl = mediaUrls[0] if mediaUrls else None
+    post.mediaType = media_kind(post.mediaUrl or "")
 
 
 def post_type_code(value: Any, default: int = 0) -> Optional[int]:
@@ -841,8 +829,8 @@ def user_pk(value: Any) -> Optional[int]:
     return optional_int(value)
 
 
-def get_user(user_id: Any) -> Optional[User]:
-    pk = user_pk(user_id)
+def get_user(userId: Any) -> Optional[User]:
+    pk = user_pk(userId)
     return db().get(User, pk) if pk is not None else None
 
 
@@ -852,7 +840,7 @@ def unique_club_slug(value: Any, current_club_id: Optional[int] = None) -> str:
     suffix = 2
     while True:
         existing = db().scalar(select(Club).where(Club.slug == candidate))
-        if existing is None or existing.club_id == current_club_id:
+        if existing is None or existing.clubId == current_club_id:
             return candidate
         candidate = f"{base_slug}-{suffix}"
         suffix += 1
@@ -872,12 +860,12 @@ def current_auth_user() -> Optional[AuthUser]:
         )
     except jwt.InvalidTokenError:
         return None
-    if claims["role"] == "admin" and claims["sub"] == AdminIdentity.user_id:
+    if claims["role"] == "admin" and claims["sub"] == AdminIdentity.userId:
         return AdminIdentity()
     if claims["role"] != "student":
         return None
     user = get_user(claims["sub"])
-    return user if user is not None and user.is_active else None
+    return user if user is not None and user.isActive else None
 
 
 def bearer_token() -> Optional[str]:
@@ -906,7 +894,7 @@ def create_auth_token(user: AuthUser) -> str:
     role = "admin" if is_admin_user(user) else "student"
     return jwt.encode(
         {
-            "sub": str(user.user_id),
+            "sub": str(user.userId),
             "role": role,
             "iss": JWT_ISSUER,
             "iat": now,
@@ -938,61 +926,60 @@ def find_auth_user_by_login(login: str) -> Optional[User]:
 
 def admin_login_matches(login: str, password: str) -> bool:
     username = normalize_username(DEFAULT_ADMIN_USER["username"])
-    mail = normalize_email(DEFAULT_ADMIN_USER["mail"])
+    mail = normalize_email(DEFAULT_ADMIN_USER["email"])
     return login in {username, mail} and password == text_value(DEFAULT_ADMIN_USER["password"])
 
 
-def serialize_post(post: Post, viewer_user_id: Optional[str] = None) -> dict[str, Any]:
-    author = db().get(User, post.author_id)
-    club = db().get(Club, post.club_id) if post.club_id is not None else None
-    liked_by_current_user = False
-    viewer_pk = user_pk(viewer_user_id)
+def serialize_post(post: Post, viewerUserId: Optional[str] = None) -> dict[str, Any]:
+    author = db().get(User, post.authorId)
+    club = db().get(Club, post.clubId) if post.clubId is not None else None
+    likedByCurrentUser = False
+    viewer_pk = user_pk(viewerUserId)
     if viewer_pk is not None:
-        liked_by_current_user = post_like_for_user(post.post_id, viewer_pk) is not None
+        likedByCurrentUser = post_like_for_user(post.postId, viewer_pk) is not None
     return {
         **post.to_dict(
-            author.full_name if author is not None else None,
+            author.fullName if author is not None else None,
             club.slug if club is not None else None,
             post_media_urls(post),
         ),
-        "likedByCurrentUser": liked_by_current_user,
-        "liked_by_current_user": liked_by_current_user,
-        "viewerHasLiked": liked_by_current_user,
+        "likedByCurrentUser": likedByCurrentUser,
+        "viewerHasLiked": likedByCurrentUser,
     }
 
 
-def post_like_for_user(post_id: Any, user_id: Any) -> Optional[PostLike]:
-    post_pk = optional_int(post_id)
-    user_id_pk = optional_int(user_id)
+def post_like_for_user(postId: Any, userId: Any) -> Optional[PostLike]:
+    post_pk = optional_int(postId)
+    user_id_pk = optional_int(userId)
     if post_pk is None or user_id_pk is None:
         return None
-    return db().get(PostLike, {"post_id": post_pk, "user_id": user_id_pk})
+    return db().get(PostLike, {"postId": post_pk, "userId": user_id_pk})
 
 
 def resolve_post_author_id(data: dict[str, Any]) -> Optional[int]:
-    explicit_author_id = optional_int(get_first(data, "author_id", "authorId"))
+    explicit_author_id = optional_int(data.get("authorId"))
     if explicit_author_id is not None:
         return explicit_author_id
     current_user = current_auth_user()
     if isinstance(current_user, User):
-        return current_user.user_id
+        return current_user.userId
     username = normalize_username(data.get("author"))
     if username:
         user = db().scalar(select(User).where(User.username == username))
         if user is not None:
-            return user.user_id
+            return user.userId
     return None
 
 
 def resolve_post_club_id(data: dict[str, Any]) -> Optional[int]:
-    explicit_club_id = optional_int(get_first(data, "club_id", "clubId"))
+    explicit_club_id = optional_int(data.get("clubId"))
     if explicit_club_id is not None:
         return explicit_club_id
-    club_slug = optional_text(get_first(data, "clubSlug", "club_slug"))
+    club_slug = optional_text(data.get("clubSlug"))
     if club_slug is None:
         return None
     club = db().scalar(select(Club).where(Club.slug == slugify(club_slug)))
-    return club.club_id if club is not None else None
+    return club.clubId if club is not None else None
 
 
 def post_caption_from_data(data: dict[str, Any]) -> str:
@@ -1002,65 +989,65 @@ def post_caption_from_data(data: dict[str, Any]) -> str:
 def make_post(data: dict[str, Any]) -> Post:
     caption = post_caption_from_data(data)
     explicit_hashtags = read_hashtags(get_first(data, "hashtags", "tag"))
-    explicit_mentions = read_mentions(get_first(data, "mentions", "taggedPeople", "tagged_people"))
+    explicit_mentions = read_mentions(get_first(data, "mentions", "taggedPeople"))
     tags = unique_preserving_order([*explicit_hashtags, *extract_hashtags(caption)])
     mentions = unique_preserving_order([*explicit_mentions, *extract_mentions(caption)])
     decorated_caption = " ".join([caption, *tags, *mentions]).strip()
-    media_urls = read_media_urls(data)
-    media_url = media_urls[0] if media_urls else ""
-    code = post_type_code(get_first(data, "type", "postType", "post_type"), default=0) or 0
+    mediaUrls = read_media_urls(data)
+    mediaUrl = mediaUrls[0] if mediaUrls else ""
+    code = post_type_code(get_first(data, "type", "postType"), default=0) or 0
     return Post(
-        author_id=resolve_post_author_id(data) or 0,
-        club_id=resolve_post_club_id(data),
-        post_type=CODE_TO_POST_TYPE[code],
+        authorId=resolve_post_author_id(data) or 0,
+        clubId=resolve_post_club_id(data),
+        postType=CODE_TO_POST_TYPE[code],
         content=decorated_caption,
-        media_url=media_url,
-        media_type=media_kind(media_url),
-        like_count=optional_int(data.get("likes")) or 0,
-        share_count=optional_int(data.get("shares")) or 0,
+        mediaUrl=mediaUrl,
+        mediaType=media_kind(mediaUrl),
+        likeCount=optional_int(data.get("likes")) or 0,
+        shareCount=optional_int(data.get("shares")) or 0,
     )
 
 
-def validate_post(post: Post, media_urls: Optional[list[str]] = None):
-    if db().get(User, post.author_id) is None:
-        return jsonify({"error": "author_id must reference an existing user"}), 400
-    if post.post_type in CLUB_POST_TYPES:
-        if post.club_id is None or db().get(Club, post.club_id) is None:
-            return jsonify({"error": "club_id or clubSlug must reference an existing club"}), 400
+def validate_post(post: Post, mediaUrls: Optional[list[str]] = None):
+    if db().get(User, post.authorId) is None:
+        return jsonify({"error": "authorId must reference an existing user"}), 400
+    if post.postType in CLUB_POST_TYPES:
+        if post.clubId is None or db().get(Club, post.clubId) is None:
+            return jsonify({"error": "clubId or clubSlug must reference an existing club"}), 400
         actor = current_auth_user()
         if not isinstance(actor, User):
             return jsonify({"error": "unauthorized"}), 401
-        if actor.user_id != post.author_id:
+        if actor.userId != post.authorId:
             return jsonify({"error": "club post author must match the authenticated user"}), 403
-        if not can_publish_club_content(post.club_id, post.author_id):
-            return jsonify({"error": "club posts and announcements require a president, chairman, or secretary role"}), 403
+        if not can_publish_club_content(post.clubId, post.authorId, post.postType):
+            return jsonify({"error": f"{post.postType.replace('_', ' ')} publishing privilege required"}), 403
     else:
-        post.club_id = None
-    media_urls = media_urls if media_urls is not None else post_media_urls(post)
-    for media_url in media_urls:
-        error = media_error(media_url, post.type_code)
+        post.clubId = None
+    mediaUrls = mediaUrls if mediaUrls is not None else post_media_urls(post)
+    for mediaUrl in mediaUrls:
+        error = media_error(mediaUrl, post.type_code)
         if error is not None:
             return jsonify({"error": error}), 400
-    if post.post_type == "announcement" and (len(media_urls) != 1 or media_kind(media_urls[0]) != "image"):
+    if post.postType == "announcement" and (len(mediaUrls) != 1 or media_kind(mediaUrls[0]) != "image"):
         return jsonify({"error": "announcements require exactly one poster image"}), 400
     return None
 
 
 def create_post_from_payload(data: dict[str, Any]):
-    code = post_type_code(get_first(data, "type", "postType", "post_type"), default=0)
+    code = post_type_code(get_first(data, "type", "postType"), default=0)
     if code is None:
         return jsonify({"error": "type must be 0, 1, 2, or 3"}), 400
     if code == 2:
         return create_marketplace_item_from_payload(data)
     post = make_post({**data, "type": code})
-    media_urls = read_media_urls(data)
-    validation_error = validate_post(post, media_urls)
+    mediaUrls = read_media_urls(data)
+    validation_error = validate_post(post, mediaUrls)
     if validation_error is not None:
         return validation_error
-    post.engagement_score = float(post.like_count + post.share_count * 2)
+    post.engagementScore = float(post.likeCount + post.shareCount * 2)
     db().add(post)
     db().flush()
-    replace_post_media(post, media_urls)
+    replace_post_media(post, mediaUrls)
     notify_new_post(post)
     db().commit()
     db().refresh(post)
@@ -1068,40 +1055,40 @@ def create_post_from_payload(data: dict[str, Any]):
 
 
 def update_post_from_payload(post: Post, data: dict[str, Any]):
-    code = post_type_code(get_first(data, "type", "postType", "post_type"), default=post.type_code)
+    code = post_type_code(get_first(data, "type", "postType"), default=post.type_code)
     if code is None or code == 2:
         return jsonify({"error": "type must be 0, 1, or 3 for feed posts"}), 400
-    post.post_type = CODE_TO_POST_TYPE[code]
-    if "author_id" in data or "authorId" in data:
-        author_id = optional_int(get_first(data, "author_id", "authorId"))
-        if author_id is not None:
-            post.author_id = author_id
-    if "club_id" in data or "clubId" in data or "clubSlug" in data or "club_slug" in data:
-        post.club_id = resolve_post_club_id(data)
-    media_changed = any(key in data for key in ("media_url", "mediaUrl", "media_urls", "mediaUrls", "image"))
-    media_urls = read_media_urls(data) if media_changed else post_media_urls(post)
+    post.postType = CODE_TO_POST_TYPE[code]
+    if "authorId" in data:
+        authorId = optional_int(data.get("authorId"))
+        if authorId is not None:
+            post.authorId = authorId
+    if "clubId" in data or "clubSlug" in data:
+        post.clubId = resolve_post_club_id(data)
+    media_changed = any(key in data for key in ("mediaUrl", "mediaUrls", "image"))
+    mediaUrls = read_media_urls(data) if media_changed else post_media_urls(post)
     if media_changed:
-        post.media_url = media_urls[0] if media_urls else None
-        post.media_type = media_kind(post.media_url or "")
-    if any(key in data for key in ("caption", "body", "title", "hashtags", "tag", "mentions", "taggedPeople", "tagged_people")):
-        post.content = make_post({**post.to_dict(), **data, "author_id": post.author_id}).content
+        post.mediaUrl = mediaUrls[0] if mediaUrls else None
+        post.mediaType = media_kind(post.mediaUrl or "")
+    if any(key in data for key in ("caption", "body", "title", "hashtags", "tag", "mentions", "taggedPeople")):
+        post.content = make_post({**post.to_dict(), **data, "authorId": post.authorId}).content
     if "likes" in data:
-        post.like_count = max(optional_int(data.get("likes")) or 0, 0)
+        post.likeCount = max(optional_int(data.get("likes")) or 0, 0)
     if "shares" in data:
-        post.share_count = max(optional_int(data.get("shares")) or 0, 0)
-    post.engagement_score = float(post.like_count + post.share_count * 2)
-    validation_error = validate_post(post, media_urls)
+        post.shareCount = max(optional_int(data.get("shares")) or 0, 0)
+    post.engagementScore = float(post.likeCount + post.shareCount * 2)
+    validation_error = validate_post(post, mediaUrls)
     if validation_error is not None:
         return validation_error
     if media_changed:
-        replace_post_media(post, media_urls)
+        replace_post_media(post, mediaUrls)
     db().commit()
     db().refresh(post)
     return jsonify(serialize_post(post))
 
 
 def club_by_slug(slug: str) -> Optional[Club]:
-    return db().scalar(select(Club).where((Club.slug == slugify(slug)) & (Club.is_active.is_(True))))
+    return db().scalar(select(Club).where((Club.slug == slugify(slug)) & (Club.isActive.is_(True))))
 
 
 def make_club_card(data: dict[str, Any]) -> Club:
@@ -1110,35 +1097,35 @@ def make_club_card(data: dict[str, Any]) -> Club:
         name=title,
         slug=unique_club_slug(get_first(data, "slug", default=title)),
         description=text_value(data.get("description")),
-        logo_url=text_value(get_first(data, "bannerImage", "banner_image", "logo_url", "image")),
+        logoUrl=text_value(get_first(data, "bannerImage", "logoUrl", "image")),
         status=text_value(data.get("status"), "Open"),
-        created_by_service="admin",
+        createdByService="admin",
     )
 
 
 def serialize_club_member(member: ClubMember) -> dict[str, Any]:
-    user = db().get(User, member.user_id)
-    name = user.full_name if user is not None else str(member.user_id)
+    user = db().get(User, member.userId)
+    name = user.fullName if user is not None else str(member.userId)
+    is_publisher = member.role in CLUB_PUBLISHER_ROLES
     return {
-        "id": member.club_member_id,
-        "club_id": member.club_id,
-        "clubId": member.club_id,
-        "user_id": str(member.user_id),
-        "userId": str(member.user_id),
+        "id": member.clubMemberId,
+        "clubId": member.clubId,
+        "userId": str(member.userId),
         "title": member.title,
-        "created_at": member.joined_at.isoformat(),
-        "createdAt": member.joined_at.isoformat(),
+        "createdAt": member.joinedAt.isoformat(),
         "user": user.to_dict() if user is not None else None,
         "name": name,
         "username": user.username if user is not None else "",
-        "mail": user.email if user is not None else "",
+        "email": user.email if user is not None else "",
         "initials": initials_for_name(name),
+        "canPost": member.canPost or is_publisher,
+        "canCreateAnnouncement": member.canCreateAnnouncement or is_publisher,
     }
 
 
 def club_members_for_club(club: Club) -> list[ClubMember]:
     return db().scalars(
-        select(ClubMember).where((ClubMember.club_id == club.club_id) & (ClubMember.status == "active")).order_by(ClubMember.club_member_id.asc())
+        select(ClubMember).where((ClubMember.clubId == club.clubId) & (ClubMember.status == "active")).order_by(ClubMember.clubMemberId.asc())
     ).all()
 
 
@@ -1146,20 +1133,20 @@ def club_member_role_error(club: Club, role: str, member_id: Optional[int] = Non
     if role not in SINGLE_CLUB_MEMBER_ROLES:
         return None
     query = select(ClubMember).where(
-        (ClubMember.club_id == club.club_id)
+        (ClubMember.clubId == club.clubId)
         & (ClubMember.status == "active")
         & (ClubMember.role == role)
     )
     if member_id is not None:
-        query = query.where(ClubMember.club_member_id != member_id)
+        query = query.where(ClubMember.clubMemberId != member_id)
     return f"{role_label(role)} is already assigned" if db().scalar(query) is not None else None
 
 
 def is_club_president(club: Club, user: Optional[AuthUser]) -> bool:
     return isinstance(user, User) and db().scalar(
         select(ClubMember).where(
-            (ClubMember.club_id == club.club_id)
-            & (ClubMember.user_id == user.user_id)
+            (ClubMember.clubId == club.clubId)
+            & (ClubMember.userId == user.userId)
             & (ClubMember.status == "active")
             & (ClubMember.role == "president")
         )
@@ -1177,8 +1164,8 @@ def can_remove_club_member(club: Club, user: Optional[AuthUser], member: ClubMem
 def club_posts_for_club(club: Club) -> list[Post]:
     return db().scalars(
         select(Post)
-        .where((Post.club_id == club.club_id) & (Post.post_type.in_(CLUB_POST_TYPES)) & (Post.is_deleted.is_(False)))
-        .order_by(Post.created_at.desc(), Post.post_id.asc())
+        .where((Post.clubId == club.clubId) & (Post.postType.in_(CLUB_POST_TYPES)) & (Post.isDeleted.is_(False)))
+        .order_by(Post.createdAt.desc(), Post.postId.asc())
     ).all()
 
 
@@ -1187,25 +1174,23 @@ def club_posts_count(club: Club) -> int:
 
 
 def club_followers_count(club: Club) -> int:
-    count = db().scalar(select(func.count()).select_from(ClubFollower).where(ClubFollower.club_id == club.club_id))
+    count = db().scalar(select(func.count()).select_from(ClubFollower).where(ClubFollower.clubId == club.clubId))
     return int(count or 0)
 
 
-def club_follow_for_user(club: Club, user_id: Any) -> Optional[ClubFollower]:
-    pk = user_pk(user_id)
+def club_follow_for_user(club: Club, userId: Any) -> Optional[ClubFollower]:
+    pk = user_pk(userId)
     if pk is None:
         return None
-    return db().get(ClubFollower, {"club_id": club.club_id, "user_id": pk})
+    return db().get(ClubFollower, {"clubId": club.clubId, "userId": pk})
 
 
 def club_follow_payload(club: Club, user: User) -> dict[str, Any]:
-    follower = club_follow_for_user(club, user.user_id)
+    follower = club_follow_for_user(club, user.userId)
     return {
-        "club_id": club.club_id,
-        "clubId": club.club_id,
+        "clubId": club.clubId,
         "clubSlug": club.slug,
-        "user_id": str(user.user_id),
-        "userId": str(user.user_id),
+        "userId": str(user.userId),
         "isFollowing": follower is not None,
         "followers": club_followers_count(club),
         "postsCount": club_posts_count(club),
@@ -1217,25 +1202,25 @@ def serialize_club_detail(club: Club) -> dict[str, Any]:
     posts = club_posts_for_club(club)
     followers = club_followers_count(club)
     viewer = current_auth_user()
-    viewer_user_id = str(viewer.user_id) if isinstance(viewer, User) else None
+    viewerUserId = str(viewer.userId) if isinstance(viewer, User) else None
     return {
         "club": {**club.to_dict(), "followers": followers, "postsCount": len(posts)},
         "members": [serialize_club_member(member) for member in club_members_for_club(club)],
-        "posts": [serialize_post(post, viewer_user_id) for post in posts],
+        "posts": [serialize_post(post, viewerUserId) for post in posts],
         "followers": followers,
         "postsCount": len(posts),
     }
 
 
-def is_club_member(club_id: int, user_id: Any) -> bool:
-    pk = user_pk(user_id)
+def is_club_member(clubId: int, userId: Any) -> bool:
+    pk = user_pk(userId)
     if pk is None:
         return False
     return (
         db().scalar(
             select(ClubMember).where(
-                (ClubMember.club_id == club_id)
-                & (ClubMember.user_id == pk)
+                (ClubMember.clubId == clubId)
+                & (ClubMember.userId == pk)
                 & (ClubMember.status == "active")
             )
         )
@@ -1243,26 +1228,27 @@ def is_club_member(club_id: int, user_id: Any) -> bool:
     )
 
 
-def can_publish_club_content(club_id: int, user_id: Any) -> bool:
-    pk = user_pk(user_id)
+def can_publish_club_content(clubId: int, userId: Any, post_type: str) -> bool:
+    pk = user_pk(userId)
+    permission = ClubMember.canCreateAnnouncement if post_type == "announcement" else ClubMember.canPost
     return pk is not None and db().scalar(
         select(ClubMember).where(
-            (ClubMember.club_id == club_id)
-            & (ClubMember.user_id == pk)
+            (ClubMember.clubId == clubId)
+            & (ClubMember.userId == pk)
             & (ClubMember.status == "active")
-            & (ClubMember.role.in_(CLUB_PUBLISHER_ROLES))
+            & (permission.is_(True) | ClubMember.role.in_(CLUB_PUBLISHER_ROLES))
         )
     ) is not None
 
 
 def resolve_member_user(data: dict[str, Any]) -> Optional[User]:
-    user_id = optional_int(get_first(data, "user_id", "userId"))
-    if user_id is not None:
-        return db().get(User, user_id)
+    userId = optional_int(data.get("userId"))
+    if userId is not None:
+        return db().get(User, userId)
     username = normalize_username(data.get("username"))
     if username:
         return db().scalar(select(User).where(User.username == username))
-    mail = normalize_email(get_first(data, "mail", "email"))
+    mail = normalize_email(data.get("email"))
     if mail:
         return db().scalar(select(User).where(User.email == mail))
     return None
@@ -1272,26 +1258,26 @@ def create_club_member_resource(club: Club, actor: Optional[AuthUser]):
     data = read_json()
     user = resolve_member_user(data)
     if user is None:
-        return jsonify({"error": "user_id, username, or mail must reference an existing user"}), 400
+        return jsonify({"error": "userId, username, or email must reference an existing user"}), 400
     role = role_value(data.get("title") or data.get("role"))
     if not can_add_club_member(club, actor, role):
         return jsonify({"error": "admin or club president access required"}), 403
-    existing = db().scalar(select(ClubMember).where((ClubMember.club_id == club.club_id) & (ClubMember.user_id == user.user_id)))
+    existing = db().scalar(select(ClubMember).where((ClubMember.clubId == club.clubId) & (ClubMember.userId == user.userId)))
     if existing is not None:
         return jsonify({"error": "user is already a club member"}), 409
     role_error = club_member_role_error(club, role)
     if role_error is not None:
         return jsonify({"error": role_error}), 409
     member = ClubMember(
-        club_id=club.club_id,
-        user_id=user.user_id,
+        clubId=club.clubId,
+        userId=user.userId,
         role=role,
-        can_post=role in CLUB_PUBLISHER_ROLES,
-        can_create_announcement=role in CLUB_PUBLISHER_ROLES,
-        added_by_service="admin",
+        canPost=role in CLUB_PUBLISHER_ROLES,
+        canCreateAnnouncement=role in CLUB_PUBLISHER_ROLES,
+        addedByService="admin",
     )
     db().add(member)
-    commit_with_feed_graph()
+    db().commit()
     db().refresh(member)
     return jsonify(serialize_club_member(member)), 201
 
@@ -1299,14 +1285,13 @@ def create_club_member_resource(club: Club, actor: Optional[AuthUser]):
 def search_user_payload(user: User) -> dict[str, Any]:
     return {
         "type": "user",
-        "id": str(user.user_id),
-        "title": user.full_name,
+        "id": str(user.userId),
+        "title": user.fullName,
         "subtitle": f"@{user.username}",
-        "href": f"/{user.user_id}",
+        "href": f"/{user.userId}",
         "icon": "person",
-        "initials": initials_for_name(user.full_name),
-        "user_id": str(user.user_id),
-        "userId": str(user.user_id),
+        "initials": initials_for_name(user.fullName),
+        "userId": str(user.userId),
         "username": user.username,
     }
 
@@ -1314,7 +1299,7 @@ def search_user_payload(user: User) -> dict[str, Any]:
 def search_club_payload(club: Club) -> dict[str, Any]:
     return {
         "type": "club",
-        "id": club.club_id,
+        "id": club.clubId,
         "title": club.name,
         "subtitle": club.status or "Club",
         "href": f"/clubs/{club.slug}",
@@ -1324,16 +1309,15 @@ def search_club_payload(club: Club) -> dict[str, Any]:
 
 
 def search_post_payload(post: Post) -> dict[str, Any]:
-    author = db().get(User, post.author_id)
+    author = db().get(User, post.authorId)
     return {
         "type": "post",
-        "id": str(post.post_id),
+        "id": str(post.postId),
         "title": post.caption[:72] or "Untitled post",
-        "subtitle": author.full_name if author is not None else "Post",
-        "href": f"/#{post.post_id}",
+        "subtitle": author.fullName if author is not None else "Post",
+        "href": f"/#{post.postId}",
         "icon": "article",
-        "post_id": str(post.post_id),
-        "postId": str(post.post_id),
+        "postId": str(post.postId),
     }
 
 
@@ -1344,10 +1328,9 @@ def search_marketplace_payload(item: MarketplaceItem) -> dict[str, Any]:
         "id": payload["id"],
         "title": payload["title"],
         "subtitle": payload["price"] or payload["owner"],
-        "href": f"/marketplace#{payload['post_id']}",
+        "href": f"/marketplace#{payload['postId']}",
         "icon": "storefront",
-        "post_id": payload["post_id"],
-        "postId": payload["post_id"],
+        "postId": payload["postId"],
     }
 
 
@@ -1357,7 +1340,7 @@ def search_results(query: str, limit: int, types: Optional[set[str]] = None) -> 
     users = (
         db().scalars(
             select(User)
-            .where((func.lower(User.username).contains(normalized)) | (func.lower(User.full_name).contains(normalized)))
+            .where((func.lower(User.username).contains(normalized)) | (func.lower(User.fullName).contains(normalized)))
             .order_by(User.username.asc())
             .limit(limit)
         ).all()
@@ -1377,8 +1360,8 @@ def search_results(query: str, limit: int, types: Optional[set[str]] = None) -> 
     posts = (
         db().scalars(
             select(Post)
-            .where((Post.is_deleted.is_(False)) & func.lower(func.coalesce(Post.content, "")).contains(normalized))
-            .order_by(Post.created_at.desc(), Post.post_id.asc())
+            .where((Post.isDeleted.is_(False)) & func.lower(func.coalesce(Post.content, "")).contains(normalized))
+            .order_by(Post.createdAt.desc(), Post.postId.asc())
             .limit(limit)
         ).all()
         if "post" in requested
@@ -1394,7 +1377,7 @@ def search_results(query: str, limit: int, types: Optional[set[str]] = None) -> 
                     | func.lower(func.coalesce(MarketplaceItem.description, "")).contains(normalized)
                 )
             )
-            .order_by(MarketplaceItem.created_at.desc(), MarketplaceItem.item_id.asc())
+            .order_by(MarketplaceItem.createdAt.desc(), MarketplaceItem.itemId.asc())
             .limit(limit)
         ).all()
         if "product" in requested
@@ -1412,8 +1395,8 @@ def search_results(query: str, limit: int, types: Optional[set[str]] = None) -> 
 def feed_viewer_user_id() -> Optional[str]:
     current_user = current_auth_user()
     if isinstance(current_user, User):
-        return str(current_user.user_id)
-    requested_user_id = optional_int(request.args.get("user_id") or request.args.get("userId"))
+        return str(current_user.userId)
+    requested_user_id = optional_int(request.args.get("userId"))
     if requested_user_id is None:
         return None
     return str(requested_user_id) if db().get(User, requested_user_id) is not None else None
@@ -1424,120 +1407,154 @@ def feed_limit() -> Optional[int]:
     return max(1, min(limit, 100)) if limit is not None else None
 
 
-def build_database_feed_graph(session: Session):
-    users = session.scalars(select(User).where(User.is_active.is_(True)).order_by(User.user_id.asc())).all()
-    clubs = session.scalars(select(Club).where(Club.is_active.is_(True)).order_by(Club.club_id.asc())).all()
-    memberships = session.scalars(select(ClubMember).where(ClubMember.status == "active").order_by(ClubMember.club_member_id.asc())).all()
-    followers = session.scalars(select(ClubFollower).order_by(ClubFollower.club_id.asc(), ClubFollower.user_id.asc())).all()
-    friendships = session.scalars(select(Friendship).where(Friendship.status == "accepted").order_by(Friendship.friendship_id.asc())).all()
+def build_database_feed_graph(session: Session, friendship_pairs: Optional[Sequence[tuple[Any, Any]]] = None):
+    users = session.scalars(
+        select(User).where(User.isActive.is_(True) & (User.accountRole != "admin")).order_by(User.userId.asc())
+    ).all()
+    clubs = session.scalars(select(Club).where(Club.isActive.is_(True)).order_by(Club.clubId.asc())).all()
+    memberships = session.scalars(select(ClubMember).where(ClubMember.status == "active").order_by(ClubMember.clubMemberId.asc())).all()
+    followers = session.scalars(select(ClubFollower).order_by(ClubFollower.clubId.asc(), ClubFollower.userId.asc())).all()
+    if friendship_pairs is None:
+        friendships = session.scalars(select(Friendship).where(Friendship.status == "accepted").order_by(Friendship.friendshipId.asc())).all()
+        friendship_pairs = [(friendship.requesterId, friendship.receiverId) for friendship in friendships]
     return build_feed_graph(
-        users=[{"user_id": str(user.user_id)} for user in users],
-        clubs=[{"id": club.club_id} for club in clubs],
-        club_memberships=[(member.club_id, str(member.user_id)) for member in memberships],
-        club_followers=[(follower.club_id, str(follower.user_id)) for follower in followers],
-        friendships=[(str(friendship.requester_id), str(friendship.receiver_id)) for friendship in friendships],
+        users=[{"userId": str(user.userId)} for user in users],
+        clubs=[{"id": club.clubId} for club in clubs],
+        club_memberships=[(member.clubId, str(member.userId)) for member in memberships],
+        club_followers=[(follower.clubId, str(follower.userId)) for follower in followers],
+        friendships=friendship_pairs,
     )
 
 
-def rebuild_persisted_feed_graph(session: Session):
-    graph = build_database_feed_graph(session)
-    persist_feed_graph(graph)
+def update_neo4j_graph(session: Session, *, bootstrap: bool = False):
+    users = session.scalars(
+        select(User).where(User.isActive.is_(True) & (User.accountRole != "admin")).order_by(User.userId.asc())
+    ).all()
+    clubs = session.scalars(select(Club).where(Club.isActive.is_(True)).order_by(Club.clubId.asc())).all()
+    memberships = session.scalars(select(ClubMember).where(ClubMember.status == "active")).all()
+    followers = session.scalars(select(ClubFollower)).all()
+
+    if bootstrap:
+        sql_friendships = session.scalars(
+            select(Friendship).where(Friendship.status == "accepted").order_by(Friendship.friendshipId.asc())
+        ).all()
+        friendship_records = [
+            {
+                "friendshipId": f"{friendship.requesterId}:{friendship.receiverId}",
+                "userAId": friendship.requesterId,
+                "userBId": friendship.receiverId,
+                "createdAt": friendship.createdAt.replace(tzinfo=timezone.utc).isoformat()
+                if friendship.createdAt.tzinfo is None
+                else friendship.createdAt.isoformat(),
+            }
+            for friendship in sql_friendships
+        ]
+    else:
+        friendship_records = stored_friendships()
+
+    friendship_pairs = [(row["userAId"], row["userBId"]) for row in friendship_records]
+    graph = build_database_feed_graph(session, friendship_pairs)
+    member_pairs = {(member.userId, member.clubId) for member in memberships}
+    follower_pairs = {(follower.userId, follower.clubId) for follower in followers}
+
+    # ponytail: the dense baseline preserves the current ranker; switch to sparse edges if user x club size becomes material.
+    relationships = [
+        {
+            "userId": user.userId,
+            "clubId": club.clubId,
+            "weight": graph[f"user:{user.userId}"][f"club:{club.clubId}"]["weight"],
+            "isMember": (user.userId, club.clubId) in member_pairs,
+            "isFollower": (user.userId, club.clubId) in follower_pairs,
+        }
+        for user in users
+        for club in clubs
+    ]
+    pagerank = {node: float(data.get("pagerank", 0.0)) for node, data in graph.nodes(data=True)}
+
+    ensure_graph_constraints()
+    replace_graph(
+        user_ids=[user.userId for user in users],
+        club_ids=[club.clubId for club in clubs],
+        relationships=relationships,
+        pagerank=pagerank,
+        bootstrap_friendships=friendship_records if bootstrap else (),
+        bootstrap=bootstrap,
+    )
     return graph
 
 
-def commit_with_feed_graph() -> None:
-    session = db()
-    session.flush()
-    # ponytail: full rebuilds keep writes simple; update individual edges if measured write latency becomes a problem.
-    graph = build_database_feed_graph(session)
-    staged_path, destination = stage_feed_graph(graph)
-    try:
-        session.commit()
-    except Exception:
-        staged_path.unlink(missing_ok=True)
-        raise
-    try:
-        publish_staged_feed_graph(graph, staged_path, destination)
-    finally:
-        staged_path.unlink(missing_ok=True)
-
-
-def current_feed_graph():
-    try:
-        return load_feed_graph()
-    except (FileNotFoundError, EOFError, OSError, ValueError, pickle.UnpicklingError):
-        return rebuild_persisted_feed_graph(db())
-
-
-def ranked_feed_cards(viewer_user_id: Optional[str], limit: Optional[int]) -> list[dict[str, Any]]:
+def ranked_feed_cards(viewerUserId: Optional[str], limit: Optional[int]) -> list[dict[str, Any]]:
     posts = db().scalars(
         select(Post)
-        .where(Post.is_deleted.is_(False))
-        .order_by(Post.created_at.desc(), Post.post_id.asc())
+        .where(Post.isDeleted.is_(False))
+        .order_by(Post.createdAt.desc(), Post.postId.asc())
     ).all()
+    serialized_posts = [serialize_post(post, viewerUserId) for post in posts]
+    user_ids = [post.authorId for post in posts if post.type_code != 1]
+    club_ids = [post.clubId for post in posts if post.type_code == 1 and post.clubId is not None]
+    try:
+        pagerank, social = feed_signals(
+            user_ids=user_ids,
+            club_ids=club_ids,
+            viewerUserId=viewerUserId,
+        )
+    except GraphUnavailable:
+        app.logger.warning("Neo4j unavailable; serving feed without graph signals")
+        pagerank, social = {}, {}
     return rank_feed_posts(
-        graph=current_feed_graph(),
-        posts=[serialize_post(post, viewer_user_id) for post in posts],
-        viewer_user_id=viewer_user_id,
+        posts=serialized_posts,
+        viewerUserId=viewerUserId,
+        pagerank_scores=pagerank,
+        social_scores=social,
         limit=limit,
     )
 
 
-def friendship_between(user_a_id: Any, user_b_id: Any) -> Optional[Friendship]:
-    user_a = user_pk(user_a_id)
-    user_b = user_pk(user_b_id)
-    if user_a is None or user_b is None:
+def friendship_between(userAId: Any, userBId: Any) -> Optional[dict[str, Any]]:
+    user_a = user_pk(userAId)
+    user_b = user_pk(userBId)
+    if user_a is None or user_b is None or user_a == user_b:
         return None
-    return db().scalar(
-        select(Friendship).where(
-            (
-                ((Friendship.requester_id == user_a) & (Friendship.receiver_id == user_b))
-                | ((Friendship.requester_id == user_b) & (Friendship.receiver_id == user_a))
-            )
-            & (Friendship.status == "accepted")
-        )
-    )
+    return graph_get_friendship(user_a, user_b)
 
 
-def friendship_rows(user_id: Any) -> list[tuple[User, Friendship]]:
-    pk = user_pk(user_id)
+def friendship_rows(userId: Any) -> list[tuple[User, dict[str, Any]]]:
+    pk = user_pk(userId)
     if pk is None:
         return []
-    outgoing = db().execute(
-        select(User, Friendship)
-        .join(Friendship, Friendship.receiver_id == User.user_id)
-        .where((Friendship.requester_id == pk) & (Friendship.status == "accepted"))
-    ).all()
-    incoming = db().execute(
-        select(User, Friendship)
-        .join(Friendship, Friendship.requester_id == User.user_id)
-        .where((Friendship.receiver_id == pk) & (Friendship.status == "accepted"))
-    ).all()
-    rows = sorted([*outgoing, *incoming], key=lambda row: row[1].created_at, reverse=True)
-    return list({user.user_id: (user, friendship) for user, friendship in rows}.values())
+    graph_rows = graph_friend_rows(pk)
+    friend_ids = [row["friendUserId"] for row in graph_rows]
+    if not friend_ids:
+        return []
+    users = {
+        user.userId: user
+        for user in db().scalars(select(User).where(User.userId.in_(friend_ids) & User.isActive.is_(True))).all()
+    }
+    return [
+        (users[row["friendUserId"]], row["friendship"])
+        for row in graph_rows
+        if row["friendUserId"] in users
+    ]
 
 
-def friendship_user_payload(user: User, friendship: Friendship) -> dict[str, Any]:
+def friendship_user_payload(user: User, friendship: dict[str, Any]) -> dict[str, Any]:
     return {
-        "user_id": str(user.user_id),
-        "userId": str(user.user_id),
-        "id": str(user.user_id),
-        "name": user.full_name,
+        "userId": str(user.userId),
+        "id": str(user.userId),
+        "name": user.fullName,
         "username": user.username,
-        "acronym": initials_for_name(user.full_name),
-        "initials": initials_for_name(user.full_name),
-        "friendship_id": friendship.friendship_id,
-        "friendshipId": friendship.friendship_id,
-        "created_at": friendship.created_at.isoformat(),
-        "createdAt": friendship.created_at.isoformat(),
+        "acronym": initials_for_name(user.fullName),
+        "initials": initials_for_name(user.fullName),
+        "friendshipId": friendship["friendshipId"],
+        "createdAt": friendship["createdAt"],
     }
 
 
-def friendship_lists(user_id: Any, current_user_id: Any) -> dict[str, list[dict[str, Any]]]:
+def friendship_lists(userId: Any, current_user_id: Any) -> dict[str, list[dict[str, Any]]]:
     # ponytail: load the full profile list; add pagination when friend counts become large enough to affect the UI.
-    friends = friendship_rows(user_id)
-    current_friend_ids = set() if user_pk(user_id) == user_pk(current_user_id) else {user.user_id for user, _ in friendship_rows(current_user_id)}
-    mutuals = [(user, friendship) for user, friendship in friends if user.user_id in current_friend_ids]
+    friends = friendship_rows(userId)
+    current_friend_ids = set() if user_pk(userId) == user_pk(current_user_id) else {user.userId for user, _ in friendship_rows(current_user_id)}
+    mutuals = [(user, friendship) for user, friendship in friends if user.userId in current_friend_ids]
     return {
         "friendsList": [friendship_user_payload(user, friendship) for user, friendship in friends],
         "mutualsList": [friendship_user_payload(user, friendship) for user, friendship in mutuals],
@@ -1545,15 +1562,15 @@ def friendship_lists(user_id: Any, current_user_id: Any) -> dict[str, list[dict[
 
 
 def friendship_status_payload(current_user: User, target_user: User, include_lists: bool = False) -> dict[str, Any]:
-    friendship = friendship_between(current_user.user_id, target_user.user_id)
+    friendship = friendship_between(current_user.userId, target_user.userId)
     payload = {
         "isFriend": friendship is not None,
-        "isSelf": current_user.user_id == target_user.user_id,
-        "friends": len(friendship_rows(target_user.user_id)),
-        "friendship": friendship.to_dict() if friendship is not None else None,
+        "isSelf": current_user.userId == target_user.userId,
+        "friends": len(friendship_rows(target_user.userId)),
+        "friendship": friendship,
     }
     if include_lists:
-        payload.update(friendship_lists(target_user.user_id, current_user.user_id))
+        payload.update(friendship_lists(target_user.userId, current_user.userId))
     return payload
 
 
@@ -1561,9 +1578,9 @@ def user_values(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": text_value(data.get("name")),
         "username": normalize_username(data.get("username")),
-        "mail": normalize_email(get_first(data, "mail", "email")),
-        "dob": parse_date(get_first(data, "DOB", "dob", "dateOfBirth", "date_of_birth")),
-        "year": read_year_of_study(get_first(data, "year", "yearOfStudy", "year_of_study")),
+        "mail": normalize_email(data.get("email")),
+        "dob": parse_date(data.get("dateOfBirth")),
+        "year": read_year_of_study(data.get("yearOfStudy")),
         "department": text_value(data.get("department")),
     }
 
@@ -1574,13 +1591,13 @@ def validate_user_values(values: dict[str, Any]) -> Optional[str]:
     if not values["username"]:
         return "username is required"
     if not values["mail"] or not valid_email(values["mail"]):
-        return "valid mail is required"
-    if not edu_email(values["mail"]):
-        return "mail must use a .edu domain"
+        return "valid email is required"
+    if values["mail"].rsplit("@", 1)[-1] not in ALLOWED_EMAIL_DOMAINS:
+        return "email domain is not allowed"
     if values["dob"] is None:
-        return "DOB is required"
+        return "dateOfBirth is required"
     if values["year"] is None:
-        return "year is required"
+        return "yearOfStudy is required"
     if values["department"] not in DEPARTMENTS:
         return "valid department is required"
     return None
@@ -1588,11 +1605,11 @@ def validate_user_values(values: dict[str, Any]) -> Optional[str]:
 
 def validate_unique_user(username: str, mail: str, current_user_id: Optional[int] = None):
     existing_username = db().scalar(select(User).where(User.username == username))
-    if existing_username is not None and existing_username.user_id != current_user_id:
+    if existing_username is not None and existing_username.userId != current_user_id:
         return jsonify({"error": "username already exists"}), 409
     existing_mail = db().scalar(select(User).where(User.email == mail))
-    if existing_mail is not None and existing_mail.user_id != current_user_id:
-        return jsonify({"error": "mail already exists"}), 409
+    if existing_mail is not None and existing_mail.userId != current_user_id:
+        return jsonify({"error": "email already exists"}), 409
     return None
 
 
@@ -1608,13 +1625,13 @@ def create_user_from_payload(data: dict[str, Any], require_password: bool = Fals
     if require_password and len(password) < 6:
         return None, jsonify({"error": "password must be at least 6 characters"}), 400
     user = User(
-        full_name=values["name"],
+        fullName=values["name"],
         username=values["username"],
         email=values["mail"],
-        date_of_birth=values["dob"],
+        dateOfBirth=values["dob"],
         semester=values["year"],
         department=values["department"],
-        password_hash=generate_password_hash(password or os.urandom(32).hex()),
+        passwordHash=generate_password_hash(password or os.urandom(32).hex()),
     )
     return user, None, None
 
@@ -1622,29 +1639,29 @@ def create_user_from_payload(data: dict[str, Any], require_password: bool = Fals
 def update_user_from_payload(user: User, data: dict[str, Any]):
     values = user_values(
         {
-            "name": get_first(data, "name", default=user.full_name),
+            "name": get_first(data, "name", default=user.fullName),
             "username": get_first(data, "username", default=user.username),
-            "mail": get_first(data, "mail", "email", default=user.email),
-            "DOB": get_first(data, "DOB", "dob", "dateOfBirth", "date_of_birth", default=user.date_of_birth.isoformat() if user.date_of_birth else ""),
-            "year": get_first(data, "year", "yearOfStudy", "year_of_study", default=user.semester),
+            "email": data.get("email", user.email),
+            "dateOfBirth": data.get("dateOfBirth", user.dateOfBirth.isoformat() if user.dateOfBirth else ""),
+            "yearOfStudy": data.get("yearOfStudy", user.semester),
             "department": get_first(data, "department", default=user.department),
         }
     )
     validation_error = validate_user_values(values)
     if validation_error is not None:
         return jsonify({"error": validation_error}), 400
-    unique_error = validate_unique_user(values["username"], values["mail"], current_user_id=user.user_id)
+    unique_error = validate_unique_user(values["username"], values["mail"], current_user_id=user.userId)
     if unique_error is not None:
         return unique_error
     if "password" in data:
         password = text_value(data.get("password"))
         if len(password) < 6:
             return jsonify({"error": "password must be at least 6 characters"}), 400
-        user.password_hash = generate_password_hash(password)
-    user.full_name = values["name"]
+        user.passwordHash = generate_password_hash(password)
+    user.fullName = values["name"]
     user.username = values["username"]
     user.email = values["mail"]
-    user.date_of_birth = values["dob"]
+    user.dateOfBirth = values["dob"]
     user.semester = values["year"]
     user.department = values["department"]
     return None
@@ -1654,7 +1671,7 @@ def require_post_owner_or_admin(post: Post):
     user = current_auth_user()
     if user is None:
         return jsonify({"error": "unauthorized"}), 401
-    if isinstance(user, User) and post.author_id == user.user_id:
+    if isinstance(user, User) and post.authorId == user.userId:
         return None
     if is_admin_user(user):
         return None
@@ -1662,36 +1679,31 @@ def require_post_owner_or_admin(post: Post):
 
 
 def post_like_payload(post: Post, user: User) -> dict[str, Any]:
-    liked = post_like_for_user(post.post_id, user.user_id) is not None
+    liked = post_like_for_user(post.postId, user.userId) is not None
     return {
-        "post": serialize_post(post, str(user.user_id)),
-        "post_id": str(post.post_id),
-        "postId": str(post.post_id),
-        "likes": post.like_count,
+        "post": serialize_post(post, str(user.userId)),
+        "postId": str(post.postId),
+        "likes": post.likeCount,
         "liked": liked,
         "likedByCurrentUser": liked,
     }
 
 
 def comment_payload(comment: Comment) -> dict[str, Any]:
-    user = db().get(User, comment.user_id)
-    name = user.full_name if user is not None else str(comment.user_id)
-    created_at = comment.created_at.isoformat()
+    user = db().get(User, comment.userId)
+    name = user.fullName if user is not None else str(comment.userId)
+    createdAt = comment.createdAt.isoformat()
     return {
-        "id": str(comment.comment_id),
-        "comment_id": str(comment.comment_id),
-        "commentId": str(comment.comment_id),
-        "post_id": str(comment.post_id),
-        "postId": str(comment.post_id),
-        "user_id": str(comment.user_id),
-        "userId": str(comment.user_id),
+        "id": str(comment.commentId),
+        "commentId": str(comment.commentId),
+        "postId": str(comment.postId),
+        "userId": str(comment.userId),
         "author": name,
         "username": user.username if user is not None else "",
         "initials": initials_for_name(name),
         "content": comment.content,
         "body": comment.content,
-        "created_at": created_at,
-        "createdAt": created_at,
+        "createdAt": createdAt,
     }
 
 
@@ -1722,24 +1734,24 @@ def relative_time(value: datetime) -> str:
 
 
 def add_notification(
-    user_id: int,
-    actor_id: int,
+    userId: int,
+    actorId: int,
     notification_type: str,
-    target_type: str,
-    target_id: Any,
+    targetType: str,
+    targetId: Any,
     message: str,
 ) -> None:
-    if user_id == actor_id:
+    if userId == actorId:
         return
-    if db().get(User, user_id) is None or db().get(User, actor_id) is None:
+    if db().get(User, userId) is None or db().get(User, actorId) is None:
         return
     db().add(
         Notification(
-            user_id=user_id,
-            actor_id=actor_id,
+            userId=userId,
+            actorId=actorId,
             type=notification_type,
-            target_type=target_type,
-            target_id=text_value(target_id),
+            targetType=targetType,
+            targetId=text_value(targetId),
             message=compact_text(message),
         )
     )
@@ -1747,55 +1759,60 @@ def add_notification(
 
 def add_notifications_for_users(
     user_ids: Sequence[int],
-    actor_id: int,
+    actorId: int,
     notification_type: str,
-    target_type: str,
-    target_id: Any,
+    targetType: str,
+    targetId: Any,
     message: str,
 ) -> None:
     seen: set[int] = set()
-    for user_id in user_ids:
-        if user_id in seen:
+    for userId in user_ids:
+        if userId in seen:
             continue
-        seen.add(user_id)
-        add_notification(user_id, actor_id, notification_type, target_type, target_id, message)
+        seen.add(userId)
+        add_notification(userId, actorId, notification_type, targetType, targetId, message)
 
 
-def friend_user_ids(user_id: int) -> list[int]:
-    return [user.user_id for user, _ in friendship_rows(user_id)]
+def friend_user_ids(userId: int) -> list[int]:
+    return [user.userId for user, _ in friendship_rows(userId)]
 
 
-def club_audience_user_ids(club_id: int) -> list[int]:
-    follower_ids = db().scalars(select(ClubFollower.user_id).where(ClubFollower.club_id == club_id)).all()
+def club_audience_user_ids(clubId: int) -> list[int]:
+    follower_ids = db().scalars(select(ClubFollower.userId).where(ClubFollower.clubId == clubId)).all()
     member_ids = db().scalars(
-        select(ClubMember.user_id).where((ClubMember.club_id == club_id) & (ClubMember.status == "active"))
+        select(ClubMember.userId).where((ClubMember.clubId == clubId) & (ClubMember.status == "active"))
     ).all()
     return [*follower_ids, *member_ids]
 
 
 def notify_new_post(post: Post) -> None:
-    author = db().get(User, post.author_id)
+    author = db().get(User, post.authorId)
     if author is None:
         return
-    if post.post_type in CLUB_POST_TYPES and post.club_id is not None:
-        club = db().get(Club, post.club_id)
+    if post.postType in CLUB_POST_TYPES and post.clubId is not None:
+        club = db().get(Club, post.clubId)
         club_name = club.name if club is not None else "a club"
         add_notifications_for_users(
-            club_audience_user_ids(post.club_id),
-            post.author_id,
+            club_audience_user_ids(post.clubId),
+            post.authorId,
             "club_post",
             "post",
-            post.post_id,
-            f"{author.full_name} posted in {club_name}: {post.content or 'View the club update.'}",
+            post.postId,
+            f"{author.fullName} posted in {club_name}: {post.content or 'View the club update.'}",
         )
         return
+    try:
+        audience = friend_user_ids(post.authorId)
+    except GraphUnavailable:
+        app.logger.warning("Neo4j unavailable; skipping friend post notifications")
+        return
     add_notifications_for_users(
-        friend_user_ids(post.author_id),
-        post.author_id,
+        audience,
+        post.authorId,
         "friend_post",
         "post",
-        post.post_id,
-        f"{author.full_name} shared a new post: {post.content or 'View the post.'}",
+        post.postId,
+        f"{author.fullName} shared a new post: {post.content or 'View the post.'}",
     )
 
 
@@ -1803,12 +1820,12 @@ def notification_href(notification: Notification, actor: Optional[User], post: O
     if notification.type in {"friend_request", "friend_accept"}:
         return f"/{actor.username}" if actor is not None else "/"
     if notification.type == "club_post" and club is not None:
-        return f"/clubs/{club.slug}#{notification.target_id}"
-    return f"/#{notification.target_id}" if notification.target_id else "/"
+        return f"/clubs/{club.slug}#{notification.targetId}"
+    return f"/#{notification.targetId}" if notification.targetId else "/"
 
 
 def notification_title(notification: Notification, actor: Optional[User], post: Optional[Post], club: Optional[Club]) -> str:
-    actor_name = actor.full_name if actor is not None else "Someone"
+    actor_name = actor.fullName if actor is not None else "Someone"
     if notification.type in {"friend_request", "friend_accept"}:
         return f"{actor_name} is now your friend"
     if notification.type == "friend_post":
@@ -1829,27 +1846,26 @@ def notification_body(notification: Notification, post: Optional[Post]) -> str:
 
 
 def serialize_notification(notification: Notification) -> dict[str, Any]:
-    actor = db().get(User, notification.actor_id)
-    post = db().get(Post, optional_int(notification.target_id)) if notification.target_type == "post" else None
-    club = db().get(Club, post.club_id) if post is not None and post.club_id is not None else None
+    actor = db().get(User, notification.actorId)
+    post = db().get(Post, optional_int(notification.targetId)) if notification.targetType == "post" else None
+    club = db().get(Club, post.clubId) if post is not None and post.clubId is not None else None
     source = "club" if notification.type == "club_post" else "friend"
-    actor_name = actor.full_name if actor is not None else "Campus Nexus"
+    actor_name = actor.fullName if actor is not None else "Campus Nexus"
     return {
-        "id": str(notification.notification_id),
-        "notification_id": str(notification.notification_id),
-        "notificationId": str(notification.notification_id),
+        "id": str(notification.notificationId),
+        "notificationId": str(notification.notificationId),
         "type": notification.type,
         "source": source,
         "title": notification_title(notification, actor, post, club),
         "body": notification_body(notification, post),
-        "time": relative_time(notification.created_at),
-        "createdAt": notification.created_at.isoformat(),
+        "time": relative_time(notification.createdAt),
+        "createdAt": notification.createdAt.isoformat(),
         "href": notification_href(notification, actor, post, club),
         "actionLabel": "View profile" if notification.type in {"friend_request", "friend_accept"} else "View post",
         "iconText": initials_for_name(actor_name),
         "iconName": "groups" if source == "club" else {"post_like": "favorite", "post_comment": "chat_bubble", "friend_post": "post_add"}.get(notification.type, "person"),
-        "isRead": notification.is_read,
-        "unread": not notification.is_read,
+        "isRead": notification.isRead,
+        "unread": not notification.isRead,
     }
 
 
@@ -1858,12 +1874,12 @@ def create_marketplace_item_from_payload(data: dict[str, Any]):
     if not isinstance(user, User):
         return jsonify({"error": "unauthorized"}), 401
     item = MarketplaceItem(
-        seller_id=user.user_id,
+        sellerId=user.userId,
         title=text_value(get_first(data, "title", "itemName", "caption"), "Marketplace listing"),
         description=text_value(data.get("description")),
         category=text_value(data.get("category"), "Marketplace"),
         price=parse_price(data.get("price")),
-        image_url=text_value(get_first(data, "image", "photoUrl", "mediaUrl", "media_url")),
+        imageUrl=text_value(get_first(data, "image", "photoUrl", "mediaUrl")),
     )
     if not item.title:
         return jsonify({"error": "title is required"}), 400
@@ -1877,75 +1893,72 @@ def marketplace_posts() -> list[MarketplaceItem]:
     return db().scalars(
         select(MarketplaceItem)
         .where(MarketplaceItem.status != "removed")
-        .order_by(MarketplaceItem.created_at.desc(), MarketplaceItem.item_id.asc())
+        .order_by(MarketplaceItem.createdAt.desc(), MarketplaceItem.itemId.asc())
     ).all()
 
 
 def serialize_marketplace_item(item: MarketplaceItem) -> dict[str, Any]:
-    user = db().get(User, item.seller_id)
-    created_at = item.created_at.isoformat()
+    user = db().get(User, item.sellerId)
+    createdAt = item.createdAt.isoformat()
     return {
-        "id": str(item.item_id),
-        "post_id": str(item.item_id),
-        "postId": str(item.item_id),
+        "id": str(item.itemId),
+        "postId": str(item.itemId),
         "title": item.title,
-        "owner": user.full_name if user is not None else str(item.seller_id),
+        "owner": user.fullName if user is not None else str(item.sellerId),
         "mode": "Sell",
         "category": item.category or "Marketplace",
         "condition": "",
         "price": format_price(item.price),
         "location": "",
         "description": item.description or "",
-        "image": item.image_url or "",
+        "image": item.imageUrl or "",
         "tags": [],
         "contact": user.email if user is not None else "",
         "preferredExchange": "",
-        "createdAt": created_at,
+        "createdAt": createdAt,
     }
 
 
 def leaderboard_entries() -> list[dict[str, Any]]:
     rows = db().execute(
-        select(User, func.coalesce(func.sum(UserPoint.points), 0).label("total_xp"))
-        .join(UserPoint, UserPoint.user_id == User.user_id)
-        .group_by(User.user_id)
+        select(User, func.coalesce(func.sum(UserPoint.points), 0).label("totalXp"))
+        .join(UserPoint, UserPoint.userId == User.userId)
+        .group_by(User.userId)
         .having(func.sum(UserPoint.points) > 0)
         .order_by(func.sum(UserPoint.points).desc(), User.username.asc())
     ).all()
     entries: list[dict[str, Any]] = []
-    for index, (user, total_xp) in enumerate(rows, start=1):
+    for index, (user, totalXp) in enumerate(rows, start=1):
         entries.append(
             {
                 "rank": index,
-                "user_id": str(user.user_id),
-                "userId": str(user.user_id),
-                "id": str(user.user_id),
-                "name": user.full_name,
+                "userId": str(user.userId),
+                "id": str(user.userId),
+                "name": user.fullName,
                 "username": user.username,
-                "acronym": initials_for_name(user.full_name),
-                "initials": initials_for_name(user.full_name),
-                "total_xp": int(total_xp or 0),
-                "totalXp": int(total_xp or 0),
+                "acronym": initials_for_name(user.fullName),
+                "initials": initials_for_name(user.fullName),
+                "totalXp": int(totalXp or 0),
             }
         )
     return entries
 
 
 def award_user_xp(user: User, xp: int) -> int:
-    db().add(UserPoint(user_id=user.user_id, points=xp, reason="game_xp"))
+    db().add(UserPoint(userId=user.userId, points=xp, reason="game_xp"))
     db().commit()
-    total = db().scalar(select(func.coalesce(func.sum(UserPoint.points), 0)).where(UserPoint.user_id == user.user_id))
+    total = db().scalar(select(func.coalesce(func.sum(UserPoint.points), 0)).where(UserPoint.userId == user.userId))
     return int(total or 0)
 
 
 def serialize_conversations() -> list[dict[str, Any]]:
-    threads = db().scalars(select(ChatThread).order_by(ChatThread.created_at.desc(), ChatThread.thread_id.asc())).all()
+    threads = db().scalars(select(ChatThread).order_by(ChatThread.createdAt.desc(), ChatThread.threadId.asc())).all()
     return [
         {
-            "id": thread.thread_id,
-            "name": f"{thread.thread_type.title()} Chat",
+            "id": thread.threadId,
+            "name": f"{thread.threadType.title()} Chat",
             "preview": "",
-            "time": thread.created_at.isoformat(),
+            "time": thread.createdAt.isoformat(),
             "active": index == 0,
         }
         for index, thread in enumerate(threads)
@@ -1953,15 +1966,15 @@ def serialize_conversations() -> list[dict[str, Any]]:
 
 
 def serialize_messages() -> list[dict[str, Any]]:
-    messages = db().scalars(select(ChatMessage).where(ChatMessage.is_deleted.is_(False)).order_by(ChatMessage.created_at.asc(), ChatMessage.message_id.asc())).all()
+    messages = db().scalars(select(ChatMessage).where(ChatMessage.isDeleted.is_(False)).order_by(ChatMessage.createdAt.asc(), ChatMessage.messageId.asc())).all()
     current_user = current_auth_user()
-    current_user_id = current_user.user_id if isinstance(current_user, User) else None
+    current_user_id = current_user.userId if isinstance(current_user, User) else None
     return [
         {
-            "id": message.message_id,
-            "side": "right" if current_user_id is not None and message.sender_id == current_user_id else "left",
+            "id": message.messageId,
+            "side": "right" if current_user_id is not None and message.senderId == current_user_id else "left",
             "text": message.content or "",
-            "time": message.created_at.isoformat(),
+            "time": message.createdAt.isoformat(),
             "status": None,
         }
         for message in messages
@@ -1969,7 +1982,7 @@ def serialize_messages() -> list[dict[str, Any]]:
 
 
 def profile_payload(user: User) -> dict[str, Any]:
-    return {"avatar": user.profile_photo_url or PROFILE_AVATAR, "major": user.department or "", "bio": user.bio or ""}
+    return {"avatar": user.profilePhotoUrl or PROFILE_AVATAR, "major": user.department or "", "bio": user.bio or ""}
 
 
 def profile_user(identifier: str) -> Optional[User]:
@@ -2031,6 +2044,11 @@ def handle_database_error(error):
     return jsonify({"error": "database error"}), 500
 
 
+@app.errorhandler(GraphUnavailable)
+def handle_graph_error(error):
+    return jsonify({"error": "relationship graph unavailable"}), 503
+
+
 @app.after_request
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
@@ -2069,7 +2087,7 @@ def users_collection():
             admin_error = require_admin_user()
             if admin_error is not None:
                 return admin_error
-        statement = select(User).where(User.is_active.is_(True))
+        statement = select(User).where(User.isActive.is_(True))
         if username_query:
             statement = statement.where(User.username.contains(username_query)).limit(10)
         return jsonify([user.to_dict() for user in db().scalars(statement.order_by(User.username.asc())).all()])
@@ -2077,21 +2095,21 @@ def users_collection():
     if error_response is not None:
         return error_response, status
     db().add(user)
-    commit_with_feed_graph()
+    db().commit()
     db().refresh(user)
     return jsonify(user.to_dict()), 201
 
 
-@app.route("/api/users/<user_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def users_item(user_id: str):
-    user = get_user(user_id)
+@app.route("/api/users/<userId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def users_item(userId: str):
+    user = get_user(userId)
     if user is None:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(user.to_dict())
     if request.method == "DELETE":
         db().delete(user)
-        commit_with_feed_graph()
+        db().commit()
         return ("", 204)
     update_error = update_user_from_payload(user, read_json())
     if update_error is not None:
@@ -2101,63 +2119,52 @@ def users_item(user_id: str):
     return jsonify(user.to_dict())
 
 
-@app.route("/api/users/<user_id>/friends", methods=["GET", "POST", "DELETE"])
-def user_friendship_collection(user_id: str):
-    target_user = get_user(user_id)
+@app.route("/api/users/<userId>/friends", methods=["GET", "POST", "DELETE"])
+def user_friendship_collection(userId: str):
+    target_user = get_user(userId)
     if target_user is None:
         return jsonify({"error": "not found"}), 404
     current_user = current_auth_user()
     if not isinstance(current_user, User):
         return jsonify({"error": "unauthorized"}), 401
     if request.method == "GET":
-        include_lists = read_bool(request.args.get("includeLists") or request.args.get("include_lists"))
+        include_lists = read_bool(request.args.get("includeLists"))
         return jsonify(friendship_status_payload(current_user, target_user, include_lists))
-    if current_user.user_id == target_user.user_id:
+    if current_user.userId == target_user.userId:
         return jsonify({"error": "users cannot befriend themselves"}), 400
-    existing = friendship_between(current_user.user_id, target_user.user_id)
     if request.method == "DELETE":
-        friendships = db().scalars(
-            select(Friendship).where(
-                (
-                    ((Friendship.requester_id == current_user.user_id) & (Friendship.receiver_id == target_user.user_id))
-                    | ((Friendship.requester_id == target_user.user_id) & (Friendship.receiver_id == current_user.user_id))
-                )
-                & (Friendship.status == "accepted")
-            )
-        ).all()
-        if friendships:
-            for friendship in friendships:
-                db().delete(friendship)
-            commit_with_feed_graph()
+        graph_delete_friendship(current_user.userId, target_user.userId)
         return jsonify(friendship_status_payload(current_user, target_user))
-    if existing is None:
-        user_a_id, user_b_id = sorted((current_user.user_id, target_user.user_id))
-        db().add(Friendship(requester_id=user_a_id, receiver_id=user_b_id, status="accepted"))
-        add_notification(
-            target_user.user_id,
-            current_user.user_id,
-            "friend_accept",
-            "user",
-            current_user.user_id,
-            f"{current_user.full_name} added you as a friend.",
-        )
-        commit_with_feed_graph()
-        return jsonify(friendship_status_payload(current_user, target_user)), 201
-    return jsonify(friendship_status_payload(current_user, target_user))
+    _, created = graph_create_friendship(current_user.userId, target_user.userId)
+    if created:
+        try:
+            add_notification(
+                target_user.userId,
+                current_user.userId,
+                "friend_accept",
+                "user",
+                current_user.userId,
+                f"{current_user.fullName} added you as a friend.",
+            )
+            db().commit()
+        except SQLAlchemyError:
+            db().rollback()
+            app.logger.exception("Friendship created but notification could not be saved")
+    return jsonify(friendship_status_payload(current_user, target_user)), 201 if created else 200
 
 
 @app.route("/api/posts", methods=["GET", "POST"])
 def posts_collection():
     if request.method == "POST":
         return create_post_from_payload(read_json())
-    posts = db().scalars(select(Post).where(Post.is_deleted.is_(False)).order_by(Post.created_at.desc(), Post.post_id.asc())).all()
+    posts = db().scalars(select(Post).where(Post.isDeleted.is_(False)).order_by(Post.createdAt.desc(), Post.postId.asc())).all()
     return jsonify([serialize_post(post) for post in posts])
 
 
-@app.route("/api/posts/<post_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def posts_item(post_id: str):
-    post = db().get(Post, optional_int(post_id))
-    if post is None or post.is_deleted:
+@app.route("/api/posts/<postId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def posts_item(postId: str):
+    post = db().get(Post, optional_int(postId))
+    if post is None or post.isDeleted:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(serialize_post(post))
@@ -2165,44 +2172,44 @@ def posts_item(post_id: str):
         owner_error = require_post_owner_or_admin(post)
         if owner_error is not None:
             return owner_error
-        post.is_deleted = True
+        post.isDeleted = True
         db().commit()
         return ("", 204)
     return update_post_from_payload(post, read_json())
 
 
-@app.route("/api/posts/<post_id>/like", methods=["GET", "POST", "DELETE"])
-def posts_like_item(post_id: str):
-    post = db().get(Post, optional_int(post_id))
-    if post is None or post.is_deleted:
+@app.route("/api/posts/<postId>/like", methods=["GET", "POST", "DELETE"])
+def posts_like_item(postId: str):
+    post = db().get(Post, optional_int(postId))
+    if post is None or post.isDeleted:
         return jsonify({"error": "not found"}), 404
     user = current_auth_user()
     if not isinstance(user, User):
         return jsonify({"error": "unauthorized"}), 401
-    existing = post_like_for_user(post.post_id, user.user_id)
+    existing = post_like_for_user(post.postId, user.userId)
     if request.method == "GET":
         return jsonify(post_like_payload(post, user))
     if request.method == "DELETE":
         if existing is not None:
             db().delete(existing)
-            post.like_count = max(post.like_count - 1, 0)
-            post.engagement_score = float(post.like_count + post.share_count * 2)
+            post.likeCount = max(post.likeCount - 1, 0)
+            post.engagementScore = float(post.likeCount + post.shareCount * 2)
             db().commit()
             db().refresh(post)
         return jsonify(post_like_payload(post, user))
     if existing is None:
-        db().add(PostLike(post_id=post.post_id, user_id=user.user_id))
-        post.like_count += 1
-        post.engagement_score = float(post.like_count + post.share_count * 2)
-        owner = db().get(User, post.author_id)
-        if owner is not None and owner.user_id != user.user_id:
+        db().add(PostLike(postId=post.postId, userId=user.userId))
+        post.likeCount += 1
+        post.engagementScore = float(post.likeCount + post.shareCount * 2)
+        owner = db().get(User, post.authorId)
+        if owner is not None and owner.userId != user.userId:
             add_notification(
-                owner.user_id,
-                user.user_id,
+                owner.userId,
+                user.userId,
                 "post_like",
                 "post",
-                post.post_id,
-                f"{user.full_name} liked your post: {post.content or 'View the post.'}",
+                post.postId,
+                f"{user.fullName} liked your post: {post.content or 'View the post.'}",
             )
         db().commit()
         db().refresh(post)
@@ -2217,36 +2224,36 @@ def notifications_collection():
         return jsonify({"error": "unauthorized"}), 401
     items = db().scalars(
         select(Notification)
-        .where(Notification.user_id == user.user_id)
-        .order_by(Notification.created_at.desc(), Notification.notification_id.desc())
+        .where(Notification.userId == user.userId)
+        .order_by(Notification.createdAt.desc(), Notification.notificationId.desc())
     ).all()
-    unread_count = sum(1 for item in items if not item.is_read)
+    unread_count = sum(1 for item in items if not item.isRead)
     return jsonify({"items": [serialize_notification(item) for item in items], "total": len(items), "unreadCount": unread_count})
 
 
-@app.route("/api/notifications/<notification_id>", methods=["DELETE"])
-def notification_item(notification_id: str):
+@app.route("/api/notifications/<notificationId>", methods=["DELETE"])
+def notification_item(notificationId: str):
     user = current_auth_user()
     if not isinstance(user, User):
         return jsonify({"error": "unauthorized"}), 401
-    notification = db().get(Notification, optional_int(notification_id))
-    if notification is None or notification.user_id != user.user_id:
+    notification = db().get(Notification, optional_int(notificationId))
+    if notification is None or notification.userId != user.userId:
         return jsonify({"error": "not found"}), 404
     db().delete(notification)
     db().commit()
     return ("", 204)
 
 
-@app.route("/api/posts/<post_id>/comments", methods=["GET", "POST"])
-def post_comments_collection(post_id: str):
-    post = db().get(Post, optional_int(post_id))
-    if post is None or post.is_deleted:
+@app.route("/api/posts/<postId>/comments", methods=["GET", "POST"])
+def post_comments_collection(postId: str):
+    post = db().get(Post, optional_int(postId))
+    if post is None or post.isDeleted:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         comments = db().scalars(
             select(Comment)
-            .where((Comment.post_id == post.post_id) & (Comment.is_deleted.is_(False)))
-            .order_by(Comment.created_at.asc(), Comment.comment_id.asc())
+            .where((Comment.postId == post.postId) & (Comment.isDeleted.is_(False)))
+            .order_by(Comment.createdAt.asc(), Comment.commentId.asc())
         ).all()
         return jsonify({"items": [comment_payload(comment) for comment in comments], "total": len(comments)})
     user = current_auth_user()
@@ -2255,23 +2262,23 @@ def post_comments_collection(post_id: str):
     content = text_value(get_first(read_json(), "content", "body", "text"))
     if not content:
         return jsonify({"error": "content is required"}), 400
-    comment = Comment(post_id=post.post_id, user_id=user.user_id, content=content)
+    comment = Comment(postId=post.postId, userId=user.userId, content=content)
     db().add(comment)
-    post.comment_count += 1
-    post.engagement_score = float(post.like_count + post.share_count * 2 + post.comment_count)
-    if post.author_id != user.user_id:
+    post.commentCount += 1
+    post.engagementScore = float(post.likeCount + post.shareCount * 2 + post.commentCount)
+    if post.authorId != user.userId:
         add_notification(
-            post.author_id,
-            user.user_id,
+            post.authorId,
+            user.userId,
             "post_comment",
             "post",
-            post.post_id,
-            f"{user.full_name} commented: {content}",
+            post.postId,
+            f"{user.fullName} commented: {content}",
         )
     db().commit()
     db().refresh(comment)
     db().refresh(post)
-    return jsonify({"comment": comment_payload(comment), "post": serialize_post(post), "comments": post.comment_count}), 201
+    return jsonify({"comment": comment_payload(comment), "post": serialize_post(post), "comments": post.commentCount}), 201
 
 
 @app.route("/api/feed/trending", methods=["GET", "POST"])
@@ -2286,19 +2293,19 @@ def schema_removed_collection():
     return jsonify(empty_resource_collection())
 
 
-@app.route("/api/feed/trending/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-@app.route("/api/feed/suggested-people/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-@app.route("/api/clubs/spotlight/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-@app.route("/api/clubs/stats/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-@app.route("/api/games/top-rated/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-@app.route("/api/games/recent-activity/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def schema_removed_item(item_id: int):
+@app.route("/api/feed/trending/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+@app.route("/api/feed/suggested-people/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+@app.route("/api/clubs/spotlight/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+@app.route("/api/clubs/stats/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+@app.route("/api/games/top-rated/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+@app.route("/api/games/recent-activity/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def schema_removed_item(itemId: int):
     return jsonify({"error": "resource is not part of the normalized schema"}), 410
 
 
 @app.route("/api/clubs")
 def clubs():
-    return jsonify({"spotlightClubs": [], "clubCards": [club.to_dict() for club in db().scalars(select(Club).where(Club.is_active.is_(True)).order_by(Club.name.asc())).all()], "stats": []})
+    return jsonify({"spotlightClubs": [], "clubCards": [club.to_dict() for club in db().scalars(select(Club).where(Club.isActive.is_(True)).order_by(Club.name.asc())).all()], "stats": []})
 
 
 @app.route("/api/clubs", methods=["POST"])
@@ -2309,19 +2316,19 @@ def create_club_alias():
         return admin_error
     item = make_club_card(read_json())
     db().add(item)
-    commit_with_feed_graph()
+    db().commit()
     db().refresh(item)
     return jsonify(item.to_dict()), 201
 
 
 @app.route("/api/clubs/items", methods=["GET"])
 def club_items_collection():
-    return jsonify([club.to_dict() for club in db().scalars(select(Club).where(Club.is_active.is_(True)).order_by(Club.name.asc())).all()])
+    return jsonify([club.to_dict() for club in db().scalars(select(Club).where(Club.isActive.is_(True)).order_by(Club.name.asc())).all()])
 
 
-@app.route("/api/clubs/items/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def club_item(item_id: int):
-    club = db().get(Club, item_id)
+@app.route("/api/clubs/items/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def club_item(itemId: int):
+    club = db().get(Club, itemId)
     if club is None:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
@@ -2330,20 +2337,20 @@ def club_item(item_id: int):
     if admin_error is not None:
         return admin_error
     if request.method == "DELETE":
-        club.is_active = False
-        commit_with_feed_graph()
+        club.isActive = False
+        db().commit()
         return ("", 204)
     data = read_json()
     if "title" in data or "name" in data:
         club.name = text_value(get_first(data, "title", "name"), club.name)
     if "slug" in data:
-        club.slug = unique_club_slug(data.get("slug"), club.club_id)
+        club.slug = unique_club_slug(data.get("slug"), club.clubId)
     if "description" in data:
         club.description = text_value(data.get("description"))
     if "status" in data:
         club.status = text_value(data.get("status"), "Open")
-    if "bannerImage" in data or "logo_url" in data:
-        club.logo_url = text_value(get_first(data, "bannerImage", "logo_url"))
+    if "bannerImage" in data or "logoUrl" in data:
+        club.logoUrl = text_value(get_first(data, "bannerImage", "logoUrl"))
     db().commit()
     db().refresh(club)
     return jsonify(club.to_dict())
@@ -2365,17 +2372,17 @@ def club_follow(slug: str):
     user = current_auth_user()
     if not isinstance(user, User):
         return jsonify({"error": "unauthorized"}), 401
-    existing = club_follow_for_user(club, user.user_id)
+    existing = club_follow_for_user(club, user.userId)
     if request.method == "GET":
         return jsonify(club_follow_payload(club, user))
     if request.method == "DELETE":
         if existing is not None:
             db().delete(existing)
-            commit_with_feed_graph()
+            db().commit()
         return jsonify(club_follow_payload(club, user))
     if existing is None:
-        db().add(ClubFollower(club_id=club.club_id, user_id=user.user_id))
-        commit_with_feed_graph()
+        db().add(ClubFollower(clubId=club.clubId, userId=user.userId))
+        db().commit()
         return jsonify(club_follow_payload(club, user)), 201
     return jsonify(club_follow_payload(club, user))
 
@@ -2399,7 +2406,7 @@ def club_member_item(slug: str, member_id: int):
     if club is None:
         return jsonify({"error": "not found"}), 404
     member = db().get(ClubMember, member_id)
-    if member is None or member.club_id != club.club_id:
+    if member is None or member.clubId != club.clubId:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(serialize_club_member(member))
@@ -2410,20 +2417,24 @@ def club_member_item(slug: str, member_id: int):
         if not can_remove_club_member(club, user, member):
             return jsonify({"error": "admin or club president access required"}), 403
         member.status = "removed"
-        commit_with_feed_graph()
+        db().commit()
         return ("", 204)
     admin_error = require_admin_user()
     if admin_error is not None:
         return admin_error
     data = read_json()
+    if "canPost" in data:
+        if not isinstance(data["canPost"], bool):
+            return jsonify({"error": "canPost must be a boolean"}), 400
+        member.canPost = data["canPost"]
     if "title" in data or "role" in data:
         role = role_value(data.get("title") or data.get("role"))
-        role_error = club_member_role_error(club, role, member.club_member_id)
+        role_error = club_member_role_error(club, role, member.clubMemberId)
         if role_error is not None:
             return jsonify({"error": role_error}), 409
         member.role = role
-        member.can_post = role in CLUB_PUBLISHER_ROLES
-        member.can_create_announcement = role in CLUB_PUBLISHER_ROLES
+        member.canPost = role in CLUB_PUBLISHER_ROLES
+        member.canCreateAnnouncement = role in CLUB_PUBLISHER_ROLES
     db().commit()
     db().refresh(member)
     return jsonify(serialize_club_member(member))
@@ -2431,7 +2442,7 @@ def club_member_item(slug: str, member_id: int):
 
 @app.route("/api/games")
 def games():
-    game_cards = [game.to_dict() for game in db().scalars(select(Game).where(Game.is_active.is_(True)).order_by(Game.created_at.desc(), Game.game_id.asc())).all()]
+    game_cards = [game.to_dict() for game in db().scalars(select(Game).where(Game.isActive.is_(True)).order_by(Game.createdAt.desc(), Game.gameId.asc())).all()]
     return jsonify({"gameCards": game_cards, "topRated": [], "recentActivity": []})
 
 
@@ -2453,7 +2464,7 @@ def award_game_xp():
     if xp is None or xp <= 0:
         return jsonify({"error": "xp must be a positive integer"}), 400
     total = award_user_xp(user, xp)
-    return jsonify({"userId": str(user.user_id), "user_id": str(user.user_id), "awardedXp": xp, "awarded_xp": xp, "totalXp": total, "total_xp": total})
+    return jsonify({"userId": str(user.userId), "awardedXp": xp, "totalXp": total})
 
 
 @app.route("/api/games/items", methods=["GET", "POST"])
@@ -2467,18 +2478,18 @@ def game_items_collection():
         db().commit()
         db().refresh(item)
         return jsonify(item.to_dict()), 201
-    return jsonify([game.to_dict() for game in db().scalars(select(Game).order_by(Game.created_at.desc(), Game.game_id.asc())).all()])
+    return jsonify([game.to_dict() for game in db().scalars(select(Game).order_by(Game.createdAt.desc(), Game.gameId.asc())).all()])
 
 
-@app.route("/api/games/items/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def game_item(item_id: int):
-    item = db().get(Game, item_id)
+@app.route("/api/games/items/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def game_item(itemId: int):
+    item = db().get(Game, itemId)
     if item is None:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(item.to_dict())
     if request.method == "DELETE":
-        item.is_active = False
+        item.isActive = False
         db().commit()
         return ("", 204)
     data = read_json()
@@ -2507,15 +2518,15 @@ def marketplace_items_collection():
     return jsonify([serialize_marketplace_item(item) for item in marketplace_posts()])
 
 
-@app.route("/api/marketplace/items/<post_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def marketplace_item(post_id: str):
-    item = db().get(MarketplaceItem, optional_int(post_id))
+@app.route("/api/marketplace/items/<postId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def marketplace_item(postId: str):
+    item = db().get(MarketplaceItem, optional_int(postId))
     if item is None or item.status == "removed":
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(serialize_marketplace_item(item))
     user = current_auth_user()
-    if not (is_admin_user(user) or (isinstance(user, User) and item.seller_id == user.user_id)):
+    if not (is_admin_user(user) or (isinstance(user, User) and item.sellerId == user.userId)):
         return jsonify({"error": "unauthorized"}), 401
     if request.method == "DELETE":
         item.status = "removed"
@@ -2531,7 +2542,7 @@ def marketplace_item(post_id: str):
     if "price" in data:
         item.price = parse_price(data.get("price"))
     if "image" in data or "photoUrl" in data:
-        item.image_url = text_value(get_first(data, "image", "photoUrl"))
+        item.imageUrl = text_value(get_first(data, "image", "photoUrl"))
     db().commit()
     db().refresh(item)
     return jsonify(serialize_marketplace_item(item))
@@ -2545,24 +2556,24 @@ def messages():
 @app.route("/api/messages/conversations", methods=["GET", "POST"])
 def conversations_collection():
     if request.method == "POST":
-        thread = ChatThread(thread_type=text_value(read_json().get("threadType"), "direct"))
+        thread = ChatThread(threadType=text_value(read_json().get("threadType"), "direct"))
         db().add(thread)
         db().commit()
         db().refresh(thread)
-        return jsonify(serialize_conversations()[0] if serialize_conversations() else {"id": thread.thread_id}), 201
+        return jsonify(serialize_conversations()[0] if serialize_conversations() else {"id": thread.threadId}), 201
     return jsonify(serialize_conversations())
 
 
-@app.route("/api/messages/conversations/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def conversation_item(item_id: int):
-    item = db().get(ChatThread, item_id)
+@app.route("/api/messages/conversations/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def conversation_item(itemId: int):
+    item = db().get(ChatThread, itemId)
     if item is None:
         return jsonify({"error": "not found"}), 404
     if request.method == "DELETE":
         db().delete(item)
         db().commit()
         return ("", 204)
-    return jsonify({"id": item.thread_id, "name": f"{item.thread_type.title()} Chat", "preview": "", "time": item.created_at.isoformat()})
+    return jsonify({"id": item.threadId, "name": f"{item.threadType.title()} Chat", "preview": "", "time": item.createdAt.isoformat()})
 
 
 @app.route("/api/messages/items", methods=["GET", "POST"])
@@ -2572,34 +2583,34 @@ def messages_collection():
         if not isinstance(user, User):
             return jsonify({"error": "unauthorized"}), 401
         data = read_json()
-        thread_id = optional_int(data.get("thread_id")) or optional_int(data.get("threadId"))
-        if thread_id is None:
-            thread = ChatThread(thread_type="direct")
+        threadId = optional_int(data.get("threadId")) or optional_int(data.get("threadId"))
+        if threadId is None:
+            thread = ChatThread(threadType="direct")
             db().add(thread)
             db().flush()
-            thread_id = thread.thread_id
-        item = ChatMessage(thread_id=thread_id, sender_id=user.user_id, content=text_value(get_first(data, "text", "content")))
+            threadId = thread.threadId
+        item = ChatMessage(threadId=threadId, senderId=user.userId, content=text_value(get_first(data, "text", "content")))
         db().add(item)
         db().commit()
         db().refresh(item)
-        return jsonify({"id": item.message_id, "side": "right", "text": item.content or "", "time": item.created_at.isoformat()}), 201
+        return jsonify({"id": item.messageId, "side": "right", "text": item.content or "", "time": item.createdAt.isoformat()}), 201
     return jsonify(serialize_messages())
 
 
-@app.route("/api/messages/items/<int:item_id>", methods=["GET", "PATCH", "PUT", "DELETE"])
-def message_item(item_id: int):
-    item = db().get(ChatMessage, item_id)
+@app.route("/api/messages/items/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+def message_item(itemId: int):
+    item = db().get(ChatMessage, itemId)
     if item is None:
         return jsonify({"error": "not found"}), 404
     if request.method == "DELETE":
-        item.is_deleted = True
+        item.isDeleted = True
         db().commit()
         return ("", 204)
     if request.method in {"PATCH", "PUT"}:
         item.content = text_value(get_first(read_json(), "text", "content"), item.content or "")
         db().commit()
         db().refresh(item)
-    return jsonify({"id": item.message_id, "side": "left", "text": item.content or "", "time": item.created_at.isoformat()})
+    return jsonify({"id": item.messageId, "side": "left", "text": item.content or "", "time": item.createdAt.isoformat()})
 
 
 @app.route("/api/auth/signup", methods=["POST"])
@@ -2609,7 +2620,7 @@ def auth_signup():
         return error_response, status
     db().add(user)
     db().flush()
-    commit_with_feed_graph()
+    db().commit()
     db().refresh(user)
     return auth_response(user, 201)
 
@@ -2624,7 +2635,7 @@ def auth_login():
     if admin_login_matches(login, password):
         return auth_response(AdminIdentity())
     user = find_auth_user_by_login(login)
-    if user is None or not check_password_hash(user.password_hash, password):
+    if user is None or not check_password_hash(user.passwordHash, password):
         return jsonify({"error": "invalid login or password"}), 401
     return auth_response(user)
 
@@ -2658,7 +2669,7 @@ def profiles_collection():
     if user is None:
         return jsonify({"error": "user is required"}), 400
     data = read_json()
-    user.profile_photo_url = text_value(data.get("avatar"), user.profile_photo_url or PROFILE_AVATAR)
+    user.profilePhotoUrl = text_value(data.get("avatar"), user.profilePhotoUrl or PROFILE_AVATAR)
     user.department = text_value(data.get("major"), user.department or "")
     user.bio = text_value(data.get("bio"), user.bio or "")
     db().commit()
@@ -2673,13 +2684,13 @@ def profile_item(user: str):
     if request.method == "GET":
         return jsonify({"user": row.username, **profile_payload(row)})
     if request.method == "DELETE":
-        row.profile_photo_url = None
+        row.profilePhotoUrl = None
         row.bio = None
         db().commit()
         return ("", 204)
     data = read_json()
     if "avatar" in data:
-        row.profile_photo_url = text_value(data.get("avatar"), PROFILE_AVATAR)
+        row.profilePhotoUrl = text_value(data.get("avatar"), PROFILE_AVATAR)
     if "major" in data:
         row.department = text_value(data.get("major"))
     if "bio" in data:
