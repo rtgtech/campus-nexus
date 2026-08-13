@@ -3,6 +3,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EntityListItem, profileEntityHref } from "@/components/entity-list-item";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Spinner } from "@/components/ui/spinner";
 import { API_BASE_URL, authFetch, isAdminUser, readAuthSession } from "@/lib/auth-client";
 import { type CampusUser } from "@/lib/app-data";
 
@@ -134,42 +140,25 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
   }
 
   return (
-    <>
-      <button
-        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-[0_14px_34px_rgba(34,29,92,0.2)] transition hover:scale-[1.02]"
-        type="button"
-        onClick={() => setOpen(true)}
-      >
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button className="rounded-full shadow-[0_14px_34px_rgba(34,29,92,0.2)]" />}>
         <span className="material-symbols-outlined text-base">person_add</span>
         Add member
-      </button>
-
-      {open ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-2xl md:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl rounded-[10px] p-5 md:p-6">
+            <DialogHeader className="pr-10">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Admin</p>
-                <h3 className="mt-1 font-headline-md text-lg text-on-background">Add member</h3>
-              </div>
-              <button
-                className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container-low hover:text-secondary"
-                type="button"
-                onClick={() => setOpen(false)}
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
+                <DialogTitle className="mt-1 font-headline-md text-lg text-on-background">Add member</DialogTitle>
+                <DialogDescription className="sr-only">Search for a user and assign a club designation</DialogDescription>
+            </DialogHeader>
 
             <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-on-surface" htmlFor="club-member-username">
-                    Username
-                  </label>
-                  <input
+                <Field>
+                  <FieldLabel htmlFor="club-member-username">Username</FieldLabel>
+                  <Input
                     id="club-member-username"
-                    className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                    className="h-11 rounded-2xl bg-surface-container-low px-4"
                     placeholder="Search username"
                     type="text"
                     value={query}
@@ -179,34 +168,35 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                       setMessage("");
                     }}
                   />
-                </div>
+                </Field>
 
-                <label className="space-y-2">
-                  <span className="block text-sm font-semibold text-on-surface">Designation</span>
-                  <select
-                    className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                <Field>
+                  <FieldLabel htmlFor="member-designation">Designation</FieldLabel>
+                  <NativeSelect
+                    className="w-full [&_select]:h-11 [&_select]:rounded-2xl [&_select]:bg-surface-container-low"
+                    id="member-designation"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
                   >
                     {availableDesignations.map((designation) => (
-                      <option
+                      <NativeSelectOption
                         key={designation}
                         value={designation}
                       >
                         {designation}
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </select>
-                </label>
+                  </NativeSelect>
+                </Field>
 
                 <div className="flex items-end">
-                  <button
-                    className="w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary shadow-[0_14px_34px_rgba(34,29,92,0.2)] transition hover:scale-[1.02] disabled:opacity-60 lg:w-auto"
+                  <Button
+                    className="h-11 w-full rounded-full px-5 shadow-[0_14px_34px_rgba(34,29,92,0.2)] lg:w-auto"
                     disabled={!selectedUser || status === "saving"}
                     type="submit"
                   >
                     Add
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -220,8 +210,9 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                   className="flex min-w-0 items-center gap-3 rounded-2xl bg-primary-fixed/70 p-3"
                   avatarClassName="rounded-full bg-primary text-on-primary"
                   trailing={
-                    <button
-                      className="rounded-full p-2 text-on-surface-variant transition hover:bg-white hover:text-secondary"
+                    <Button
+                      className="rounded-full text-on-surface-variant hover:bg-white hover:text-secondary"
+                      size="icon-sm"
                       type="button"
                       onClick={() => {
                         setSelectedUser(null);
@@ -230,7 +221,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                       }}
                     >
                       <span className="material-symbols-outlined text-lg">close</span>
-                    </button>
+                    </Button>
                   }
                 />
               ) : null}
@@ -246,8 +237,9 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                       kind="user"
                       initials={user.initials}
                       trailing={
-                        <button
+                        <Button
                           className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:text-secondary"
+                          size="sm"
                           type="button"
                           onClick={() => {
                             setSelectedUser(user);
@@ -258,7 +250,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                           }}
                         >
                           Select
-                        </button>
+                        </Button>
                       }
                     />
                   ))}
@@ -271,15 +263,13 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
 
               <p className={status === "error" ? "text-sm font-semibold text-secondary" : "text-sm text-on-surface-variant"}>
                 {status === "searching"
-                  ? "Searching..."
+                  ? <span className="inline-flex items-center gap-2"><Spinner /> Searching...</span>
                   : status === "saving"
                     ? "Adding member..."
                     : message || "Search by username, then assign their club designation."}
               </p>
             </form>
-          </div>
-        </div>
-      ) : null}
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -3,8 +3,10 @@ import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { FriendButton } from "@/components/follow-button";
 import { ProfilePostsGrid } from "@/components/profile-posts-grid";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
 import { fallbackFeed, fallbackProfile, getInitials, type CampusUser, type FeedData, type ProfileData } from "@/lib/app-data";
+import { cn } from "@/lib/utils";
 
 type ProfilePageProps = {
   params: Promise<{
@@ -59,7 +61,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   return (
     <CampusShell active="profile">
       <div className="space-y-8">
-        <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)] md:p-8">
+        <section className="rounded-[10px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)] md:p-8">
           <div className="flex flex-col gap-8 md:flex-row md:items-center">
             <div className="relative">
               <div className="h-36 w-36 rounded-full bg-primary p-1 md:h-40 md:w-40">
@@ -80,16 +82,16 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                 {profileUser ? (
                   <FriendButton targetUserId={profileUser.userId} targetName={displayName} />
                 ) : (
-                  <button className="rounded-full bg-surface-container px-6 py-3 text-sm font-semibold text-on-surface-variant" disabled>
+                  <Button className="h-11 rounded-full bg-surface-container px-6 text-on-surface-variant" disabled>
                     Profile unavailable
-                  </button>
+                  </Button>
                 )}
-                <button className="rounded-full border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface">
+                <Button className="h-11 rounded-full px-4" variant="outline">
                   Share
-                </button>
+                </Button>
                 <Link
                   href="/my_activity"
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary transition hover:bg-primary/90"
+                  className={cn(buttonVariants({ size: "lg" }), "rounded-full px-5")}
                 >
                   <span className="material-symbols-outlined text-base">history</span>
                   My Activity
@@ -99,7 +101,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           </div>
         </section>
 
-        <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
+        <section className="rounded-[10px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
           <SectionTitle
             title="Posts"
             description={userPosts.length > 0 ? `${userPosts.length} posts shared by ${displayName}.` : "Posts for this profile will appear here."}

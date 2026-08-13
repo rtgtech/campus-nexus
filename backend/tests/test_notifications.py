@@ -25,8 +25,6 @@ class NotificationsTest(unittest.TestCase):
 
         backend_app.Base.metadata.drop_all(backend_app.engine)
         backend_app.Base.metadata.create_all(backend_app.engine)
-        backend_app.ensure_app_schema()
-        backend_app.ensure_app_indexes()
         backend_app._database_initialized = True
         self.graph = FakeGraph()
         self.graph_patcher = self.graph.patch_backend(backend_schema)
@@ -82,6 +80,39 @@ class NotificationsTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/notifications").status_code, 401)
         self.assertEqual(self.client.delete("/api/notifications/1").status_code, 401)
         self.assertEqual(self.client.post(f"/api/posts/{postId}/comments", json={"content": "Hi"}).status_code, 401)
+
+    def test_notifications_return_utc_timestamps_and_cors_headers(self) -> None:
+        with backend_app.SessionLocal() as session:
+            self.add_user(session, "owner", "owner", "Owner User")
+            self.add_user(session, "actor", "actor", "Actor User")
+            self.add_token(session, "owner-token", "owner")
+            session.add(
+                backend_app.Notification(
+                    userId=self.user_ids["owner"],
+                    actorId=self.user_ids["actor"],
+                    type="friend_accept",
+                    targetType="user",
+                    targetId=str(self.user_ids["actor"]),
+                    message="You are now connected.",
+                    createdAt=datetime(2026, 8, 11, 8, 0, 0),
+                )
+            )
+            session.commit()
+
+        headers = {**self.auth("owner-token"), "Origin": backend_app.CORS_ORIGIN}
+        response = self.client.get("/api/notifications", headers=headers)
+
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], backend_app.CORS_ORIGIN)
+        self.assertEqual(response.headers["Access-Control-Allow-Credentials"], "true")
+        self.assertEqual(response.get_json()["items"][0]["createdAt"], "2026-08-11T08:00:00+00:00")
+
+        preflight = self.client.options(
+            "/api/notifications",
+            headers={"Origin": backend_app.CORS_ORIGIN, "Access-Control-Request-Method": "GET"},
+        )
+        self.assertEqual(preflight.status_code, 204)
+        self.assertEqual(preflight.headers["Access-Control-Allow-Origin"], backend_app.CORS_ORIGIN)
 
     def test_adding_friend_creates_notification(self) -> None:
         with backend_app.SessionLocal() as session:

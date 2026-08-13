@@ -1,7 +1,7 @@
-import { AuthSessionControl } from "@/components/auth-session-control";
+import { CampusHeader } from "@/components/campus-header";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { EmptyState } from "@/components/empty-state";
-import { HeaderSearch } from "@/components/header-search";
+import { Button } from "@/components/ui/button";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackClubs, type ClubsData } from "@/lib/app-data";
 import Link from "next/link";
@@ -12,29 +12,11 @@ export default async function ClubsPage() {
   return (
     <>
       <div className="min-h-screen bg-background pb-10 font-body-md text-on-background">
-        <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
-          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
-            <div className="flex items-center gap-3">
-              <span className="font-headline-lg text-2xl font-black tracking-tighter text-primary">
-                Campus Nexus
-              </span>
-            </div>
-            <HeaderSearch className="hidden w-88 md:block" placeholder="Search campus clubs..." types={["club"]} />
-            <div className="flex items-center gap-4">
-              <button className="material-symbols-outlined rounded-full p-2 text-primary transition-all duration-200 ease-out hover:bg-surface-container active:scale-95">
-                notifications
-              </button>
-              <button className="material-symbols-outlined rounded-full p-2 text-secondary transition-all duration-200 ease-out hover:bg-secondary/10 active:scale-95">
-                bolt
-              </button>
-              <AuthSessionControl compact />
-            </div>
-          </div>
-        </header>
+        <CampusHeader active="clubs" searchProps={{ placeholder: "Search campus clubs...", types: ["club"] }} />
 
         <CollapsibleSidebar active="clubs" />
 
-        <main className="mx-auto max-w-7xl space-y-16 px-5 pt-24">
+        <main className="mx-auto max-w-7xl space-y-16 px-5 pt-8">
           <section className="space-y-6">
             <div className="flex items-end justify-between">
               <div>
@@ -43,12 +25,12 @@ export default async function ClubsPage() {
               </div>
               { clubsData.spotlightClubs.length > 4 && (
                 <div className="flex gap-2">
-                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface transition-colors hover:bg-surface-container-highest">
+                <Button aria-label="Previous featured club" className="size-10 rounded-full bg-surface-container-high text-on-surface" size="icon" variant="ghost">
                   <span className="material-symbols-outlined">chevron_left</span>
-                </button>
-                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface transition-colors hover:bg-surface-container-highest">
+                </Button>
+                <Button aria-label="Next featured club" className="size-10 rounded-full bg-surface-container-high text-on-surface" size="icon" variant="ghost">
                   <span className="material-symbols-outlined">chevron_right</span>
-                </button>
+                </Button>
               </div>
               )}
             </div>
@@ -59,7 +41,7 @@ export default async function ClubsPage() {
                 {clubsData.spotlightClubs.map((club) => (
                 <div
                   key={club.title}
-                  className="group relative aspect-[16/9] min-w-[320px] snap-start cursor-pointer overflow-hidden rounded-[24px] shadow-xl md:min-w-[450px]"
+                  className="group relative aspect-video min-w-[320px] snap-start cursor-pointer overflow-hidden rounded-[10px] shadow-xl md:min-w-[450px]"
                 >
                   <img
                     className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -97,7 +79,7 @@ export default async function ClubsPage() {
                 <Link
                   key={card.slug}
                   href={`/clubs/${card.slug}`}
-                  className="group overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
+                  className="group overflow-hidden rounded-[10px] border border-surface-container-highest bg-white shadow-xs transition-all duration-300 hover:shadow-xl"
                 >
                   <div className={`relative h-32 overflow-hidden ${card.bannerBg}`}>
                     <img

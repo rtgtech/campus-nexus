@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AuthSessionControl } from "@/components/auth-session-control";
+import { CampusHeader } from "@/components/campus-header";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { ClubFollowButton } from "@/components/club-follow-button";
 import { ClubMembersButton } from "@/components/club-members-button";
 import { ClubPostComposer } from "@/components/club-post-composer";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
-import { HeaderSearch } from "@/components/header-search";
+import { buttonVariants } from "@/components/ui/button";
 import { API_BASE_URL } from "@/lib/campus-api";
 import { fallbackClubDetail, type ClubDetailData } from "@/lib/app-data";
+import { cn } from "@/lib/utils";
 
 type ClubDetailPageProps = {
   params: Promise<{
@@ -52,28 +53,23 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
   return (
     <>
       <div className="min-h-screen bg-background pb-10 font-body-md text-on-background">
-        <header className="fixed top-0 z-50 w-full border-b border-surface-container-highest bg-white/95 shadow-sm backdrop-blur-xl">
-          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
-            <Link href="/clubs" className="font-headline-lg text-2xl font-black tracking-tighter text-primary">
-              Campus Nexus
+        <CampusHeader
+          active="clubs"
+          contextAction={
+            <Link
+              href="/clubs"
+              className={cn(buttonVariants({ variant: "outline" }), "hidden rounded-full bg-white px-4 text-on-surface-variant hover:text-primary xl:inline-flex")}
+            >
+              Back to clubs
             </Link>
-            <div className="flex items-center gap-3">
-              <HeaderSearch className="hidden w-72 md:block" placeholder="Search campus clubs..." types={["club"]} />
-              <Link
-                href="/clubs"
-                className="hidden rounded-full border border-outline-variant/70 bg-white px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary sm:inline-flex"
-              >
-                Back to clubs
-              </Link>
-              <AuthSessionControl compact />
-            </div>
-          </div>
-        </header>
+          }
+          searchProps={{ placeholder: "Search campus clubs...", types: ["club"] }}
+        />
 
         <CollapsibleSidebar active="clubs" />
 
-        <main className="mx-auto max-w-7xl space-y-8 px-5 pt-24">
-          <section className="overflow-hidden rounded-[32px] border border-surface-container-highest bg-white shadow-sm">
+        <main className="mx-auto max-w-7xl space-y-8 px-5 pt-8">
+          <section className="overflow-hidden rounded-[10px] border border-surface-container-highest bg-white shadow-xs">
             <div className={`relative min-h-72 overflow-hidden ${club.bannerBg}`}>
               {club.bannerImage ? (
                 <img alt={club.title} className="absolute inset-0 h-full w-full object-cover" src={club.bannerImage} />
@@ -93,7 +89,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
                     <p className="mt-4 max-w-2xl text-sm leading-7 text-white/82 md:text-base">{club.description}</p>
                   </div>
                   {club.status ? (
-                    <span className="rounded-full bg-white/14 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-white backdrop-blur">
+                    <span className="rounded-full bg-white/14 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
                       {club.status}
                     </span>
                   ) : null}
@@ -106,7 +102,7 @@ export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
             <aside className="space-y-6">
               <ClubFollowButton clubSlug={club.slug} clubTitle={club.title} initialFollowers={followers} />
 
-              <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
+              <section className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Club Posts</p>

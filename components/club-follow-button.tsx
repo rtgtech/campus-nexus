@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 type ClubFollowButtonProps = {
   clubSlug: string;
@@ -93,40 +96,37 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
   }
 
   return (
-    <div className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
+    <Card className="rounded-[10px] border border-surface-container-highest bg-white py-0 shadow-xs">
+      <CardHeader className="flex-row items-start justify-between gap-4 p-5 pb-0">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Followers</p>
           <p className="mt-2 font-headline-md text-2xl text-on-background">{formatCount(followers)}</p>
         </div>
         <span className="material-symbols-outlined rounded-full bg-primary-fixed p-3 text-primary">favorite</span>
-      </div>
+      </CardHeader>
 
-      <div className="mt-5">
+      <CardContent className="p-5 pt-0">
         {session ? (
-          <button
-            className={
-              isFollowing
-                ? "w-full rounded-full border border-primary px-4 py-3 text-sm font-semibold text-primary transition hover:border-secondary hover:text-secondary disabled:opacity-60"
-                : "w-full rounded-full bg-secondary px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.01] disabled:opacity-60"
-            }
+          <Button
+            className={cn("h-11 w-full rounded-full px-4", !isFollowing && "bg-secondary text-white hover:bg-secondary/90")}
             disabled={status === "loading" || status === "saving"}
             type="button"
+            variant={isFollowing ? "outline" : "default"}
             onClick={toggleFollow}
           >
             {status === "loading" ? "Checking..." : status === "saving" ? "Saving..." : isFollowing ? "Following" : "Follow club"}
-          </button>
+          </Button>
         ) : (
           <Link
             href={`/auth?next=${encodeURIComponent(`/clubs/${clubSlug}`)}`}
-            className="block w-full rounded-full bg-secondary px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.01]"
+            className={cn(buttonVariants(), "h-11 w-full rounded-full bg-secondary px-4 text-white hover:bg-secondary/90")}
           >
             Sign in to follow
           </Link>
         )}
         {message ? <p className="mt-3 text-sm font-semibold text-secondary">{message}</p> : null}
         <p className="mt-3 text-xs text-on-surface-variant">Follow {clubTitle} to keep it on your radar.</p>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

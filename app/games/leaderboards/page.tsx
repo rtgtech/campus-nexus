@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { AuthSessionControl } from "@/components/auth-session-control";
+import { CampusHeader } from "@/components/campus-header";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { EmptyState } from "@/components/empty-state";
+import { buttonVariants } from "@/components/ui/button";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackLeaderboard, type LeaderboardEntry, type LeaderboardData } from "@/lib/app-data";
+import { cn } from "@/lib/utils";
 
 const rankStyles: Record<number, { row: string; badge: string; avatar: string; score: string; icon: string }> = {
   1: {
@@ -50,7 +52,7 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
 
   return (
     <article
-      className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[24px] border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:gap-4 sm:p-4 ${style.row}`}
+      className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border p-3 shadow-xs transition hover:-translate-y-0.5 hover:shadow-md sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:gap-4 sm:p-4 ${style.row}`}
     >
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${style.badge}`}>
         {entry.rank}
@@ -96,27 +98,15 @@ export default async function GameLeaderboardsPage() {
   return (
     <>
       <div className="min-h-screen bg-background pb-10 font-body-md text-on-surface">
-        <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/80 shadow-sm shadow-primary/5 backdrop-blur-xl">
-          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
-            <Link href="/games" className="font-['Space_Grotesk'] text-2xl font-black tracking-normal text-primary">
-              Campus Nexus
-            </Link>
-            <div className="flex items-center gap-4">
-              <button className="material-symbols-outlined rounded-full p-2 text-outline transition-all duration-200 ease-out hover:bg-surface-container active:scale-95">
-                notifications
-              </button>
-              <AuthSessionControl compact />
-            </div>
-          </div>
-        </header>
+        <CampusHeader active="games" />
 
         <CollapsibleSidebar active="games" />
 
         <main className="mx-auto max-w-5xl space-y-8 px-4 pt-8 md:px-10">
-          <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm md:p-8">
+          <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs md:p-8">
             <Link
               href="/games"
-              className="inline-flex items-center gap-2 rounded-full border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary"
+              className={cn(buttonVariants({ variant: "outline" }), "rounded-full px-4 text-on-surface-variant hover:text-primary")}
             >
               <span className="material-symbols-outlined text-lg">arrow_back</span>
               Games

@@ -2,6 +2,12 @@
 
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { type ClubMember } from "@/lib/app-data";
 
@@ -71,53 +77,55 @@ export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; memb
   if (!permissions.canPost && !permissions.canCreateAnnouncement) return null;
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-secondary/90"
-      >
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button className="rounded-full bg-secondary text-white hover:bg-secondary/90" />}>
         <span className="material-symbols-outlined text-lg">add</span>
         Create
-      </button>
-
-      {open ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="club-post-title">
-          <form onSubmit={submit} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between gap-4">
-              <h2 id="club-post-title" className="font-headline-md text-2xl text-on-background">Create club content</h2>
-              <button type="button" onClick={() => setOpen(false)} className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container" aria-label="Close">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <div className="mt-5 inline-flex rounded-lg bg-surface-container p-1" aria-label="Content type">
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl rounded-2xl p-6">
+        <DialogHeader>
+          <DialogTitle className="font-headline-md text-2xl text-on-background">Create club content</DialogTitle>
+          <DialogDescription className="sr-only">Publish a post or announcement to this club</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit}>
+            <ToggleGroup
+              aria-label="Content type"
+              className="mt-5 bg-surface-container p-1"
+              value={[String(type)]}
+              onValueChange={(values) => {
+                const nextType = Number(values[0]) as 1 | 3;
+                if (nextType !== 1 && nextType !== 3) return;
+                setType(nextType);
+                setFiles([]);
+                setStatus("idle");
+              }}
+            >
               {([[1, "Post", permissions.canPost], [3, "Announcement", permissions.canCreateAnnouncement]] as const)
                 .filter(([, , allowed]) => allowed)
                 .map(([value, label]) => (
-                <button
+                <ToggleGroupItem
                   key={value}
-                  type="button"
-                  onClick={() => { setType(value); setFiles([]); setStatus("idle"); }}
-                  className={`rounded-md px-4 py-2 text-sm font-semibold ${type === value ? "bg-white text-primary shadow-sm" : "text-on-surface-variant"}`}
+                  value={String(value)}
+                  className="px-4"
                 >
                   {label}
-                </button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
 
-            <label className="mt-5 block">
-              <span className="text-sm font-semibold text-on-surface">{type === 3 ? "Poster" : "Photos and videos"}</span>
-              <input
+            <Field className="mt-5">
+              <FieldLabel htmlFor="club-post-media">{type === 3 ? "Poster" : "Photos and videos"}</FieldLabel>
+              <Input
                 key={type}
+                id="club-post-media"
                 type="file"
                 required={type === 3}
                 multiple={type === 1}
                 accept={type === 3 ? "image/*" : "image/*,video/mp4"}
                 onChange={selectFiles}
-                className="mt-2 block w-full rounded-lg border border-outline-variant bg-surface-container-low text-sm file:mr-4 file:border-0 file:bg-primary file:px-4 file:py-3 file:font-semibold file:text-white"
+                className="h-11 bg-surface-container-low"
               />
-            </label>
+            </Field>
 
             {files.length ? (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -125,37 +133,37 @@ export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; memb
                   <span key={`${file.name}-${file.lastModified}`} className="inline-flex max-w-full items-center gap-2 rounded-lg bg-surface-container px-3 py-2 text-xs font-semibold text-on-surface-variant">
                     <span className="material-symbols-outlined text-base">{file.type.startsWith("video/") ? "videocam" : "image"}</span>
                     <span className="max-w-52 truncate">{file.name}</span>
-                    <button type="button" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`}>
+                    <Button type="button" variant="ghost" size="icon-xs" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`}>
                       <span className="material-symbols-outlined text-base">close</span>
-                    </button>
+                    </Button>
                   </span>
                 ))}
               </div>
             ) : null}
 
-            <label className="mt-5 block">
-              <span className="text-sm font-semibold text-on-surface">Content</span>
-              <textarea
+            <Field className="mt-5">
+              <FieldLabel htmlFor="club-post-content">Content</FieldLabel>
+              <Textarea
                 autoFocus
                 required
+                id="club-post-content"
                 maxLength={2000}
                 value={content}
                 onChange={(event) => { setContent(event.target.value); setStatus("idle"); }}
-                className="mt-2 min-h-44 w-full resize-y rounded-lg border border-outline-variant bg-surface-container-low p-3 text-sm outline-none focus:border-primary"
+                className="min-h-44 resize-y bg-surface-container-low"
                 placeholder={type === 3 ? "Write an announcement..." : "Share a club update..."}
               />
-            </label>
+            </Field>
 
             {message ? <p className="mt-3 text-sm font-semibold text-secondary">{message}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-on-surface-variant">Cancel</button>
-              <button disabled={status === "saving" || !content.trim() || (type === 3 && files.length !== 1)} type="submit" className="rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+              <Button type="button" onClick={() => setOpen(false)} variant="ghost">Cancel</Button>
+              <Button disabled={status === "saving" || !content.trim() || (type === 3 && files.length !== 1)} type="submit" className="bg-secondary text-white hover:bg-secondary/90">
                 {status === "saving" ? "Publishing..." : "Publish"}
-              </button>
+              </Button>
             </div>
-          </form>
-        </div>
-      ) : null}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

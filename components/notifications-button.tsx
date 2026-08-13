@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 type NotificationItem = {
   id: string;
@@ -68,7 +74,6 @@ export function NotificationsButton() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [status, setStatus] = useState<LoadStatus>("idle");
-  const panelId = useId();
   const visibleBadge = badgeLabel(unreadCount);
 
   const hasItems = items.length > 0;
@@ -122,27 +127,6 @@ export function NotificationsButton() {
     setSession(readAuthSession());
   }, [open]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
   async function dismissNotification(item: NotificationItem) {
     if (!session) {
       return;
@@ -170,56 +154,32 @@ export function NotificationsButton() {
   }
 
   return (
-    <>
-      <button
-        aria-controls={panelId}
-        aria-expanded={open}
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
         aria-label="Open notifications"
-        className="relative rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container"
-        type="button"
-        onClick={() => setOpen((current) => !current)}
+        render={<Button className="relative rounded-full text-on-surface-variant" size="icon" variant="ghost" />}
       >
         <span className="material-symbols-outlined">notifications</span>
         {visibleBadge ? (
-          <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">
+          <Badge className="absolute -right-1 -top-1 min-w-5 justify-center rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">
             {visibleBadge}
-          </span>
+          </Badge>
         ) : null}
-      </button>
-
-      {open ? (
-        <div
-          className="fixed inset-0 z-[80] bg-[rgba(15,18,33,0.42)] backdrop-blur-sm md:bg-transparent md:backdrop-blur-none"
-          onClick={() => setOpen(false)}
-        >
-          <section
-            id={panelId}
-            aria-label="Notifications"
-            className="fixed inset-0 flex h-dvh w-full flex-col bg-white text-on-surface shadow-[0_24px_80px_rgba(15,18,33,0.22)] md:inset-auto md:right-4 md:top-16 md:h-auto md:max-h-[calc(100vh-5rem)] md:w-[390px] md:overflow-hidden md:rounded-[24px] md:border md:border-outline-variant/70"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-4 border-b border-outline-variant/60 px-4 py-4 md:px-5">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-secondary">Updates</p>
-                <h2 className="mt-1 font-['Space_Grotesk'] text-xl font-bold tracking-tight text-on-background">
-                  Notifications
-                </h2>
-              </div>
-              <button
-                aria-label="Close notifications"
-                className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container hover:text-primary"
-                type="button"
-                onClick={() => setOpen(false)}
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 md:max-h-[520px]">
+      </DialogTrigger>
+      <DialogContent className="inset-0 flex h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0 md:inset-auto md:left-auto md:right-4 md:top-16 md:h-auto md:max-h-[calc(100vh-5rem)] md:w-[390px] md:translate-x-0 md:translate-y-0 md:rounded-[10px]">
+        <DialogHeader className="border-b border-outline-variant/60 px-4 py-4 pr-14 text-left md:px-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-secondary">Updates</p>
+          <DialogTitle className="font-['Space_Grotesk'] text-xl font-bold tracking-tight text-on-background">
+            Notifications
+          </DialogTitle>
+          <DialogDescription className="sr-only">Recent friend and club updates</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="min-h-0 flex-1 md:max-h-[520px]">
+          <div className="p-3">
               {hasItems ? (
                 <div className="space-y-2">
                   {items.map((item) => (
-                  <article
+                  <Card
                     key={item.id}
                     className="relative flex gap-3 rounded-xl border border-outline-variant/50 bg-surface-container-low px-3 py-3 pr-11"
                   >
@@ -240,7 +200,7 @@ export function NotificationsButton() {
                       </div>
                       <div className="mt-3 flex justify-end">
                         <Link
-                          className="inline-flex w-full items-center justify-center rounded-full bg-white px-3 py-2 text-xs font-bold text-primary transition hover:text-secondary sm:w-auto"
+                          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full rounded-full bg-white text-xs font-bold text-primary hover:text-secondary sm:w-auto")}
                           href={item.href}
                           onClick={() => setOpen(false)}
                         >
@@ -248,15 +208,17 @@ export function NotificationsButton() {
                         </Link>
                       </div>
                     </div>
-                    <button
+                    <Button
                       aria-label="Dismiss notification"
-                      className="absolute right-2 top-2 rounded-full p-1.5 text-on-surface-variant transition hover:bg-white hover:text-secondary"
+                      className="absolute right-2 top-2 rounded-full text-on-surface-variant hover:bg-white hover:text-secondary"
+                      size="icon-sm"
                       type="button"
+                      variant="ghost"
                       onClick={() => dismissNotification(item)}
                     >
                       <span className="material-symbols-outlined text-base">close</span>
-                    </button>
-                  </article>
+                    </Button>
+                  </Card>
                   ))}
                 </div>
               ) : (
@@ -264,10 +226,9 @@ export function NotificationsButton() {
                   {panelMessage}
                 </p>
               )}
-            </div>
-          </section>
-        </div>
-      ) : null}
-    </>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }

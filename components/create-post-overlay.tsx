@@ -2,6 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { authFetch } from "@/lib/auth-client";
 
 const API_BASE_URL =
@@ -113,29 +119,29 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-[rgba(15,18,33,0.55)] px-4 py-8 backdrop-blur-sm md:px-6 md:py-12">
-      <div className="w-full max-w-2xl rounded-[28px] border border-secondary/20 bg-white/95 p-5 shadow-[0_24px_80px_rgba(15,18,33,0.28)] backdrop-blur-xl md:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+    <Dialog
+      open
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) router.replace(returnHref);
+      }}
+    >
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-hidden rounded-[10px] border-secondary/20 bg-white/95 p-5 shadow-[0_24px_80px_rgba(15,18,33,0.28)] backdrop-blur-xl md:p-6">
+        <DialogHeader className="pr-10">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Create Post</p>
-            <h2 className="mt-2 font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-on-background">
+            <DialogTitle className="mt-2 font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-on-background">
               {step === "media" ? "Choose your media." : "Write your post."}
-            </h2>
+            </DialogTitle>
+            <DialogDescription className="sr-only">Create a campus post</DialogDescription>
           </div>
-          <button
-            type="button"
-            className="rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary"
-            onClick={() => router.replace(returnHref)}
-          >
-            Close
-          </button>
-        </div>
+        </DialogHeader>
 
-        <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+        <ScrollArea className="min-h-0">
+        <form className="mt-2 space-y-5 pr-3" onSubmit={handleSubmit}>
           {step === "media" ? (
             <div
               className={[
-                "flex h-[420px] max-h-[calc(100dvh-14rem)] flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed p-4 text-center transition md:h-[500px]",
+                "flex h-[420px] max-h-[calc(100dvh-14rem)] flex-col items-center justify-center overflow-hidden rounded-[10px] border border-dashed p-4 text-center transition md:h-[500px]",
                 isDragging
                   ? "border-secondary bg-secondary/5"
                   : "border-outline-variant/80 bg-surface-container-low",
@@ -144,7 +150,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
               onDragOver={handleDragOver}
               onDrop={handleDrop}
             >
-              <input
+              <Input
                 ref={inputRef}
                 accept="image/*,video/*"
                 className="sr-only"
@@ -154,7 +160,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
 
               {previewUrl ? (
                 <div className="flex min-h-0 w-full max-w-md flex-1 flex-col justify-center">
-                  <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[22px] bg-black">
+                  <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[10px] bg-black">
                     {mediaKind(selectedFile) === "video" ? (
                       <video className="max-h-full max-w-full object-contain" controls src={previewUrl} />
                     ) : (
@@ -164,7 +170,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
                   <p className="mt-3 truncate text-sm font-semibold text-on-surface">{selectedFile?.name}</p>
                 </div>
               ) : (
-                <div className="flex max-w-sm flex-col items-center">
+                <div className="flex flex-col items-center">
                   <span className="material-symbols-outlined rounded-full bg-primary-fixed p-5 text-4xl text-primary">
                     add_photo_alternate
                   </span>
@@ -173,18 +179,19 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
                 </div>
               )}
 
-              <button
-                className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary px-5 py-3 text-sm font-semibold text-primary transition hover:border-secondary hover:text-secondary"
+              <Button
+                className="mt-6 rounded-full px-5"
                 type="button"
+                variant="outline"
                 onClick={() => inputRef.current?.click()}
               >
                 <span className="material-symbols-outlined text-base">add</span>
                 Add media
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-[180px_minmax(0,1fr)]">
-              <div className="flex h-48 items-center justify-center overflow-hidden rounded-[22px] bg-black md:h-60">
+              <div className="flex h-48 items-center justify-center overflow-hidden rounded-[10px] bg-black md:h-60">
                 {mediaKind(selectedFile) === "video" ? (
                   <video className="max-h-full max-w-full object-contain" controls src={previewUrl} />
                 ) : (
@@ -192,10 +199,11 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
                 )}
               </div>
 
-              <label className="block space-y-2">
-                <span className="text-sm font-semibold text-on-surface">Post body</span>
-                <textarea
-                  className="min-h-[300px] w-full resize-none rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm leading-6 text-on-surface outline-none transition focus:border-primary md:min-h-[420px]"
+              <Field>
+                <FieldLabel htmlFor="post-body">Post body</FieldLabel>
+                <Textarea
+                  id="post-body"
+                  className="min-h-[300px] resize-none rounded-2xl bg-surface-container-low px-4 py-3 text-sm leading-6 md:min-h-[420px]"
                   maxLength={2000}
                   placeholder="Write something..."
                   value={content}
@@ -204,7 +212,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
                     setStatus("idle");
                   }}
                 />
-              </label>
+              </Field>
             </div>
           )}
 
@@ -224,38 +232,40 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {step === "content" ? (
-                <button
-                  className="rounded-full border border-outline-variant/70 px-5 py-3 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary"
+                <Button
+                  className="rounded-full px-5"
                   disabled={status === "saving"}
                   type="button"
+                  variant="outline"
                   onClick={() => setStep("media")}
                 >
                   Back
-                </button>
+                </Button>
               ) : null}
 
               {step === "media" ? (
-                <button
+                <Button
                   disabled={!selectedFile}
-                  className="rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.02] disabled:opacity-50"
+                  className="rounded-full bg-secondary px-5 text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
                   type="button"
                   onClick={() => setStep("content")}
                 >
                   Next
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   disabled={status === "saving" || !content.trim()}
-                  className="rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.02] disabled:opacity-50"
+                  className="rounded-full bg-secondary px-5 text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
                   type="submit"
                 >
                   Post
-                </button>
+                </Button>
               )}
             </div>
           </div>
         </form>
-      </div>
-    </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }

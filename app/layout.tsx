@@ -3,6 +3,10 @@ import { Suspense } from "react";
 import { CreatePostRoute } from "@/components/create-post-route";
 import "material-symbols/outlined.css";
 import "./globals.css";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Campus Nexus",
@@ -11,11 +15,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  modal: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light">
+    <html lang="en" className={cn("light", "font-sans", geist.variable)}>
       <head>
         <link
           rel="preconnect"
@@ -33,6 +39,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        {modal}
         <Suspense fallback={null}>
           <CreatePostRoute />
         </Suspense>

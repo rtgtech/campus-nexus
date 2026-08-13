@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AuthSessionControl } from "@/components/auth-session-control";
+import { CampusHeader } from "@/components/campus-header";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 type Cell = {
   row: number;
@@ -267,27 +270,22 @@ export default function SudokuPage() {
   return (
     <>
       <div className="min-h-screen bg-white font-body-md text-on-surface">
-        <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/85 shadow-sm shadow-primary/5 backdrop-blur-xl">
-          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
-            <Link href="/games" className="font-['Space_Grotesk'] text-xl font-black tracking-normal text-primary">
-              Sudoku
+        <CampusHeader
+          active="games"
+          contextAction={
+            <Link
+              href="/games"
+              className={cn(buttonVariants({ variant: "outline" }), "hidden rounded-full px-4 text-on-surface-variant hover:text-primary xl:inline-flex")}
+            >
+              Games
             </Link>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/games"
-                className="hidden rounded-full border border-outline-variant/70 px-4 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-primary hover:text-primary sm:inline-flex"
-              >
-                Games
-              </Link>
-              <AuthSessionControl compact />
-            </div>
-          </div>
-        </header>
+          }
+        />
 
         <CollapsibleSidebar active="games" />
 
         <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 pt-6 md:grid-cols-[minmax(0,1fr)_320px] md:px-8">
-          <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm md:p-6">
+          <section className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs md:p-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <h1 className="mt-1 font-headline-lg text-4xl text-primary">Campus Sudoku</h1>
@@ -308,10 +306,10 @@ export default function SudokuPage() {
                     const bottomBorder = (row + 1) % BOX_ROWS === 0 && row !== SIZE - 1;
 
                     return (
-                      <button
+                      <Button
                         key={cellKey(row, col)}
                         className={[
-                          "aspect-square min-h-10 border border-outline-variant bg-white text-center font-headline-md text-2xl transition hover:bg-primary-fixed/60 focus:outline-none",
+                          "h-auto aspect-square min-h-10 w-full rounded-none border border-outline-variant bg-white p-0 text-center font-headline-md text-2xl hover:bg-primary-fixed/60",
                           fixed ? "font-bold text-primary" : "text-on-surface",
                           selected ? "z-10 bg-primary-fixed ring-2 ring-primary" : "",
                           duplicate ? "bg-secondary/12 text-secondary ring-2 ring-secondary" : "",
@@ -319,10 +317,11 @@ export default function SudokuPage() {
                           bottomBorder ? "border-b-4 border-b-primary" : "",
                         ].join(" ")}
                         type="button"
+                        variant="ghost"
                         onClick={() => selectCell(row, col)}
                       >
                         {value || ""}
-                      </button>
+                      </Button>
                     );
                   })
                 )}
@@ -331,24 +330,25 @@ export default function SudokuPage() {
 
             <div className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-7">
               {[1, 2, 3, 4, 5, 6].map((value) => (
-                <button
+                <Button
                   key={value}
-                  className="rounded-2xl bg-primary px-4 py-3 font-headline-md text-xl text-white transition hover:bg-primary/90 disabled:opacity-50"
+                  className="h-12 rounded-2xl px-4 font-headline-md text-xl"
                   disabled={!selectedCell || (selectedCell ? isFixedCell(puzzle, selectedCell.row, selectedCell.col) : true)}
                   type="button"
                   onClick={() => setCellValue(value)}
                 >
                   {value}
-                </button>
+                </Button>
               ))}
-              <button
-                className="rounded-2xl border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface-variant transition hover:border-secondary hover:text-secondary disabled:opacity-50"
+              <Button
+                className="h-12 rounded-2xl px-4 text-on-surface-variant hover:border-secondary hover:text-secondary"
                 disabled={!selectedCell || (selectedCell ? isFixedCell(puzzle, selectedCell.row, selectedCell.col) : true)}
                 type="button"
+                variant="outline"
                 onClick={clearCell}
               >
                 Clear
-              </button>
+              </Button>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -366,30 +366,29 @@ export default function SudokuPage() {
               </p>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  className="rounded-full border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface transition hover:border-primary hover:text-primary"
+                <Button
+                  className="rounded-full px-4"
                   type="button"
+                  variant="outline"
                   onClick={() => resetPuzzle()}
                 >
                   Reset
-                </button>
-                <button
-                  className="rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-white transition hover:scale-[1.02]"
+                </Button>
+                <Button
+                  className="rounded-full bg-secondary px-4 text-white hover:bg-secondary/90"
                   type="button"
                   onClick={() => resetPuzzle((puzzleIndex + 1) % PUZZLES.length)}
                 >
                   New puzzle
-                </button>
+                </Button>
               </div>
             </div>
           </section>
 
           <aside className="space-y-4">
-            <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
+            <section className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Progress</p>
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-surface-container-low">
-                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
-              </div>
+              <Progress className="mt-4 [&_[data-slot=progress-track]]:h-3" value={progress} />
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-primary-fixed p-4 text-primary">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em]">Filled</p>
@@ -402,7 +401,7 @@ export default function SudokuPage() {
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-surface-container-highest bg-white p-5 shadow-sm">
+            <section className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">XP</p>
               <h2 className="mt-2 font-headline-md text-2xl text-primary">100 XP per complete puzzle</h2>
               {xpSaveMessage ? (
@@ -425,7 +424,7 @@ export default function SudokuPage() {
               )}
               <Link
                 href="/games/leaderboards"
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface transition hover:border-primary hover:text-primary"
+                className={cn(buttonVariants({ variant: "outline", size: "lg" }), "mt-4 w-full rounded-full px-4")}
               >
                 <span className="material-symbols-outlined text-base">leaderboard</span>
                 Leaderboard

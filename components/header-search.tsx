@@ -2,8 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { SearchIcon } from "lucide-react";
 import { EntityListItem } from "@/components/entity-list-item";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
 import { API_BASE_URL } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 export type SearchKind = "user" | "club" | "post" | "product";
 
@@ -26,6 +32,7 @@ type SearchResponse = {
 
 export type HeaderSearchProps = {
   className?: string;
+  expandable?: boolean;
   placeholder?: string;
   types?: SearchKind[];
 };
@@ -63,6 +70,7 @@ function resultGroups(results: SearchResponse, enabledTypes: SearchKind[]) {
 
 export function HeaderSearch({
   className = "",
+  expandable = false,
   placeholder = "Search campus spaces...",
   types = defaultTypes,
 }: HeaderSearchProps) {
@@ -71,6 +79,7 @@ export function HeaderSearch({
   const [results, setResults] = useState<SearchResponse>(emptyResults);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(!expandable);
 
   const enabledTypes = useMemo(() => Array.from(new Set(types)), [types]);
   const groups = useMemo(() => resultGroups(results, enabledTypes), [enabledTypes, results]);
@@ -130,43 +139,93 @@ export function HeaderSearch({
     }
 
     setOpen(false);
+    setExpanded(!expandable);
     router.push(firstResult.href);
   }
 
   return (
-    <form
-      className={`relative ${className}`}
-      onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-      onFocus={() => setOpen(true)}
-      onSubmit={handleSubmit}
+    <Popover
+      open={open && trimmedQuery.length >= 2}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          setExpanded(!expandable);
+        }
+      }}
     >
-      <div className="flex w-full items-center gap-3 rounded-full border border-outline-variant bg-[#F5F5F5] px-4 h-10">
-        <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
-        <input
-          className="w-full appearance-none border-none bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:outline-none focus:ring-0"
-          placeholder={placeholder}
-          type="text"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setOpen(true);
-          }}
-        />
-      </div>
+      <form
+        className={cn(
+          "relative z-20 transition-[width] duration-300 ease-out",
+          className,
+          expandable && (expanded ? "w-52 sm:w-64 md:w-72" : "w-10"),
+        )}
+        onSubmit={handleSubmit}
+      >
+        <PopoverTrigger
+          render={
+            <InputGroup
+              aria-expanded={expanded}
+              className="h-10 overflow-hidden rounded-full border-outline-variant bg-muted px-2"
+            />
+          }
+        >
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label="Search campus"
+            className={cn(
+              "text-on-surface transition-opacity duration-200 placeholder:text-on-surface-variant",
+              expandable && !expanded && "w-0 min-w-0 px-0 opacity-0",
+            )}
+            placeholder={placeholder}
+            type="search"
+            value={query}
+            onBlur={() => {
+              if (trimmedQuery.length < 2) {
+                setExpanded(!expandable);
+              }
+            }}
+            onFocus={() => {
+              setExpanded(true);
+              setOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && trimmedQuery.length < 2) {
+                setExpanded(!expandable);
+                event.currentTarget.blur();
+              }
+            }}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+          />
+        </PopoverTrigger>
+      </form>
 
-      {open && trimmedQuery.length >= 2 ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[90] overflow-hidden rounded-[24px] border border-outline-variant/70 bg-white shadow-[0_24px_70px_rgba(15,18,33,0.2)]">
-          {status === "loading" ? (
-            <p className="p-4 text-sm font-semibold text-on-surface-variant">Searching...</p>
-          ) : status === "error" ? (
-            <p className="p-4 text-sm font-semibold text-secondary">Search is unavailable.</p>
-          ) : groups.length === 0 ? (
-            <p className="p-4 text-sm font-semibold text-on-surface-variant">No results found.</p>
-          ) : (
-            <div className="max-h-[420px] overflow-y-auto p-2">
+      <PopoverContent
+        align={expandable ? "end" : "start"}
+        className="w-(--anchor-width) min-w-80 overflow-hidden rounded-[10px] border-outline-variant/70 p-0 shadow-[0_24px_70px_rgba(15,18,33,0.2)]"
+        initialFocus={false}
+        sideOffset={8}
+      >
+        {status === "loading" ? (
+          <p className="flex items-center gap-2 p-4 text-sm font-semibold text-on-surface-variant">
+            <Spinner /> Searching...
+          </p>
+        ) : status === "error" ? (
+          <p className="p-4 text-sm font-semibold text-destructive">Search is unavailable.</p>
+        ) : groups.length === 0 ? (
+          <p className="p-4 text-sm font-semibold text-on-surface-variant">No results found.</p>
+        ) : (
+          <ScrollArea className="max-h-[420px]">
+            <div className="p-2">
               {groups.map((group) => (
                 <div key={group.label} className="py-1">
-                  <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">{group.label}</p>
+                  <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+                    {group.label}
+                  </p>
                   {group.items.map((item) => (
                     <EntityListItem
                       key={`${item.type}-${item.id}`}
@@ -185,15 +244,18 @@ export function HeaderSearch({
                           {typeMeta[item.type].label}
                         </span>
                       }
-                      onNavigate={() => setOpen(false)}
+                      onNavigate={() => {
+                        setOpen(false);
+                        setExpanded(!expandable);
+                      }}
                     />
                   ))}
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      ) : null}
-    </form>
+          </ScrollArea>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

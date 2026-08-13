@@ -113,7 +113,14 @@ JWT_ISSUER = "campus-nexus"
 JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "24"))
 JWT_COOKIE_NAME = "campusNexusToken"
 JWT_COOKIE_SECURE = os.getenv("JWT_COOKIE_SECURE", "0") == "1"
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:3000")
+CORS_ORIGINS = tuple(
+    dict.fromkeys(
+        origin.strip().rstrip("/")
+        for origin in os.getenv("CORS_ORIGIN", "http://localhost:3000").split(",")
+        if origin.strip()
+    )
+) or ("http://localhost:3000",)
+CORS_ORIGIN = CORS_ORIGINS[0]
 if len(JWT_SECRET) < 32:
     raise RuntimeError("JWT_SECRET must be set to at least 32 characters")
 if JWT_EXPIRES_HOURS <= 0:
@@ -125,7 +132,17 @@ class Base(DeclarativeBase):
 
 
 def utcnow() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
+
+
+def as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def utc_isoformat(value: datetime) -> str:
+    return as_utc(value).isoformat()
 
 
 class User(Base):
@@ -194,7 +211,7 @@ class Friendship(Base):
             "id": self.friendshipId,
             "userAId": str(self.requesterId),
             "userBId": str(self.receiverId),
-            "createdAt": self.createdAt.isoformat(),
+            "createdAt": utc_isoformat(self.createdAt),
         }
 
 
@@ -297,7 +314,7 @@ class ClubFollower(Base):
             "id": self.id,
             "clubId": self.clubId,
             "userId": str(self.userId),
-            "createdAt": self.createdAt.isoformat(),
+            "createdAt": utc_isoformat(self.createdAt),
         }
 
 
@@ -363,10 +380,7 @@ class Post(Base):
         club_slug: Optional[str] = None,
         mediaUrls: Optional[list[str]] = None,
     ) -> dict[str, Any]:
-        createdAt = self.createdAt
-        if createdAt.tzinfo is None:
-            createdAt = createdAt.replace(tzinfo=timezone.utc)
-        createdAt = createdAt.astimezone(timezone.utc).isoformat()
+        createdAt = utc_isoformat(self.createdAt)
         caption = self.caption
         hashtags = extract_hashtags(caption)
         title = caption[:72] or "Untitled post"
@@ -427,7 +441,7 @@ class PostLike(Base):
             "id": self.id,
             "postId": str(self.postId),
             "userId": str(self.userId),
-            "createdAt": self.createdAt.isoformat(),
+            "createdAt": utc_isoformat(self.createdAt),
         }
 
 
@@ -586,19 +600,6 @@ def ensure_database_initialized() -> None:
             return
         Base.metadata.create_all(engine)
         _database_initialized = True
-
-
-def ensure_app_schema() -> None:
-    Base.metadata.create_all(engine)
-
-
-def ensure_app_indexes() -> None:
-    return None
-
-
-def seed_admin_user(session: Session) -> None:
-    return None
-
 
 def read_json() -> dict[str, Any]:
     data = request.get_json(silent=True)
@@ -1112,7 +1113,7 @@ def serialize_club_member(member: ClubMember) -> dict[str, Any]:
         "clubId": member.clubId,
         "userId": str(member.userId),
         "title": member.title,
-        "createdAt": member.joinedAt.isoformat(),
+        "createdAt": utc_isoformat(member.joinedAt),
         "user": user.to_dict() if user is not None else None,
         "name": name,
         "username": user.username if user is not None else "",
@@ -1443,9 +1444,7 @@ def update_neo4j_graph(session: Session, *, bootstrap: bool = False):
                 "friendshipId": f"{friendship.requesterId}:{friendship.receiverId}",
                 "userAId": friendship.requesterId,
                 "userBId": friendship.receiverId,
-                "createdAt": friendship.createdAt.replace(tzinfo=timezone.utc).isoformat()
-                if friendship.createdAt.tzinfo is None
-                else friendship.createdAt.isoformat(),
+                "createdAt": utc_isoformat(friendship.createdAt),
             }
             for friendship in sql_friendships
         ]
@@ -1692,7 +1691,7 @@ def post_like_payload(post: Post, user: User) -> dict[str, Any]:
 def comment_payload(comment: Comment) -> dict[str, Any]:
     user = db().get(User, comment.userId)
     name = user.fullName if user is not None else str(comment.userId)
-    createdAt = comment.createdAt.isoformat()
+    createdAt = utc_isoformat(comment.createdAt)
     return {
         "id": str(comment.commentId),
         "commentId": str(comment.commentId),
@@ -1715,7 +1714,7 @@ def compact_text(value: str, fallback: str = "View the latest campus activity.")
 
 
 def relative_time(value: datetime) -> str:
-    elapsed_seconds = max(0, int((utcnow() - value).total_seconds()))
+    elapsed_seconds = max(0, int((utcnow() - as_utc(value)).total_seconds()))
     if elapsed_seconds < 60:
         return "Just now"
     elapsed_minutes = elapsed_seconds // 60
@@ -1859,7 +1858,7 @@ def serialize_notification(notification: Notification) -> dict[str, Any]:
         "title": notification_title(notification, actor, post, club),
         "body": notification_body(notification, post),
         "time": relative_time(notification.createdAt),
-        "createdAt": notification.createdAt.isoformat(),
+        "createdAt": utc_isoformat(notification.createdAt),
         "href": notification_href(notification, actor, post, club),
         "actionLabel": "View profile" if notification.type in {"friend_request", "friend_accept"} else "View post",
         "iconText": initials_for_name(actor_name),
@@ -1899,7 +1898,7 @@ def marketplace_posts() -> list[MarketplaceItem]:
 
 def serialize_marketplace_item(item: MarketplaceItem) -> dict[str, Any]:
     user = db().get(User, item.sellerId)
-    createdAt = item.createdAt.isoformat()
+    createdAt = utc_isoformat(item.createdAt)
     return {
         "id": str(item.itemId),
         "postId": str(item.itemId),
@@ -1958,7 +1957,7 @@ def serialize_conversations() -> list[dict[str, Any]]:
             "id": thread.threadId,
             "name": f"{thread.threadType.title()} Chat",
             "preview": "",
-            "time": thread.createdAt.isoformat(),
+            "time": utc_isoformat(thread.createdAt),
             "active": index == 0,
         }
         for index, thread in enumerate(threads)
@@ -1974,7 +1973,7 @@ def serialize_messages() -> list[dict[str, Any]]:
             "id": message.messageId,
             "side": "right" if current_user_id is not None and message.senderId == current_user_id else "left",
             "text": message.content or "",
-            "time": message.createdAt.isoformat(),
+            "time": utc_isoformat(message.createdAt),
             "status": None,
         }
         for message in messages
@@ -2011,7 +2010,7 @@ def protect_cookie_mutations():
     if (
         request.method in {"POST", "PUT", "PATCH", "DELETE"}
         and request.cookies.get(JWT_COOKIE_NAME)
-        and request.headers.get("Origin") != CORS_ORIGIN
+        and request.headers.get("Origin", "").rstrip("/") not in CORS_ORIGINS
     ):
         return jsonify({"error": "invalid request origin"}), 403
     return None
@@ -2051,11 +2050,13 @@ def handle_graph_error(error):
 
 @app.after_request
 def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-    response.headers.add("Vary", "Origin")
+    origin = request.headers.get("Origin", "").rstrip("/")
+    if origin in CORS_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+        response.headers.add("Vary", "Origin")
     return response
 
 
@@ -2449,7 +2450,7 @@ def games():
 @app.route("/api/games/leaderboards")
 def game_leaderboards():
     entries = leaderboard_entries()
-    return jsonify({"entries": entries, "totalPlayers": len(entries), "generatedAt": datetime.utcnow().isoformat()})
+    return jsonify({"entries": entries, "totalPlayers": len(entries), "generatedAt": utc_isoformat(utcnow())})
 
 
 @app.route("/api/games/xp", methods=["POST"])
@@ -2573,7 +2574,7 @@ def conversation_item(itemId: int):
         db().delete(item)
         db().commit()
         return ("", 204)
-    return jsonify({"id": item.threadId, "name": f"{item.threadType.title()} Chat", "preview": "", "time": item.createdAt.isoformat()})
+    return jsonify({"id": item.threadId, "name": f"{item.threadType.title()} Chat", "preview": "", "time": utc_isoformat(item.createdAt)})
 
 
 @app.route("/api/messages/items", methods=["GET", "POST"])
@@ -2593,7 +2594,7 @@ def messages_collection():
         db().add(item)
         db().commit()
         db().refresh(item)
-        return jsonify({"id": item.messageId, "side": "right", "text": item.content or "", "time": item.createdAt.isoformat()}), 201
+        return jsonify({"id": item.messageId, "side": "right", "text": item.content or "", "time": utc_isoformat(item.createdAt)}), 201
     return jsonify(serialize_messages())
 
 
@@ -2610,7 +2611,7 @@ def message_item(itemId: int):
         item.content = text_value(get_first(read_json(), "text", "content"), item.content or "")
         db().commit()
         db().refresh(item)
-    return jsonify({"id": item.messageId, "side": "left", "text": item.content or "", "time": item.createdAt.isoformat()})
+    return jsonify({"id": item.messageId, "side": "left", "text": item.content or "", "time": utc_isoformat(item.createdAt)})
 
 
 @app.route("/api/auth/signup", methods=["POST"])

@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EntityListItem, profileEntityHref } from "@/components/entity-list-item";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_BASE_URL, authFetch, type CampusAuthSession, readAuthSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 type FriendshipUser = {
   userId: string;
@@ -54,14 +60,16 @@ function UserRow({
       avatarClassName="rounded-full bg-primary-fixed text-primary"
       trailing={
         canUnfriend ? (
-          <button
-            className="rounded-full border border-outline-variant px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-secondary hover:text-secondary disabled:opacity-60"
+          <Button
+            className="rounded-full border-outline-variant px-3 text-xs text-on-surface-variant hover:border-secondary hover:text-secondary"
             disabled={isSaving}
+            size="sm"
             type="button"
+            variant="outline"
             onClick={() => onUnfriend(userId)}
           >
             {isSaving ? "..." : "Unfriend"}
-          </button>
+          </Button>
         ) : null
       }
     />
@@ -145,13 +153,8 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
     }
 
     const controller = new AbortController();
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     loadFriendLists(controller.signal);
-    return () => {
-      controller.abort();
-      document.body.style.overflow = originalOverflow;
-    };
+    return () => controller.abort();
   }, [showFriends, session, targetUserId]);
 
   async function toggleFriendship() {
@@ -203,7 +206,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
     return (
       <Link
         href={`/auth?next=${encodeURIComponent(nextPath)}`}
-        className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-on-primary transition hover:scale-[1.02]"
+        className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6")}
       >
         Sign in to add friends
       </Link>
@@ -218,106 +221,76 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
     <>
       <div className="flex flex-wrap items-center gap-3">
         {isSelf ? (
-          <button className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-on-primary transition hover:scale-[1.02]" type="button">
+          <Button className="rounded-full px-6" size="lg" type="button">
             Edit Profile
-          </button>
+          </Button>
         ) : (
-          <button
-            className={
-              isFriend
-                ? "rounded-full border border-primary px-6 py-3 text-sm font-semibold text-primary transition hover:border-secondary hover:text-secondary disabled:opacity-60"
-                : "rounded-full bg-primary px-6 py-3 text-sm font-semibold text-on-primary transition hover:scale-[1.02] disabled:opacity-60"
-            }
+          <Button
+            className="rounded-full px-6"
             disabled={status === "loading" || status === "saving"}
+            size="lg"
             type="button"
+            variant={isFriend ? "outline" : "default"}
             onClick={toggleFriendship}
           >
             {status === "loading" ? "Checking..." : status === "saving" ? "Saving..." : isFriend ? "Friends" : "Add friend"}
-          </button>
+          </Button>
         )}
 
-        <button
-          className="rounded-full border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface transition hover:border-primary hover:text-primary"
+        <Button
+          className="rounded-full px-4"
+          size="lg"
           type="button"
+          variant="outline"
           onClick={() => setShowFriends(true)}
         >
           {friendship?.friends ?? 0} friends
-        </button>
+        </Button>
         {message ? <span className="text-sm font-semibold text-secondary">{message}</span> : null}
       </div>
 
-      {showFriends ? (
-        <div
-          className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-[rgba(15,18,33,0.58)] px-4 py-8 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Friends list"
-          onClick={() => setShowFriends(false)}
-        >
-          <div
-            className="w-full max-w-2xl rounded-[28px] border border-outline-variant/70 bg-white p-5 shadow-[0_24px_80px_rgba(15,18,33,0.28)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Profile</p>
-                <h2 className="mt-2 font-['Space_Grotesk'] text-2xl font-bold text-primary">Friends</h2>
-              </div>
-              <button
-                className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container hover:text-secondary"
-                type="button"
-                aria-label="Close friends list"
-                onClick={() => setShowFriends(false)}
-              >
-                <span className="material-symbols-outlined text-xl">close</span>
-              </button>
-            </div>
-
+      <Dialog open={showFriends} onOpenChange={setShowFriends}>
+        <DialogContent className="max-w-2xl rounded-[10px] p-5">
+          <DialogHeader>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Profile</p>
+            <DialogTitle className="font-['Space_Grotesk'] text-2xl font-bold text-primary">Friends</DialogTitle>
+            <DialogDescription className="sr-only">Friends and mutual friends for {targetName}</DialogDescription>
+          </DialogHeader>
             {listStatus === "loading" ? (
-              <p className="mt-5 rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">Loading...</p>
+              <p className="mt-5 flex items-center gap-2 rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+                <Spinner /> Loading...
+              </p>
             ) : (
-              <div className="mt-5">
-                <div className="grid grid-cols-2 gap-2 rounded-full bg-surface-container-low p-1" role="tablist" aria-label="Friend lists">
-                  {(["friends", "mutuals"] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      className={
-                        activeTab === tab
-                          ? "rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
-                          : "rounded-full px-4 py-2 text-sm font-semibold text-on-surface-variant hover:text-primary"
-                      }
-                      type="button"
-                      role="tab"
-                      aria-selected={activeTab === tab}
-                      onClick={() => setActiveTab(tab)}
-                    >
-                      {tab === "friends" ? "Friends" : "Mutuals"}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-5 max-h-[55vh] space-y-3 overflow-y-auto pr-1" role="tabpanel">
-                  {activeRows.length ? (
-                    activeRows.map((user) => (
-                      <UserRow
-                        key={user.userId}
-                        canUnfriend={Boolean(friendship?.isSelf && activeTab === "friends")}
-                        isSaving={unfriendingId === user.userId}
-                        user={user}
-                        onUnfriend={unfriendFromList}
-                      />
-                    ))
-                  ) : (
-                    <p className="rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
-                      {activeTab === "friends" ? `${targetName} has no friends yet.` : `You and ${targetName} have no mutual friends yet.`}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <Tabs className="mt-5" value={activeTab} onValueChange={(value) => setActiveTab(value as FriendsTab)}>
+                <TabsList className="grid w-full grid-cols-2 rounded-full">
+                  <TabsTrigger className="rounded-full" value="friends">Friends</TabsTrigger>
+                  <TabsTrigger className="rounded-full" value="mutuals">Mutuals</TabsTrigger>
+                </TabsList>
+                <TabsContent value={activeTab}>
+                  <ScrollArea className="mt-3 max-h-[55vh]">
+                    <div className="space-y-3 pr-3">
+                      {activeRows.length ? (
+                        activeRows.map((user) => (
+                          <UserRow
+                            key={user.userId}
+                            canUnfriend={Boolean(friendship?.isSelf && activeTab === "friends")}
+                            isSaving={unfriendingId === user.userId}
+                            user={user}
+                            onUnfriend={unfriendFromList}
+                          />
+                        ))
+                      ) : (
+                        <p className="rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+                          {activeTab === "friends" ? `${targetName} has no friends yet.` : `You and ${targetName} have no mutual friends yet.`}
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
             )}
-          </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

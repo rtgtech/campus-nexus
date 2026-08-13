@@ -1,18 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AuthSessionControl } from "@/components/auth-session-control";
+import { CampusHeader, type CampusNavKey } from "@/components/campus-header";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { CreatePostLink } from "@/components/create-post-route";
-import { HeaderSearch, type HeaderSearchProps } from "@/components/header-search";
-import { NotificationsButton } from "@/components/notifications-button";
+import type { HeaderSearchProps } from "@/components/header-search";
 import { ProfileNavLink } from "@/components/profile-nav-link";
 
-type NavKey = "feed" | "clubs" | "marketplace" | "games" | "messages" | "profile";
-type NavItemKey = NavKey | "create-post";
+type NavItemKey = CampusNavKey | "create-post";
 
 type CampusShellProps = {
-  active: NavKey;
+  active: CampusNavKey;
   children: ReactNode;
+  feedView?: "home" | "discover";
   headerSearchProps?: Pick<HeaderSearchProps, "placeholder" | "types">;
 };
 
@@ -57,33 +56,10 @@ export function SectionTitle({
   );
 }
 
-export function CampusShell({ active, children, headerSearchProps }: CampusShellProps) {
+export function CampusShell({ active, children, feedView = "home", headerSearchProps }: CampusShellProps) {
   return (
     <div className="min-h-screen bg-background text-on-background">
-      <header className="sticky top-0 z-50 border-b border-outline-variant/70 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto grid h-14 w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-4 md:px-6">
-          <div className="flex items-center">
-            <Link
-              href="/"
-              className=" text-[1.25rem] font-black tracking-[-0.06em] text-primary"
-            >
-              Campus Nexus
-            </Link>
-          </div>
-          <div className="hidden justify-center md:flex">
-            <HeaderSearch className="w-full max-w-sm" {...headerSearchProps} />
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container">
-              <Link href="/games">
-                <span className="material-symbols-outlined shrink-0 text-[22px]">{"sports_esports"}</span>
-              </Link>
-            </button>
-            <NotificationsButton />
-            <AuthSessionControl compact />
-          </div>
-        </div>
-      </header>
+      <CampusHeader active={active} feedView={feedView} searchProps={headerSearchProps} />
 
       <CollapsibleSidebar active={active} />
 

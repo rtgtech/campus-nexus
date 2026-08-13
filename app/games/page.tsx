@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { AuthSessionControl } from "@/components/auth-session-control";
+import { CampusHeader } from "@/components/campus-header";
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
+import { buttonVariants } from "@/components/ui/button";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackGames, type GamesData } from "@/lib/app-data";
+import { cn } from "@/lib/utils";
 
 export default async function GamesPage() {
   const gamesData = await getCampusData<GamesData>("/api/games", fallbackGames);
@@ -10,24 +12,12 @@ export default async function GamesPage() {
   return (
     <>
       <div className="min-h-screen bg-background pb-10 font-body-md text-on-surface">
-        <header className="sticky top-0 z-50 border-b border-surface-container-highest bg-white/80 shadow-sm shadow-primary/5 backdrop-blur-xl">
-          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5">
-            <div className="font-['Space_Grotesk'] text-2xl font-black tracking-tighter text-primary">
-              Campus Nexus
-            </div>
-            <div className="flex items-center gap-4">
-              <button className="material-symbols-outlined rounded-full p-2 text-outline transition-all duration-200 ease-out hover:bg-surface-container active:scale-95">
-                notifications
-              </button>
-              <AuthSessionControl compact />
-            </div>
-          </div>
-        </header>
+        <CampusHeader active="games" />
 
         <CollapsibleSidebar active="games" />
 
         <main className="mx-auto max-w-7xl space-y-10 px-4 pt-8 md:px-10">
-          <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm md:p-8">
+          <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs md:p-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Games</p>
@@ -38,7 +28,7 @@ export default async function GamesPage() {
               </div>
               <Link
                 href="/games/leaderboards"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(56,72,96,0.18)] transition hover:scale-[1.02] md:w-auto"
+                className={cn(buttonVariants({ size: "lg" }), "w-full rounded-full px-5 shadow-[0_14px_34px_rgba(56,72,96,0.18)] md:w-auto")}
               >
                 <span className="material-symbols-outlined text-lg">leaderboard</span>
                 Leaderboard
@@ -55,7 +45,7 @@ export default async function GamesPage() {
             <div className="grid gap-6 xl:grid-cols-2">
               <Link
                 href="/games/mind-snap"
-                className="group grid overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,1fr)_260px]"
+                className="group grid overflow-hidden rounded-[10px] border border-surface-container-highest bg-white shadow-xs transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,1fr)_260px]"
               >
                 <div className="space-y-4 p-6 md:p-8">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_14px_34px_rgba(34,29,92,0.18)]">
@@ -74,7 +64,7 @@ export default async function GamesPage() {
                 </div>
 
                 <div className="bg-white p-6">
-                  <div className="grid aspect-square grid-cols-3 gap-2 rounded-[24px] border border-primary/20 bg-primary p-3">
+                  <div className="grid aspect-square grid-cols-3 gap-2 rounded-[10px] border border-primary/20 bg-primary p-3">
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((cell) => {
                       const isLit = [0, 2, 4, 7].includes(cell);
                       return (
@@ -95,7 +85,7 @@ export default async function GamesPage() {
 
               <Link
                 href="/games/sudoku"
-                className="group grid overflow-hidden rounded-[28px] border border-surface-container-highest bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,1fr)_260px]"
+                className="group grid overflow-hidden rounded-[10px] border border-surface-container-highest bg-white shadow-xs transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,1fr)_260px]"
               >
                 <div className="space-y-4 p-6 md:p-8">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_14px_34px_rgba(34,29,92,0.18)]">
@@ -139,7 +129,7 @@ export default async function GamesPage() {
               {gamesData.gameCards.map((card) => (
                 <article
                   key={card.title}
-                  className="overflow-hidden rounded-[24px] border border-outline-variant bg-white shadow-sm"
+                  className="overflow-hidden rounded-[10px] border border-outline-variant bg-white shadow-xs"
                 >
                   <div className="relative aspect-square overflow-hidden bg-primary-fixed">
                     {card.image ? <img alt={card.title} className="h-full w-full object-cover" src={card.image} /> : null}
@@ -157,7 +147,7 @@ export default async function GamesPage() {
           ) : null}
 
           {gamesData.topRated.length > 0 ? (
-            <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm">
+            <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs">
               <h2 className="font-headline-lg text-headline-lg">Top rated</h2>
               <div className="mt-5 space-y-3">
                 {gamesData.topRated.map((game) => (
@@ -175,7 +165,7 @@ export default async function GamesPage() {
           ) : null}
 
           {gamesData.recentActivity.length > 0 ? (
-            <section className="rounded-[32px] border border-surface-container-highest bg-white p-6 shadow-sm">
+            <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs">
               <h2 className="font-headline-lg text-headline-lg">Recent activity</h2>
               <div className="mt-5 space-y-3">
                 {gamesData.recentActivity.map((item) => (

@@ -2,6 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { FeedPostCard } from "@/components/feed-post-card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 
@@ -56,19 +70,6 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
     setSelectedPost(post);
   }
 
-  useEffect(() => {
-    if (!selectedPost) {
-      return;
-    }
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [selectedPost]);
-
   const canDeleteSelectedPost =
     Boolean(selectedPost) &&
     Boolean(postId(selectedPost as FeedCard)) &&
@@ -82,11 +83,6 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
 
     const activePostId = postId(selectedPost);
     if (!activePostId) {
-      return;
-    }
-
-    const confirmed = window.confirm("Delete this post? This cannot be undone.");
-    if (!confirmed) {
       return;
     }
 
@@ -125,10 +121,11 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
             const title = postTitle(post);
 
             return (
-              <button
+              <Button
                 key={post.postId ?? `${post.authorId}-${title}`}
-                className="group relative aspect-square overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-low text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+                className="group relative h-auto aspect-square w-full justify-start overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-low p-0 text-left shadow-xs hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
                 type="button"
+                variant="ghost"
                 onClick={() => openPost(post)}
               >
                 {mediaUrl ? (
@@ -150,51 +147,68 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
                   <p className="truncate text-sm font-semibold">{title}</p>
                   <p className="mt-1 text-xs text-white/76">View post</p>
                 </div>
-              </button>
+              </Button>
             );
           })}
         </div>
       )}
 
-      {selectedPost ? (
-        <div
-          className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-[rgba(15,18,33,0.58)] px-4 py-8 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="View post"
-          onClick={() => setSelectedPost(null)}
-        >
-          <div className="w-full max-w-3xl" onClick={(event) => event.stopPropagation()}>
+      <Dialog
+        open={Boolean(selectedPost)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setSelectedPost(null);
+        }}
+      >
+        {selectedPost ? (
+          <DialogContent className="block max-h-[calc(100dvh-2rem)] max-w-3xl overflow-hidden bg-transparent p-0 ring-0" showCloseButton={false}>
+            <DialogTitle className="sr-only">View post</DialogTitle>
+            <DialogDescription className="sr-only">Post details and actions</DialogDescription>
             <div className="mb-3 flex justify-end">
               {deleteMessage ? (
-                <p className="mr-auto rounded-full bg-white px-4 py-2 text-sm font-semibold text-secondary shadow-sm">
+                <p className="mr-auto rounded-full bg-white px-4 py-2 text-sm font-semibold text-secondary shadow-xs">
                   {deleteMessage}
                 </p>
               ) : null}
               {canDeleteSelectedPost ? (
-                <button
-                  className="mr-2 inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-secondary/90 disabled:opacity-60"
-                  disabled={deleteStatus === "deleting"}
-                  type="button"
-                  onClick={deleteSelectedPost}
-                >
-                  <span className="material-symbols-outlined text-lg">delete</span>
-                  {deleteStatus === "deleting" ? "Deleting..." : "Delete post"}
-                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger
+                    render={
+                      <Button className="mr-2 rounded-full shadow-xs" disabled={deleteStatus === "deleting"} variant="destructive" />
+                    }
+                  >
+                    <span className="material-symbols-outlined text-lg">delete</span>
+                    {deleteStatus === "deleting" ? "Deleting..." : "Delete post"}
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                      <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction variant="destructive" onClick={deleteSelectedPost}>
+                        Delete post
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               ) : null}
-              <button
-                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-on-surface shadow-sm transition hover:text-secondary"
+              <Button
+                className="rounded-full bg-white text-on-surface shadow-xs hover:text-secondary"
                 type="button"
+                variant="outline"
                 onClick={() => setSelectedPost(null)}
               >
                 <span className="material-symbols-outlined text-lg">close</span>
                 Close
-              </button>
+              </Button>
             </div>
-            <FeedPostCard post={selectedPost} />
-          </div>
-        </div>
-      ) : null}
+            <ScrollArea className="max-h-[calc(100dvh-6rem)]">
+              <FeedPostCard post={selectedPost} />
+            </ScrollArea>
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </>
   );
 }

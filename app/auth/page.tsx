@@ -1,8 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { CampusHeader } from "@/components/campus-header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   API_BASE_URL,
   CampusAuthSession,
@@ -109,24 +115,20 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-6 text-on-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col">
-        <header className="flex items-center justify-between gap-4">
-          <Link href="/" className="font-['Space_Grotesk'] text-2xl font-black tracking-[-0.06em] text-primary">
-            Campus Nexus
-          </Link>
-        </header>
-
+    <>
+      <CampusHeader />
+      <main className="min-h-[calc(100vh-4rem)] bg-background px-4 text-on-background md:px-6">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col">
         <section className="grid flex-1 items-center gap-6 py-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.72fr)]">
-          <div className="relative py-10 rounded-[28px] bg-primary text-white shadow-[0_24px_80px_rgba(34,29,92,0.22)] lg:block">
+          <div className="relative py-10 rounded-[10px] bg-primary text-white shadow-[0_24px_80px_rgba(34,29,92,0.22)] lg:block">
             <div className="relative flex p-8 flex-col justify-between">
               
 
-              <div className="max-w-xl">
+              <div className="">
                 <h1 className="font-['Space_Grotesk'] text-5xl font-bold leading-tight tracking-tight">
                   Your campus circle starts here.
                 </h1>
-                <p className="mt-4 max-w-lg text-base leading-7 text-white/82">
+                <p className="mt-4 text-base leading-7 text-white/82">
                   Sign in to post, discover clubs, follow events and activities, and keep your student profile ready.
                 </p>
                 <p>
@@ -140,7 +142,7 @@ export default function AuthPage() {
                   ["forum", "Campus chats"],
                   ["storefront", "Marketplace"],
                 ].map(([icon, label]) => (
-                  <div key={label} className="rounded-2xl bg-white/12 p-4 backdrop-blur">
+                  <div key={label} className="rounded-2xl bg-white/12 p-4 backdrop-blur-sm">
                     <span className="material-symbols-outlined text-2xl">{icon}</span>
                     <p className="mt-3 text-sm font-semibold text-white">{label}</p>
                   </div>
@@ -149,26 +151,21 @@ export default function AuthPage() {
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-xl rounded-[28px] border border-outline-variant/60 bg-white/90 p-5 shadow-[0_18px_48px_rgba(27,27,35,0.08)] backdrop-blur-xl md:p-6">
-            <div className="flex rounded-full bg-surface-container-low p-1">
-              {(["login", "signup"] as AuthMode[]).map((item) => (
-                <button
-                  key={item}
-                  className={[
-                    "flex-1 rounded-full px-4 py-3 text-sm font-semibold transition",
-                    mode === item ? "bg-primary text-on-primary shadow-[0_12px_30px_rgba(34,29,92,0.18)]" : "text-on-surface-variant hover:text-primary",
-                  ].join(" ")}
-                  type="button"
-                  onClick={() => {
-                    setMode(item);
-                    setStatus("idle");
-                    setMessage("");
-                  }}
-                >
-                  {item === "login" ? "Login" : "Sign up"}
-                </button>
-              ))}
-            </div>
+          <Card className="mx-auto w-full rounded-[10px] border-outline-variant/60 bg-white/90 py-0 shadow-[0_18px_48px_rgba(27,27,35,0.08)] backdrop-blur-xl">
+            <CardContent className="p-5 md:p-6">
+            <Tabs
+              value={mode}
+              onValueChange={(value) => {
+                setMode(value as AuthMode);
+                setStatus("idle");
+                setMessage("");
+              }}
+            >
+              <TabsList className="grid h-12 w-full grid-cols-2 rounded-full bg-surface-container-low">
+                <TabsTrigger className="rounded-full" value="login">Login</TabsTrigger>
+                <TabsTrigger className="rounded-full" value="signup">Sign up</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
             <div className="mt-6">
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">
@@ -182,109 +179,116 @@ export default function AuthPage() {
             <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
               {mode === "signup" ? (
                 <>
-                  <label className="block space-y-2">
-                    <span className="text-sm font-semibold text-on-surface">Name</span>
-                    <input
+                  <Field>
+                    <FieldLabel htmlFor="name">Name</FieldLabel>
+                    <Input
                       required
-                      className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                      className="h-11 rounded-2xl bg-surface-container-low px-4"
+                      id="name"
                       name="name"
                       type="text"
                     />
-                  </label>
+                  </Field>
 
-                  <label className="block space-y-2">
-                    <span className="text-sm font-semibold text-on-surface">Username</span>
-                    <input
+                  <Field>
+                    <FieldLabel htmlFor="username">Username</FieldLabel>
+                    <Input
                       required
                       autoComplete="username"
-                      className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                      className="h-11 rounded-2xl bg-surface-container-low px-4"
+                      id="username"
                       name="username"
                       type="text"
                     />
-                  </label>
+                  </Field>
                 </>
               ) : null}
 
-              <label className="block space-y-2">
-                <span className="text-sm font-semibold text-on-surface">
+              <Field>
+                <FieldLabel htmlFor="auth-identity">
                   {mode === "login" ? "Email or username" : "Email"}
-                </span>
-                <input
+                </FieldLabel>
+                <Input
                   required
                   autoComplete={mode === "login" ? "username" : "email"}
-                  className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                  className="h-11 rounded-2xl bg-surface-container-low px-4"
+                  id="auth-identity"
                   name={mode === "login" ? "login" : "email"}
                   type={mode === "login" ? "text" : "email"}
                 />
-                {mode === "signup" ? <span className="text-xs text-on-surface-variant">Use an approved institutional email.</span> : null}
-              </label>
+                {mode === "signup" ? <FieldDescription>Use an approved institutional email.</FieldDescription> : null}
+              </Field>
 
               {mode === "signup" ? (
                 <div className="grid gap-5 md:grid-cols-2">
-                  <label className="block space-y-2">
-                    <span className="text-sm font-semibold text-on-surface">Date of birth</span>
-                    <input
+                  <Field>
+                    <FieldLabel htmlFor="dateOfBirth">Date of birth</FieldLabel>
+                    <Input
                       required
-                      className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                      className="h-11 rounded-2xl bg-surface-container-low px-4"
+                      id="dateOfBirth"
                       name="dateOfBirth"
                       type="date"
                     />
-                  </label>
+                  </Field>
 
-                  <label className="block space-y-2">
-                    <span className="text-sm font-semibold text-on-surface">Year</span>
-                    <select
+                  <Field>
+                    <FieldLabel htmlFor="yearOfStudy">Year</FieldLabel>
+                    <NativeSelect
                       required
-                      className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                      className="w-full [&_select]:h-11 [&_select]:rounded-2xl [&_select]:bg-surface-container-low"
+                      id="yearOfStudy"
                       name="yearOfStudy"
                       defaultValue=""
                     >
-                      <option value="" disabled>
+                      <NativeSelectOption value="" disabled>
                         Select year
-                      </option>
+                      </NativeSelectOption>
                       {[1, 2, 3, 4].map((year) => (
-                        <option key={year} value={year}>
+                        <NativeSelectOption key={year} value={year}>
                           Year {year}
-                        </option>
+                        </NativeSelectOption>
                       ))}
-                    </select>
-                  </label>
+                    </NativeSelect>
+                  </Field>
                 </div>
               ) : null}
 
               {mode === "signup" ? (
-                <label className="block space-y-2">
-                  <span className="text-sm font-semibold text-on-surface">Department</span>
-                  <select
+                <Field>
+                  <FieldLabel htmlFor="department">Department</FieldLabel>
+                  <NativeSelect
                     required
-                    className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                    className="w-full [&_select]:h-11 [&_select]:rounded-2xl [&_select]:bg-surface-container-low"
+                    id="department"
                     name="department"
                     defaultValue=""
                   >
-                    <option value="" disabled>
+                    <NativeSelectOption value="" disabled>
                       Select department
-                    </option>
+                    </NativeSelectOption>
                     {["CS", "Mech", "ECE", "Electrical"].map((department) => (
-                      <option key={department} value={department}>
+                      <NativeSelectOption key={department} value={department}>
                         {department}
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </select>
-                </label>
+                  </NativeSelect>
+                </Field>
               ) : null}
 
-              <label className="block space-y-2">
-                <span className="text-sm font-semibold text-on-surface">Password</span>
-                <input
+              <Field>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <Input
                   required
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  className="w-full rounded-2xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none transition focus:border-primary"
+                  className="h-11 rounded-2xl bg-surface-container-low px-4"
+                  id="password"
                   minLength={6}
                   name="password"
                   placeholder="Minimum 6 characters"
                   type="password"
                 />
-              </label>
+              </Field>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/60 pt-5">
                 <p
@@ -293,18 +297,20 @@ export default function AuthPage() {
                 >
                   {status === "saving" ? "Signing you in..." : message}
                 </p>
-                <button
+                <Button
                   disabled={status === "saving"}
-                  className="rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] transition hover:scale-[1.02] disabled:opacity-60"
+                  className="h-11 rounded-full bg-secondary px-5 text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
                   type="submit"
                 >
                   {mode === "login" ? "Login" : "Create Account"}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+            </CardContent>
+          </Card>
         </section>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }

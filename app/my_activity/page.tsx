@@ -3,8 +3,10 @@ import { cookies } from "next/headers";
 import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
+import { buttonVariants } from "@/components/ui/button";
 import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
 import { fallbackFeed, type CampusUser, type FeedCard, type FeedData } from "@/lib/app-data";
+import { cn } from "@/lib/utils";
 
 async function getCurrentUser(token: string | undefined): Promise<CampusUser | null> {
   if (!token) {
@@ -51,7 +53,7 @@ export default async function MyActivityPage() {
   return (
     <CampusShell active="profile">
       <div className="space-y-8">
-        <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)] md:p-8">
+        <section className="rounded-[10px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)] md:p-8">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">My Activity</p>
           <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
@@ -64,7 +66,7 @@ export default async function MyActivityPage() {
             </div>
             <Link
               href={profileKey ? `/${encodeURIComponent(profileKey)}` : "/auth"}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-outline-variant px-4 py-3 text-sm font-semibold text-on-surface transition hover:border-primary hover:text-primary"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-full px-4")}
             >
               <span className="material-symbols-outlined text-base">person</span>
               Profile
@@ -72,7 +74,7 @@ export default async function MyActivityPage() {
           </div>
         </section>
 
-        <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
+        <section className="rounded-[10px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
           <SectionTitle
             title="My Posts"
             description={myPosts.length > 0 ? `${myPosts.length} posts you shared.` : "Posts you create will appear here."}
@@ -92,7 +94,7 @@ export default async function MyActivityPage() {
                   currentUser ? (
                     <Link
                       href="/?=createpost"
-                      className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white"
+                      className={cn(buttonVariants({ size: "lg" }), "rounded-full bg-secondary px-5 text-white hover:bg-secondary/90")}
                     >
                       <span className="material-symbols-outlined text-base">add</span>
                       Create post
@@ -100,7 +102,7 @@ export default async function MyActivityPage() {
                   ) : (
                     <Link
                       href="/auth"
-                      className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary"
+                      className={cn(buttonVariants({ size: "lg" }), "rounded-full px-5")}
                     >
                       <span className="material-symbols-outlined text-base">login</span>
                       Sign in
@@ -112,7 +114,7 @@ export default async function MyActivityPage() {
           </div>
         </section>
 
-        <section className="rounded-[32px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
+        <section className="rounded-[10px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
           <SectionTitle
             title="Liked Posts"
             description={likedPosts.length > 0 ? `${likedPosts.length} posts you liked.` : "Posts you like will appear here."}

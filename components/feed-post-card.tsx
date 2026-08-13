@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 import { formatPostTime } from "@/lib/post-time";
@@ -46,6 +50,7 @@ function profileHref(post: FeedCard) {
 }
 
 export function FeedPostCard({ post }: FeedPostCardProps) {
+  const router = useRouter();
   const initialLiked =
     post.likedByCurrentUser ?? post.viewerHasLiked ?? false;
   const [liked, setLiked] = useState(initialLiked);
@@ -67,6 +72,11 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   const isMarketplacePost = post.type === 2;
   const isAnnouncement = post.type === 3;
   const clubHref = post.clubSlug ? `/clubs/${encodeURIComponent(post.clubSlug)}` : null;
+
+  function openPost(comments = false) {
+    if (!post.postId) return;
+    router.push(`/viewpost?=${encodeURIComponent(post.postId)}${comments ? "&comments=1" : ""}`);
+  }
 
   useEffect(() => {
     setNow(Date.now());
@@ -126,15 +136,27 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
   }
 
   return (
-    <article
+    <Card
       id={post.postId}
-      className="scroll-mt-24 overflow-hidden rounded-[28px] border border-outline-variant/60 bg-white shadow-[0_16px_40px_rgba(27,27,35,0.08)]"
+      aria-label={post.postId ? `View ${title}` : undefined}
+      className={`scroll-mt-24 gap-0 border border-outline-variant/60 bg-white py-0 shadow-[0_16px_40px_rgba(27,27,35,0.08)] ${post.postId ? "cursor-pointer" : ""}`}
+      role={post.postId ? "button" : undefined}
+      tabIndex={post.postId ? 0 : undefined}
+      onClick={(event) => {
+        if (!(event.target as HTMLElement).closest("a, button, video")) openPost();
+      }}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          openPost();
+        }
+      }}
     >
       <div className="flex items-center justify-between px-5 py-4 md:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href={authorHref}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary outline-none transition hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary outline-hidden transition hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-primary/40"
             aria-label={`View ${post.author}'s profile`}
           >
             {getInitials(post.author)}
@@ -142,7 +164,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
           <div className="min-w-0">
             <Link
               href={authorHref}
-              className="truncate font-semibold text-on-surface outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="truncate font-semibold text-on-surface outline-hidden transition hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               {post.author}
             </Link>
@@ -152,38 +174,38 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
                   @{post.clubSlug}
                 </Link>
               ) : null}
-              {isAnnouncement ? <span className="rounded bg-secondary/10 px-1.5 py-0.5 text-secondary">Announcement</span> : null}
+              {isAnnouncement ? <Badge className="rounded bg-secondary/10 px-1.5 py-0.5 text-secondary" variant="secondary">Announcement</Badge> : null}
               {postedAt ? <time dateTime={postTimestamp}>{postedAt}</time> : null}
             </div>
           </div>
         </div>
-        <button className="rounded-full p-2 text-on-surface-variant transition hover:bg-surface-container" type="button">
+        <Button aria-label="Post options" className="rounded-full text-on-surface-variant" size="icon" type="button" variant="ghost">
           <span className="material-symbols-outlined">more_horiz</span>
-        </button>
+        </Button>
       </div>
 
       {hasMedia ? (
         <div className={`relative grid overflow-hidden bg-surface-container-low ${mediaUrls.length > 1 ? "grid-cols-2 gap-0.5" : ""}`}>
           {mediaUrls.map((url, index) =>
             isMp4(url) ? (
-              <video key={`${url}-${index}`} className={mediaUrls.length > 1 ? "aspect-square h-full w-full object-cover" : "aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]"} controls src={url} />
+              <video key={`${url}-${index}`} className={mediaUrls.length > 1 ? "aspect-square h-full w-full object-cover" : "aspect-4/5 h-full w-full object-cover md:aspect-5/4"} controls src={url} />
             ) : (
-              <img key={`${url}-${index}`} alt={`${title} ${index + 1}`} className={mediaUrls.length > 1 ? "aspect-square h-full w-full object-cover" : "aspect-[4/5] h-full w-full object-cover md:aspect-[5/4]"} src={url} />
+              <img key={`${url}-${index}`} alt={`${title} ${index + 1}`} className={mediaUrls.length > 1 ? "aspect-square h-full w-full object-cover" : "aspect-4/5 h-full w-full object-cover md:aspect-5/4"} src={url} />
             )
           )}
           {isMarketplacePost || primaryTag ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
               {isMarketplacePost ? (
-                <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur">
+                <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
                   Marketplace
                 </span>
               ) : <span />}
               {isMarketplacePost && post.price ? (
-                <span className="rounded-full bg-white/92 px-3 py-1 text-xs font-bold text-primary shadow-sm">
+                <span className="rounded-full bg-white/92 px-3 py-1 text-xs font-bold text-primary shadow-xs">
                   {post.price}
                 </span>
               ) : primaryTag ? (
-                <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur">
+                <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
                   {primaryTag}
                 </span>
               ) : null}
@@ -192,7 +214,7 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
         </div>
       ) : (
         <div className="px-5 pb-2 pt-1 md:px-6">
-          <div className="rounded-[24px] bg-surface-container-low px-5 py-6">
+          <div className="rounded-[10px] bg-surface-container-low px-5 py-6">
             <p className="text-lg font-semibold leading-8 text-on-surface">{captionText}</p>
             {detailText ? <p className="mt-3 text-sm leading-6 text-on-surface-variant">{detailText}</p> : null}
             {primaryTag ? (
@@ -207,30 +229,33 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
       <div className="px-5 pb-5 pt-4 md:px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 text-on-surface">
-            <button
+            <Button
               aria-pressed={liked}
-              className="rounded-full p-2 transition hover:bg-surface-container disabled:opacity-60"
+              aria-label={liked ? "Unlike post" : "Like post"}
+              className="rounded-full"
               disabled={isLikePending}
+              size="icon"
               type="button"
+              variant="ghost"
               onClick={handleLike}
             >
               <span className={liked ? "material-symbols-outlined text-secondary" : "material-symbols-outlined"}>
                 {liked ? "favorite" : "favorite_border"}
               </span>
-            </button>
-            <button className="rounded-full p-2 transition hover:bg-surface-container" type="button">
+            </Button>
+            <Button aria-label="Comment" className="rounded-full" size="icon" type="button" variant="ghost" onClick={() => openPost(true)}>
               <span className="material-symbols-outlined">chat_bubble_outline</span>
-            </button>
-            <button className="rounded-full p-2 transition hover:bg-surface-container" type="button" onClick={handleShare}>
+            </Button>
+            <Button aria-label="Repost" className="rounded-full" size="icon" type="button" variant="ghost" onClick={handleShare}>
               <span className="material-symbols-outlined">repeat</span>
-            </button>
-            <button className="rounded-full p-2 transition hover:bg-surface-container" type="button" onClick={handleShare}>
+            </Button>
+            <Button aria-label="Share post" className="rounded-full" size="icon" type="button" variant="ghost" onClick={handleShare}>
               <span className="material-symbols-outlined">send</span>
-            </button>
+            </Button>
           </div>
-          <button className="rounded-full p-2 text-on-surface transition hover:bg-surface-container" type="button">
+          <Button aria-label="Save post" className="rounded-full text-on-surface" size="icon" type="button" variant="ghost">
             <span className="material-symbols-outlined">bookmark_add</span>
-          </button>
+          </Button>
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-on-surface">
@@ -257,15 +282,17 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
         </div>
 
         <div className="mt-3 flex items-center justify-between border-t border-outline-variant/50 pt-3 text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-          <button
-            className="transition hover:text-primary"
+          <Button
+            className="h-auto p-0 text-xs font-semibold uppercase tracking-[0.18em] hover:text-primary"
             type="button"
+            variant="link"
+            onClick={() => openPost(true)}
           >
             View discussion
-          </button>
+          </Button>
           <span>Campus Nexus</span>
         </div>
       </div>
-    </article>
+    </Card>
   );
 }

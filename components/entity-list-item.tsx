@@ -2,6 +2,9 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { getInitials } from "@/lib/app-data";
 
 type EntityKind = "user" | "club" | "post" | "product";
@@ -87,39 +90,40 @@ export function EntityListItem({
     : "block truncate text-xs text-on-surface-variant";
 
   return (
-    <div className={rowClassName}>
-      <Link
-        href={href}
-        className={`relative flex h-10 w-10 shrink-0 items-center justify-center text-xs font-bold ${avatarClasses}`}
-        aria-label={title}
-        onClick={onNavigate}
-      >
-        {image ? (
-          <span className={`absolute inset-0 overflow-hidden ${kind === "club" ? "rounded-xl" : "rounded-full"}`}>
-            <img alt="" className="h-full w-full object-cover" src={image} />
-          </span>
-        ) : initials || kind === "user" ? (
-          <span>{initials || getInitials(title)}</span>
-        ) : (
-          <span className="material-symbols-outlined text-xl">{icon || defaultIcons[kind]}</span>
-        )}
-        {badgeIcon ? (
-          <span
-            className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white text-primary shadow-sm"
-            aria-label={badgeLabel}
-            title={badgeLabel}
-          >
-            <span className="material-symbols-outlined text-[11px] leading-none">{badgeIcon}</span>
-          </span>
-        ) : null}
-      </Link>
-      <Link href={href} className="min-w-0 flex-1" onClick={onNavigate}>
-        <span className={titleClassName ?? defaultTitleClassName}>{title}</span>
-        {subtitle ? (
-          <span className={subtitleClassName ?? defaultSubtitleClassName}>{subtitle}</span>
-        ) : null}
-      </Link>
-      {trailing}
-    </div>
+    <Item className={rowClassName}>
+      <ItemMedia>
+        <Link href={href} aria-label={title} onClick={onNavigate}>
+          <Avatar className={`size-10 text-xs font-bold ${avatarClasses}`}>
+            {image ? <AvatarImage alt="" src={image} /> : null}
+            <AvatarFallback className="bg-transparent text-inherit">
+              {initials || kind === "user" ? (
+                initials || getInitials(title)
+              ) : (
+                <span className="material-symbols-outlined text-xl">{icon || defaultIcons[kind]}</span>
+              )}
+            </AvatarFallback>
+            {badgeIcon ? (
+              <AvatarBadge
+                aria-label={badgeLabel}
+                className="size-5 bg-background text-primary ring-1 ring-background"
+                title={badgeLabel}
+              >
+                <span className="material-symbols-outlined text-[11px] leading-none">{badgeIcon}</span>
+              </AvatarBadge>
+            ) : null}
+          </Avatar>
+        </Link>
+      </ItemMedia>
+      <ItemContent className="min-w-0">
+        <Link href={href} onClick={onNavigate}>
+          <ItemTitle className={titleClassName ?? defaultTitleClassName}>{title}</ItemTitle>
+          {subtitle ? (
+            <ItemDescription className={subtitleClassName ?? defaultSubtitleClassName}>{subtitle}</ItemDescription>
+          ) : null}
+        </Link>
+      </ItemContent>
+      {trailing ? <ItemActions>{trailing}</ItemActions> : null}
+      {badgeLabel && !badgeIcon ? <Badge>{badgeLabel}</Badge> : null}
+    </Item>
   );
 }

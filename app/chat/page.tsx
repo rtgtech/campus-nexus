@@ -1,5 +1,8 @@
 import { CampusShell } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackMessages, profileAvatar, type MessagesData } from "@/lib/app-data";
 
@@ -17,7 +20,7 @@ export default async function ChatPage() {
 
   return (
     <CampusShell active="messages">
-      <div className="overflow-hidden rounded-[30px] border border-outline-variant/60 bg-white shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
+      <div className="overflow-hidden rounded-[10px] border border-outline-variant/60 bg-white shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
         <div className="grid min-h-[76vh] md:grid-cols-[360px_minmax(0,1fr)]">
           <aside className="border-b border-outline-variant/50 bg-surface-container-low md:border-b-0 md:border-r">
             <div className="border-b border-outline-variant/50 p-5">
@@ -26,43 +29,41 @@ export default async function ChatPage() {
                   <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-on-background">Chat</h1>
                   <p className="mt-1 text-sm text-on-surface-variant">{messagesData.conversations.length} conversations</p>
                 </div>
-                <button className="rounded-2xl bg-primary p-2 text-on-primary">
+                <Button aria-label="New chat" className="rounded-2xl" size="icon">
                   <span className="material-symbols-outlined">edit_square</span>
-                </button>
+                </Button>
               </div>
-              <div className="mt-4 rounded-2xl border border-outline-variant/50 bg-white px-4 py-3">
-                <div className="flex items-center gap-2">
+              <InputGroup className="mt-4 h-11 rounded-2xl border-outline-variant/50 bg-white px-2">
+                <InputGroupAddon>
                   <span className="material-symbols-outlined text-base text-on-surface-variant">search</span>
-                  <input
-                    className="w-full bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant"
-                    placeholder="Search chats"
-                    type="text"
-                  />
-                </div>
-              </div>
+                </InputGroupAddon>
+                <InputGroupInput placeholder="Search chats" type="search" />
+              </InputGroup>
               <div className="mt-4 flex gap-2 overflow-auto">
                 {["All", "Unread", "Groups", "Campus"].map((tab, index) => (
-                  <button
+                  <Button
                     key={tab}
                     className={[
-                      "whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold",
-                      index === 0 ? "bg-primary text-on-primary" : "bg-white text-on-surface-variant",
+                      "rounded-full px-4",
+                      index === 0 ? "" : "bg-white text-on-surface-variant",
                     ].join(" ")}
+                    variant={index === 0 ? "default" : "ghost"}
                   >
                     {tab}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
             <div className="divide-y divide-outline-variant/35">
               {messagesData.conversations.map((conversation) => (
-                <button
+                <Button
                   key={conversation.name}
                   className={[
-                    "flex w-full items-center gap-4 px-5 py-4 text-left transition",
+                    "h-auto w-full justify-start rounded-none px-5 py-4 text-left",
                     conversation.active ? "bg-white" : "hover:bg-white/70",
                   ].join(" ")}
+                  variant="ghost"
                 >
                   <div className="relative">
                     <img
@@ -95,7 +96,7 @@ export default async function ChatPage() {
                       ) : null}
                     </div>
                   </div>
-                </button>
+                </Button>
               ))}
             </div>
           </aside>
@@ -119,9 +120,9 @@ export default async function ChatPage() {
               </div>
               <div className="flex gap-2">
                 {["videocam", "call", "info"].map((icon) => (
-                  <button key={icon} className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container">
+                  <Button key={icon} aria-label={icon} className="rounded-full text-on-surface-variant" size="icon" variant="ghost">
                     <span className="material-symbols-outlined">{icon}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </header>
@@ -144,7 +145,7 @@ export default async function ChatPage() {
                       <div>
                         <div
                           className={[
-                            "rounded-[24px] px-4 py-3 text-sm leading-7 shadow-sm",
+                            "rounded-[10px] px-4 py-3 text-sm leading-7 shadow-xs",
                             isRight
                               ? "rounded-br-md bg-primary text-on-primary"
                               : "rounded-bl-md border border-outline-variant/45 bg-white text-on-surface",
@@ -181,20 +182,20 @@ export default async function ChatPage() {
 
             <footer className="border-t border-outline-variant/50 bg-white px-5 py-4 md:px-6">
               <div className="flex items-center gap-3">
-                <button className="rounded-2xl bg-surface-container p-3 text-primary">
+                <Button aria-label="Add attachment" className="size-12 rounded-2xl bg-surface-container text-primary" size="icon" variant="ghost">
                   <span className="material-symbols-outlined">add</span>
-                </button>
-                <button className="rounded-2xl bg-surface-container p-3 text-primary">
+                </Button>
+                <Button aria-label="Add photo" className="size-12 rounded-2xl bg-surface-container text-primary" size="icon" variant="ghost">
                   <span className="material-symbols-outlined">photo_camera</span>
-                </button>
-                <input
-                  className="h-14 flex-1 rounded-2xl border border-outline-variant/50 bg-surface-container-low px-5 text-sm outline-none focus:border-primary"
+                </Button>
+                <Input
+                  className="h-14 flex-1 rounded-2xl border border-outline-variant/50 bg-surface-container-low px-5 text-sm outline-hidden focus:border-primary"
                   placeholder="Write a message"
                   type="text"
                 />
-                <button className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary">
+                <Button className="h-12 rounded-2xl px-5">
                   Send
-                </button>
+                </Button>
               </div>
             </footer>
           </section>
