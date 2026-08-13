@@ -79,6 +79,20 @@ export type ClubCard = {
   statusClass: string;
   followers?: number;
   postsCount?: number;
+  category?: string;
+  memberCount?: number;
+  membersCount?: number;
+  establishedYear?: number | string;
+  eventsHosted?: number;
+  activityRank?: number | string;
+  recruitingDeadline?: string;
+  latestPost?: {
+    title?: string;
+    body?: string;
+    caption?: string;
+    createdAt?: string;
+  };
+  mutualFollowers?: number;
 };
 
 export type ClubMember = {
@@ -115,6 +129,14 @@ export type ClubDetailData = {
   posts: FeedCard[];
   followers?: number;
   postsCount?: number;
+  events?: ClubEvent[];
+};
+
+export type ClubEvent = {
+  id?: string | number;
+  title: string;
+  startsAt?: string;
+  location?: string;
 };
 
 export type GameCard = {

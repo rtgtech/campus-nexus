@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { type ClubMember } from "@/lib/app-data";
+import { cn } from "@/lib/utils";
 
 function readMedia(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -20,7 +21,15 @@ function readMedia(file: File) {
   });
 }
 
-export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; members: ClubMember[] }) {
+export function ClubPostComposer({
+  clubSlug,
+  members,
+  triggerClassName,
+}: {
+  clubSlug: string;
+  members: ClubMember[];
+  triggerClassName?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<1 | 3>(1);
@@ -78,7 +87,11 @@ export function ClubPostComposer({ clubSlug, members }: { clubSlug: string; memb
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="rounded-full bg-secondary text-white hover:bg-secondary/90" />}>
+      <DialogTrigger
+        render={
+          <Button className={cn("rounded-full bg-secondary text-white hover:bg-secondary/90", triggerClassName)} />
+        }
+      >
         <span className="material-symbols-outlined text-lg">add</span>
         Create
       </DialogTrigger>

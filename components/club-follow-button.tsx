@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils";
 type ClubFollowButtonProps = {
   clubSlug: string;
   clubTitle: string;
-  initialFollowers: number;
+  initialFollowers?: number;
+  layout?: "card" | "button" | "inline";
+  onFollowersChange?: (followers: number) => void;
 };
 
 type ClubFollowStatus = {
@@ -18,16 +20,28 @@ type ClubFollowStatus = {
   followers: number;
 };
 
-function formatCount(value: number) {
-  return new Intl.NumberFormat("en").format(Math.max(0, value));
+function formatCount(value: number | null) {
+  return value === null ? "—" : new Intl.NumberFormat("en").format(Math.max(0, value));
 }
 
-export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: ClubFollowButtonProps) {
+export function ClubFollowButton({
+  clubSlug,
+  clubTitle,
+  initialFollowers,
+  layout = "card",
+  onFollowersChange,
+}: ClubFollowButtonProps) {
   const [session, setSession] = useState<CampusAuthSession | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [followers, setFollowers] = useState(initialFollowers);
+  const [followers, setFollowers] = useState<number | null>(initialFollowers ?? null);
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "error">("loading");
   const [message, setMessage] = useState("");
+
+  function commitFollowers(value: number) {
+    const nextFollowers = Math.max(0, value);
+    setFollowers(nextFollowers);
+    onFollowersChange?.(nextFollowers);
+  }
 
   useEffect(() => {
     const storedSession = readAuthSession();
@@ -38,7 +52,6 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
       return;
     }
 
-    const activeSession = storedSession;
     const controller = new AbortController();
 
     async function loadStatus() {
@@ -52,8 +65,9 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
           throw new Error(typeof data.error === "string" ? data.error : "Club follow status failed");
         }
 
-        setIsFollowing(Boolean((data as ClubFollowStatus).isFollowing));
-        setFollowers(Number((data as ClubFollowStatus).followers ?? initialFollowers));
+        const payload = data as ClubFollowStatus;
+        setIsFollowing(Boolean(payload.isFollowing));
+        commitFollowers(Number(payload.followers ?? initialFollowers ?? 0));
         setStatus("idle");
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -66,6 +80,8 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
     loadStatus();
 
     return () => controller.abort();
+    // onFollowersChange is intentionally excluded: callers may pass a render-local callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubSlug, initialFollowers]);
 
   async function toggleFollow() {
@@ -86,13 +102,63 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
         throw new Error(typeof data.error === "string" ? data.error : "Club follow failed");
       }
 
-      setIsFollowing(Boolean((data as ClubFollowStatus).isFollowing));
-      setFollowers(Number((data as ClubFollowStatus).followers ?? followers));
+      const payload = data as ClubFollowStatus;
+      setIsFollowing(Boolean(payload.isFollowing));
+      commitFollowers(Number(payload.followers ?? followers ?? 0));
       setStatus("idle");
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Club follow failed");
     }
+  }
+
+  const compact = layout !== "card";
+  const action = session ? (
+    <Button
+      className={cn(
+        compact ? "h-9 rounded-[8px] border-[#d6d6d0] px-4 text-xs font-bold" : "h-11 w-full rounded-full px-4",
+        compact && !isFollowing && "border-[#171717] bg-[#171717] text-white hover:bg-[#353532]",
+        compact && isFollowing && "bg-white text-[#5f5f59] hover:bg-[#f1f1ed] hover:text-[#171717]",
+        !compact && !isFollowing && "bg-secondary text-white hover:bg-secondary/90",
+      )}
+      disabled={status === "loading" || status === "saving"}
+      type="button"
+      variant={isFollowing ? "outline" : "default"}
+      onClick={toggleFollow}
+    >
+      {status === "loading" ? "Checking…" : status === "saving" ? "Saving…" : isFollowing ? "Following" : "Follow"}
+    </Button>
+  ) : (
+    <Link
+      href={`/auth?next=${encodeURIComponent(`/clubs/${clubSlug}`)}`}
+      className={cn(
+        buttonVariants(),
+        compact
+          ? "h-9 rounded-[8px] bg-[#171717] px-4 text-xs font-bold text-white hover:bg-[#353532]"
+          : "h-11 w-full rounded-full bg-secondary px-4 text-white hover:bg-secondary/90",
+      )}
+    >
+      Sign in to follow
+    </Link>
+  );
+
+  if (layout === "button") {
+    return (
+      <div>
+        {action}
+        {message ? <span className="sr-only" role="status">{message}</span> : null}
+      </div>
+    );
+  }
+
+  if (layout === "inline") {
+    return (
+      <div className="flex w-full items-center justify-between gap-3">
+        <span className="text-[11px] text-[#686862]">{formatCount(followers)} followers</span>
+        {action}
+        {message ? <span className="sr-only" role="status">{message}</span> : null}
+      </div>
+    );
   }
 
   return (
@@ -106,24 +172,7 @@ export function ClubFollowButton({ clubSlug, clubTitle, initialFollowers }: Club
       </CardHeader>
 
       <CardContent className="p-5 pt-0">
-        {session ? (
-          <Button
-            className={cn("h-11 w-full rounded-full px-4", !isFollowing && "bg-secondary text-white hover:bg-secondary/90")}
-            disabled={status === "loading" || status === "saving"}
-            type="button"
-            variant={isFollowing ? "outline" : "default"}
-            onClick={toggleFollow}
-          >
-            {status === "loading" ? "Checking..." : status === "saving" ? "Saving..." : isFollowing ? "Following" : "Follow club"}
-          </Button>
-        ) : (
-          <Link
-            href={`/auth?next=${encodeURIComponent(`/clubs/${clubSlug}`)}`}
-            className={cn(buttonVariants(), "h-11 w-full rounded-full bg-secondary px-4 text-white hover:bg-secondary/90")}
-          >
-            Sign in to follow
-          </Link>
-        )}
+        {action}
         {message ? <p className="mt-3 text-sm font-semibold text-secondary">{message}</p> : null}
         <p className="mt-3 text-xs text-on-surface-variant">Follow {clubTitle} to keep it on your radar.</p>
       </CardContent>
