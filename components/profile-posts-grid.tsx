@@ -115,7 +115,7 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
           No posts to show.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:gap-4">
           {visiblePosts.map((post) => {
             const mediaUrl = postMedia(post);
             const title = postTitle(post);
@@ -123,7 +123,7 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
             return (
               <Button
                 key={post.postId ?? `${post.authorId}-${title}`}
-                className="group relative h-auto aspect-square w-full justify-start overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface-container-low p-0 text-left shadow-xs hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
+                className="group relative h-auto aspect-[4/3] w-full justify-start overflow-hidden rounded-[12px] border border-[#deded8] bg-white p-0 text-left shadow-none hover:-translate-y-0.5 hover:border-[#aaa] hover:shadow-sm"
                 type="button"
                 variant="ghost"
                 onClick={() => openPost(post)}
@@ -135,15 +135,15 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
                     <img alt={title} className="h-full w-full object-cover transition duration-200 group-hover:scale-105" src={mediaUrl} />
                   )
                 ) : (
-                  <div className="flex h-full flex-col justify-between p-4">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary">
+                  <div className="flex h-full flex-col justify-between bg-[#f5f5f1] p-4">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-[9px] border border-[#deded8] bg-white text-xs font-bold text-[#353532]">
                       {getInitials(post.author)}
                     </span>
-                    <p className="line-clamp-4 font-['Space_Grotesk'] text-lg font-bold leading-tight text-primary">{title}</p>
+                    <p className="line-clamp-4 text-sm font-semibold leading-6 text-[#242422] md:text-base">{title}</p>
                   </div>
                 )}
 
-                <div className="absolute inset-x-0 bottom-0 bg-[rgba(34,29,92,0.78)] p-3 text-white opacity-0 transition group-hover:opacity-100">
+                <div className="absolute inset-x-0 bottom-0 bg-black/72 p-3 text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
                   <p className="truncate text-sm font-semibold">{title}</p>
                   <p className="mt-1 text-xs text-white/76">View post</p>
                 </div>

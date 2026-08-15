@@ -1,12 +1,18 @@
-import Link from "next/link";
-import { CampusShell, SectionTitle } from "@/components/campus-shell";
-import { EmptyState } from "@/components/empty-state";
-import { FriendButton } from "@/components/follow-button";
-import { ProfilePostsGrid } from "@/components/profile-posts-grid";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
-import { fallbackFeed, fallbackProfile, getInitials, type CampusUser, type FeedData, type ProfileData } from "@/lib/app-data";
-import { cn } from "@/lib/utils";
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
+import { CampusShell } from "@/components/campus-shell";
+import { ProfilePageView, type ProfileClubSummary } from "@/components/profile-page-view";
+import { API_BASE_URL } from "@/lib/campus-api";
+import {
+  fallbackProfile,
+  type CampusUser,
+  type ClubDetailData,
+  type ClubsData,
+  type FeedCard,
+  type LeaderboardData,
+  type MarketplaceData,
+  type ProfileData,
+} from "@/lib/app-data";
 
 type ProfilePageProps = {
   params: Promise<{
@@ -14,107 +20,136 @@ type ProfilePageProps = {
   }>;
 };
 
-function formatName(user: string) {
-  return decodeURIComponent(user)
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
+type ClubFollowStatus = {
+  isFollowing?: boolean;
+  followers?: number;
+};
 
-async function getProfileUser(user: string): Promise<CampusUser | null> {
+async function fetchApi<T>(path: string, fallback: T, token?: string): Promise<T> {
   try {
-    const byIdResponse = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(user)}`, {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
       cache: "no-store",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-
-    if (byIdResponse.ok) {
-      return (await byIdResponse.json()) as CampusUser;
+    if (!response.ok) {
+      return fallback;
     }
-
-    const usernameResponse = await fetch(`${API_BASE_URL}/api/users?username=${encodeURIComponent(user)}`, {
-      cache: "no-store",
-    });
-
-    if (!usernameResponse.ok) {
-      return null;
-    }
-
-    const users = (await usernameResponse.json()) as CampusUser[];
-    return users.find((candidate) => candidate.username === user || candidate.userId === user) ?? null;
+    return (await response.json()) as T;
   } catch {
-    return null;
+    return fallback;
   }
 }
 
+async function getProfileUser(identifier: string): Promise<CampusUser | null> {
+  const byId = await fetchApi<CampusUser | null>(`/api/users/${encodeURIComponent(identifier)}`, null);
+  if (byId) {
+    return byId;
+  }
+
+  const users = await fetchApi<CampusUser[]>(`/api/users?username=${encodeURIComponent(identifier)}`, []);
+  const normalizedIdentifier = identifier.toLowerCase();
+  return users.find(
+    (candidate) =>
+      candidate.userId === identifier || candidate.username.toLowerCase() === normalizedIdentifier,
+  ) ?? null;
+}
+
+async function getCurrentUser(token: string | undefined) {
+  if (!token) {
+    return null;
+  }
+  const payload = await fetchApi<{ user?: CampusUser }>("/api/auth/me", {}, token);
+  return payload.user ?? null;
+}
+
+async function getProfileClubs(targetUserId: string, token: string | undefined, isSelf: boolean) {
+  const clubsData = await fetchApi<ClubsData>("/api/clubs", {
+    spotlightClubs: [],
+    clubCards: [],
+    stats: [],
+  });
+
+  const rows = await Promise.all(
+    clubsData.clubCards.map(async (club) => {
+      const detail = await fetchApi<ClubDetailData | null>(
+        `/api/clubs/${encodeURIComponent(club.slug)}`,
+        null,
+        token,
+      );
+      const membership = detail?.members.find((member) => member.userId === targetUserId);
+      const enrichedClub = {
+        ...club,
+        followers: detail?.followers ?? detail?.club.followers ?? club.followers,
+      };
+      let isFollowing = false;
+
+      if (isSelf && token) {
+        const follow = await fetchApi<ClubFollowStatus>(
+          `/api/clubs/${encodeURIComponent(club.slug)}/follow`,
+          {},
+          token,
+        );
+        isFollowing = Boolean(follow.isFollowing);
+        if (follow.followers !== undefined) {
+          enrichedClub.followers = follow.followers;
+        }
+      }
+
+      return { club: enrichedClub, membership, isFollowing };
+    }),
+  );
+
+  return {
+    memberships: rows
+      .filter((row): row is typeof row & { membership: NonNullable<typeof row.membership> } => Boolean(row.membership))
+      .map<ProfileClubSummary>((row) => ({
+        club: row.club,
+        membership: row.membership,
+        followers: row.club.followers,
+      })),
+    followedClubs: rows.filter((row) => row.isFollowing).map((row) => row.club),
+  };
+}
+
 export default async function ProfilePage({ params }: ProfilePageProps) {
-  const { user } = await params;
-  const profileUser = await getProfileUser(user);
-  const displayName = profileUser?.name || formatName(user) || "Profile";
-  const usernameLabel = profileUser?.username ? `@${profileUser.username}` : "";
-  const profile = await getCampusData<ProfileData>(`/api/profile/${encodeURIComponent(user)}`, fallbackProfile);
-  const feedData = await getCampusData<FeedData>("/api/feed", fallbackFeed);
-  const userPosts = profileUser
-    ? feedData.feedCards.filter((post) => post.authorId === profileUser.userId)
-    : [];
+  const { user: identifier } = await params;
+  const token = (await cookies()).get("campusNexusToken")?.value;
+  const [profileUser, currentUser] = await Promise.all([
+    getProfileUser(identifier),
+    getCurrentUser(token),
+  ]);
+
+  if (!profileUser) {
+    notFound();
+  }
+
+  const isSelf = currentUser?.userId === profileUser.userId;
+  const [profile, posts, marketplace, leaderboard, profileClubs] = await Promise.all([
+    fetchApi<ProfileData>(`/api/profiles/${encodeURIComponent(profileUser.username || profileUser.userId)}`, fallbackProfile, token),
+    fetchApi<FeedCard[]>("/api/posts", [], token),
+    fetchApi<MarketplaceData>("/api/marketplace", { items: [] }, token),
+    fetchApi<LeaderboardData>("/api/games/leaderboards", { entries: [] }, token),
+    getProfileClubs(profileUser.userId, token, isSelf),
+  ]);
+
+  const userPosts = posts.filter((post) => post.authorId === profileUser.userId);
+  const userListings = marketplace.items.filter(
+    (item) => item.contact.trim().toLowerCase() === profileUser.email.trim().toLowerCase(),
+  );
+  const leaderboardEntry = leaderboard.entries.find((entry) => entry.userId === profileUser.userId);
 
   return (
-    <CampusShell active="profile">
-      <div className="space-y-8">
-        <section className="rounded-[10px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)] md:p-8">
-          <div className="flex flex-col gap-8 md:flex-row md:items-center">
-            <div className="relative">
-              <div className="h-36 w-36 rounded-full bg-primary p-1 md:h-40 md:w-40">
-                <div className="flex h-full w-full items-center justify-center rounded-full border-4 border-white bg-primary-fixed text-4xl font-bold text-primary md:text-5xl">
-                  {getInitials(displayName)}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1">
-              <h1 className="font-['Space_Grotesk'] text-4xl font-bold tracking-tight text-primary">{displayName}</h1>
-              {usernameLabel ? (
-                <p className="mt-2 text-sm font-semibold text-secondary">{usernameLabel}</p>
-              ) : null}
-              <p className="mt-3 text-lg text-on-surface-variant">{profile.major}</p>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">{profile.bio}</p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                {profileUser ? (
-                  <FriendButton targetUserId={profileUser.userId} targetName={displayName} />
-                ) : (
-                  <Button className="h-11 rounded-full bg-surface-container px-6 text-on-surface-variant" disabled>
-                    Profile unavailable
-                  </Button>
-                )}
-                <Button className="h-11 rounded-full px-4" variant="outline">
-                  Share
-                </Button>
-                <Link
-                  href="/my_activity"
-                  className={cn(buttonVariants({ size: "lg" }), "rounded-full px-5")}
-                >
-                  <span className="material-symbols-outlined text-base">history</span>
-                  My Activity
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[10px] border border-outline-variant/60 bg-white p-6 shadow-[0_18px_50px_rgba(27,27,35,0.08)]">
-          <SectionTitle
-            title="Posts"
-            description={userPosts.length > 0 ? `${userPosts.length} posts shared by ${displayName}.` : "Posts for this profile will appear here."}
-          />
-          <div className="mt-6">
-            {profileUser && userPosts.length > 0 ? (
-              <ProfilePostsGrid ownerUserId={profileUser.userId} posts={userPosts} />
-            ) : (
-              <EmptyState title="No posts yet" description="Profile posts will appear here when this user publishes content." />
-            )}
-          </div>
-        </section>
-      </div>
+    <CampusShell active="profile" headerSearchProps={{ placeholder: "Search people...", types: ["user"] }}>
+      <ProfilePageView
+        currentUserId={currentUser?.userId}
+        followedClubs={profileClubs.followedClubs}
+        leaderboardEntry={leaderboardEntry}
+        listings={userListings}
+        memberships={profileClubs.memberships}
+        posts={userPosts}
+        profile={profile}
+        user={profileUser}
+      />
     </CampusShell>
   );
 }
