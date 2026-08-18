@@ -27,7 +27,6 @@ import {
   type ClubDetailData,
   type ClubMember,
   type ClubsData,
-  fallbackSignalBarItems,
   getInitials,
   type SignalBarItem,
 } from "@/lib/app-data";
@@ -38,6 +37,7 @@ type AdminTab = "profiles" | "clubs" | "signals";
 type AdminDashboardProps = {
   clubsData: ClubsData;
   initialTab: AdminTab;
+  initialSignalItems: SignalBarItem[];
   selectedClub: ClubDetailData | null;
   selectedSlug: string;
 };
@@ -71,7 +71,7 @@ function isSafeSignalLink(value: string) {
   }
 }
 
-export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSlug }: AdminDashboardProps) {
+export function AdminDashboard({ clubsData, initialTab, initialSignalItems, selectedClub, selectedSlug }: AdminDashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [session, setSession] = useState<CampusAuthSession | null>(null);
@@ -82,10 +82,9 @@ export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSl
   const [memberMessage, setMemberMessage] = useState("");
   const [users, setUsers] = useState<CampusUser[]>([]);
   const [usersMessage, setUsersMessage] = useState("Loading profiles...");
-  const [signalItems, setSignalItems] = useState<SignalBarItem[]>(() =>
-    fallbackSignalBarItems.map((item) => ({ ...item })),
-  );
+  const [signalItems, setSignalItems] = useState<SignalBarItem[]>(() => initialSignalItems.map((item) => ({ ...item })));
   const [signalFormOpen, setSignalFormOpen] = useState(false);
+  const [signalSaving, setSignalSaving] = useState(false);
   const [editingSignalId, setEditingSignalId] = useState<string | null>(null);
   const [signalTitle, setSignalTitle] = useState("");
   const [signalLink, setSignalLink] = useState("");
@@ -237,7 +236,7 @@ export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSl
     setSignalFormOpen(false);
   }
 
-  function saveSignal(event: FormEvent<HTMLFormElement>) {
+  async function saveSignal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = signalTitle.trim();
     const link = signalLink.trim();
@@ -251,23 +250,41 @@ export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSl
       return;
     }
 
-    if (editingSignalId) {
-      setSignalItems((items) =>
-        items.map((item) => (item.id === editingSignalId ? { ...item, title, link } : item)),
+    setSignalSaving(true);
+    setSignalMessage("");
+    try {
+      const response = await authFetch(
+        editingSignalId
+          ? `${API_BASE_URL}/api/signal-bar/${encodeURIComponent(editingSignalId)}`
+          : `${API_BASE_URL}/api/signal-bar`,
+        {
+          method: editingSignalId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, link }),
+        },
       );
-      setSignalMessage("Mock title updated for this page view.");
-    } else {
-      setSignalItems((items) => [
-        ...items,
-        { id: `mock-signal-${Date.now()}`, title, link },
-      ]);
-      setSignalMessage("Mock title added for this page view.");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Signal Bar update failed");
+      }
+      const saved = data as SignalBarItem;
+      if (editingSignalId) {
+        setSignalItems((items) => items.map((item) => (item.id === editingSignalId ? saved : item)));
+        setSignalMessage("Title updated.");
+      } else {
+        setSignalItems((items) => [...items, saved].sort((left, right) => (left.position ?? 0) - (right.position ?? 0)));
+        setSignalMessage("Title added.");
+      }
+      setEditingSignalId(null);
+      setSignalTitle("");
+      setSignalLink("");
+      setSignalFormOpen(false);
+      router.refresh();
+    } catch (error) {
+      setSignalMessage(error instanceof Error ? error.message : "Signal Bar update failed");
+    } finally {
+      setSignalSaving(false);
     }
-
-    setEditingSignalId(null);
-    setSignalTitle("");
-    setSignalLink("");
-    setSignalFormOpen(false);
   }
 
   const panelClassName = "border border-outline-variant/70 bg-white";
@@ -591,19 +608,15 @@ export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSl
                 <Button className="rounded-[3px] px-4" type="button" onClick={beginAddSignal}>Add title</Button>
               </div>
 
-              <div className="mt-5 border-l-2 border-[#8a6d1d] bg-[#fffaf0] px-4 py-3 text-sm text-[#66521d]">
-                <p className="font-semibold">Placeholder data</p>
-                <p className="mt-1 leading-5">The Signal Bar API is not available. Additions and edits below are mock changes and reset when this page reloads.</p>
-              </div>
-
               {signalFormOpen ? (
-                <form className={cn(panelClassName, "mt-4 p-4")} onSubmit={saveSignal}>
+                <form className={cn(panelClassName, "mt-5 p-4")} onSubmit={saveSignal}>
                   <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
                     <div>
                       <Label htmlFor="signal-title">Title</Label>
                       <Input
                         id="signal-title"
                         className="mt-1.5 h-10 rounded-[3px] border-outline-variant bg-white"
+                        maxLength={160}
                         placeholder="Campus update title"
                         value={signalTitle}
                         onChange={(event) => setSignalTitle(event.target.value)}
@@ -614,16 +627,17 @@ export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSl
                       <Input
                         id="signal-link"
                         className="mt-1.5 h-10 rounded-[3px] border-outline-variant bg-white"
+                        maxLength={2048}
                         placeholder="/clubs or https://example.com"
                         value={signalLink}
                         onChange={(event) => setSignalLink(event.target.value)}
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Button className="h-10 rounded-[3px] px-4" type="submit">
-                        {editingSignalId ? "Update" : "Add"}
+                      <Button className="h-10 rounded-[3px] px-4" disabled={signalSaving} type="submit">
+                        {signalSaving ? "Saving" : editingSignalId ? "Update" : "Add"}
                       </Button>
-                      <Button className="h-10 rounded-[3px]" type="button" variant="outline" onClick={cancelSignalForm}>Cancel</Button>
+                      <Button className="h-10 rounded-[3px]" disabled={signalSaving} type="button" variant="outline" onClick={cancelSignalForm}>Cancel</Button>
                     </div>
                   </div>
                   {signalMessage ? <p className="mt-3 text-sm text-destructive">{signalMessage}</p> : null}
@@ -641,7 +655,9 @@ export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSl
                   <span>Action</span>
                 </div>
                 <div className="divide-y divide-outline-variant/60">
-                  {signalItems.map((signal) => (
+                  {signalItems.length === 0 ? (
+                    <p className="px-4 py-5 text-sm text-on-surface-variant">No Signal Bar titles yet.</p>
+                  ) : signalItems.map((signal) => (
                     <div key={signal.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto] md:items-center">
                       <a className="min-w-0 truncate text-sm font-semibold underline-offset-4 hover:underline" href={signal.link}>
                         {signal.title}

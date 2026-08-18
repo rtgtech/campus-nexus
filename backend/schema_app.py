@@ -22,10 +22,14 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    delete,
+    event,
     func,
+    inspect,
     select,
+    text as sql_text,
 )
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -98,6 +102,47 @@ SINGLE_CLUB_MEMBER_ROLES = CLUB_MEMBER_ROLES - {"member"}
 CLUB_PUBLISHER_ROLES = {"president", "chairman", "secretary"}
 CLUB_POST_TYPES = {"club_post", "announcement"}
 DEPARTMENTS = {"CS", "Mech", "ECE", "Electrical"}
+PROFILE_VISIBILITY_VALUES = {"private", "friends", "campus"}
+SIGNAL_TITLE_MAX_LENGTH = 160
+SIGNAL_LINK_MAX_LENGTH = 2048
+LAST_ACTIVE_WRITE_INTERVAL = timedelta(minutes=5)
+ONLINE_WINDOW = timedelta(minutes=5)
+REQUIRED_SCHEMA_VERSION = "002_saved_posts"
+REQUIRED_SCHEMA_COLUMNS = {
+    "users": {"lastActiveAt"},
+    "user_interests": {"userId", "interest", "createdAt"},
+    "user_preferences": {
+        "userId",
+        "notifyOfficial",
+        "notifyDepartment",
+        "notifyClub",
+        "notifyStudent",
+        "notifyExternal",
+        "profileVisibility",
+        "eventHistoryVisibility",
+        "marketplaceActivityVisibility",
+        "createdAt",
+        "updatedAt",
+    },
+    "badges": {"badgeId", "name", "icon", "isActive", "createdAt"},
+    "user_badges": {"userId", "badgeId", "earnedAt"},
+    "signal_bar_items": {"signalBarItemId", "title", "link", "position", "createdAt", "updatedAt"},
+    "marketplace_trades": {"tradeId", "itemId", "sellerId", "buyerId", "status", "completedAt"},
+    "marketplace_reviews": {"reviewId", "tradeId", "reviewerId", "revieweeId", "rating"},
+    "chat_threads": {"directKey"},
+    "post_bookmarks": {"postId", "userId", "createdAt"},
+}
+REQUIRED_TIMEZONE_COLUMNS = {
+    "users": {"lastActiveAt"},
+    "user_interests": {"createdAt"},
+    "user_preferences": {"createdAt", "updatedAt"},
+    "badges": {"createdAt"},
+    "user_badges": {"earnedAt"},
+    "signal_bar_items": {"createdAt", "updatedAt"},
+    "marketplace_trades": {"completedAt", "createdAt", "updatedAt"},
+    "marketplace_reviews": {"createdAt"},
+    "post_bookmarks": {"createdAt"},
+}
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")
 VIDEO_EXTENSIONS = (".mp4",)
 HASHTAG_RE = re.compile(r"(?<![\w])#([A-Za-z0-9_]+)")
@@ -128,6 +173,10 @@ if JWT_EXPIRES_HOURS <= 0:
 
 
 class Base(DeclarativeBase):
+    pass
+
+
+class DatabaseSchemaError(RuntimeError):
     pass
 
 
@@ -166,11 +215,12 @@ class User(Base):
     profilePhotoUrl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     profileVisibility: Mapped[str] = mapped_column(Text, default="public", nullable=False)
     notificationsEnabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    lastActiveAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     reputationScore: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     safetyScore: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     isActive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.fullName
@@ -183,9 +233,72 @@ class User(Base):
             "email": self.email,
             "dateOfBirth": dob,
             "yearOfStudy": year,
+            "batchYear": self.batchYear,
             "department": self.department or "",
             "initials": initials_for_name(name),
+            "lastActiveAt": utc_isoformat(self.lastActiveAt) if self.lastActiveAt else None,
+            "isOnline": bool(self.lastActiveAt and utcnow() - as_utc(self.lastActiveAt) <= ONLINE_WINDOW),
         }
+
+
+class UserInterest(Base):
+    __tablename__ = "user_interests"
+
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    interest: Mapped[str] = mapped_column(String(80), primary_key=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+    __table_args__ = (
+        CheckConstraint("\"profileVisibility\" IN ('private', 'friends', 'campus')", name="ck_user_preferences_profile_visibility"),
+        CheckConstraint("\"eventHistoryVisibility\" IN ('private', 'friends', 'campus')", name="ck_user_preferences_event_visibility"),
+        CheckConstraint("\"marketplaceActivityVisibility\" IN ('private', 'friends', 'campus')", name="ck_user_preferences_marketplace_visibility"),
+    )
+
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    notifyOfficial: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notifyDepartment: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notifyClub: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notifyStudent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notifyExternal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    profileVisibility: Mapped[str] = mapped_column(String(16), default="campus", nullable=False)
+    eventHistoryVisibility: Mapped[str] = mapped_column(String(16), default="friends", nullable=False)
+    marketplaceActivityVisibility: Mapped[str] = mapped_column(String(16), default="campus", nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class Badge(Base):
+    __tablename__ = "badges"
+
+    badgeId: Mapped[str] = mapped_column(String(80), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    icon: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    isActive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class UserBadge(Base):
+    __tablename__ = "user_badges"
+
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    badgeId: Mapped[str] = mapped_column(String(80), ForeignKey("badges.badgeId", ondelete="CASCADE"), primary_key=True)
+    earnedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class SignalBarItem(Base):
+    __tablename__ = "signal_bar_items"
+    __table_args__ = (UniqueConstraint("position", name="uq_signal_bar_items_position"),)
+
+    signalBarItemId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(SIGNAL_TITLE_MAX_LENGTH), nullable=False)
+    link: Mapped[str] = mapped_column(String(SIGNAL_LINK_MAX_LENGTH), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
 
 class Friendship(Base):
@@ -199,8 +312,8 @@ class Friendship(Base):
     requesterId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     receiverId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     status: Mapped[str] = mapped_column(Text, default="accepted", nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
@@ -229,8 +342,8 @@ class Club(Base):
     status: Mapped[str] = mapped_column(Text, default="Open", nullable=False)
     createdByService: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     isActive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
@@ -279,7 +392,7 @@ class ClubMember(Base):
     canManageMembers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[str] = mapped_column(Text, default="active", nullable=False)
     addedByService: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    joinedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    joinedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
@@ -303,7 +416,7 @@ class ClubFollower(Base):
 
     clubId: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.clubId"), primary_key=True)
     userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), primary_key=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     @property
     def id(self) -> str:
@@ -331,8 +444,8 @@ class Post(Base):
     originalPostId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("posts.postId"), nullable=True)
     visibility: Mapped[str] = mapped_column(Text, default="public", nullable=False)
     eventTitle: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    eventStartTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    eventEndTime: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    eventStartTime: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    eventEndTime: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     eventLocation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     registrationLink: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     likeCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -343,8 +456,8 @@ class Post(Base):
     reportCount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     engagementScore: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     isDeleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     @property
     def type_code(self) -> int:
@@ -430,7 +543,27 @@ class PostLike(Base):
 
     postId: Mapped[int] = mapped_column(Integer, ForeignKey("posts.postId"), primary_key=True)
     userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), primary_key=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    @property
+    def id(self) -> str:
+        return f"{self.postId}:{self.userId}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "postId": str(self.postId),
+            "userId": str(self.userId),
+            "createdAt": utc_isoformat(self.createdAt),
+        }
+
+
+class PostBookmark(Base):
+    __tablename__ = "post_bookmarks"
+
+    postId: Mapped[int] = mapped_column(Integer, ForeignKey("posts.postId", ondelete="CASCADE"), primary_key=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     @property
     def id(self) -> str:
@@ -453,7 +586,7 @@ class Comment(Base):
     userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     isDeleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class Notification(Base):
@@ -467,7 +600,7 @@ class Notification(Base):
     targetId: Mapped[str] = mapped_column(Text, nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     isRead: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class MarketplaceItem(Base):
@@ -481,8 +614,42 @@ class MarketplaceItem(Base):
     price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     imageUrl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, default="available", nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updatedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class MarketplaceTrade(Base):
+    __tablename__ = "marketplace_trades"
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'completed', 'cancelled')", name="ck_marketplace_trades_status"),
+        CheckConstraint("\"sellerId\" <> \"buyerId\"", name="ck_marketplace_trades_distinct_users"),
+    )
+
+    tradeId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    itemId: Mapped[int] = mapped_column(Integer, ForeignKey("marketplace_items.itemId", ondelete="CASCADE"), unique=True, nullable=False)
+    sellerId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), index=True, nullable=False)
+    buyerId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    completedAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class MarketplaceReview(Base):
+    __tablename__ = "marketplace_reviews"
+    __table_args__ = (
+        UniqueConstraint("tradeId", "reviewerId", name="uq_marketplace_reviews_trade_reviewer"),
+        CheckConstraint("rating BETWEEN 1 AND 5", name="ck_marketplace_reviews_rating"),
+        CheckConstraint("\"reviewerId\" <> \"revieweeId\"", name="ck_marketplace_reviews_distinct_users"),
+    )
+
+    reviewId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tradeId: Mapped[int] = mapped_column(Integer, ForeignKey("marketplace_trades.tradeId", ondelete="CASCADE"), index=True, nullable=False)
+    reviewerId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), nullable=False)
+    revieweeId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), index=True, nullable=False)
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class Game(Base):
@@ -491,10 +658,10 @@ class Game(Base):
     gameId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    startDate: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    endDate: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    startDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    endDate: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     isActive: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     @property
     def id(self) -> int:
@@ -512,7 +679,7 @@ class UserPoint(Base):
     gameId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("games.gameId"), nullable=True)
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class ChatThread(Base):
@@ -520,29 +687,30 @@ class ChatThread(Base):
 
     threadId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     threadType: Mapped[str] = mapped_column(Text, default="direct", nullable=False)
-    clubId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.clubId"), nullable=True)
-    marketplaceItemId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("marketplace_items.itemId"), nullable=True)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    clubId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.clubId", ondelete="SET NULL"), nullable=True)
+    marketplaceItemId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("marketplace_items.itemId", ondelete="SET NULL"), nullable=True)
+    directKey: Mapped[Optional[str]] = mapped_column(String(64), unique=True, index=True, nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class ChatParticipant(Base):
     __tablename__ = "chat_participants"
 
-    threadId: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.threadId"), primary_key=True)
-    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), primary_key=True)
-    joinedAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    lastReadAt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    threadId: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.threadId", ondelete="CASCADE"), primary_key=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    joinedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    lastReadAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     messageId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    threadId: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.threadId"), index=True, nullable=False)
-    senderId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), nullable=False)
+    threadId: Mapped[int] = mapped_column(Integer, ForeignKey("chat_threads.threadId", ondelete="CASCADE"), index=True, nullable=False)
+    senderId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), nullable=False)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     isDeleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    createdAt: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 @dataclass(frozen=True)
@@ -581,6 +749,16 @@ def build_engine_options(database_url: str) -> dict[str, Any]:
 
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 engine = create_engine(DATABASE_URL, **build_engine_options(DATABASE_URL))
+
+
+if engine.dialect.name == "sqlite":
+    @event.listens_for(engine, "connect")
+    def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
@@ -591,6 +769,35 @@ def db() -> Session:
     return session
 
 
+def database_schema_issues() -> list[str]:
+    if engine.dialect.name == "sqlite":
+        return []
+    issues: list[str] = []
+    with engine.connect() as connection:
+        database_inspector = inspect(connection)
+        table_names = set(database_inspector.get_table_names())
+        if "schema_migrations" not in table_names:
+            issues.append("schema_migrations table is missing")
+        elif connection.scalar(
+            sql_text("SELECT 1 FROM schema_migrations WHERE version = :version"),
+            {"version": REQUIRED_SCHEMA_VERSION},
+        ) is None:
+            issues.append(f"migration {REQUIRED_SCHEMA_VERSION} is not recorded")
+        for table_name, required_columns in REQUIRED_SCHEMA_COLUMNS.items():
+            if table_name not in table_names:
+                issues.append(f"table {table_name} is missing")
+                continue
+            columns = {column["name"]: column for column in database_inspector.get_columns(table_name)}
+            missing_columns = sorted(required_columns - set(columns))
+            if missing_columns:
+                issues.append(f"{table_name} is missing columns {', '.join(missing_columns)}")
+            for column_name in REQUIRED_TIMEZONE_COLUMNS.get(table_name, set()):
+                column = columns.get(column_name)
+                if column is not None and not bool(getattr(column["type"], "timezone", False)):
+                    issues.append(f"{table_name}.{column_name} must use TIMESTAMPTZ")
+    return issues
+
+
 def ensure_database_initialized() -> None:
     global _database_initialized
     if _database_initialized:
@@ -598,8 +805,19 @@ def ensure_database_initialized() -> None:
     with _database_lock:
         if _database_initialized:
             return
-        Base.metadata.create_all(engine)
+        if engine.dialect.name == "sqlite":
+            Base.metadata.create_all(engine)
+        else:
+            issues = database_schema_issues()
+            if issues:
+                detail = "; ".join(issues)
+                raise DatabaseSchemaError(
+                    f"Database schema is not ready: {detail}. "
+                    "Apply backend/migrations/001_frontend_api_requirements.postgresql and "
+                    "backend/migrations/002_saved_posts.postgresql."
+                )
         _database_initialized = True
+
 
 def read_json() -> dict[str, Any]:
     data = request.get_json(silent=True)
@@ -634,6 +852,33 @@ def read_bool(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "y", "on"}
     return bool(value)
+
+
+def bounded_limit(value: Any, default: int = 20, maximum: int = 100) -> int:
+    parsed = optional_int(value)
+    return default if parsed is None else max(1, min(parsed, maximum))
+
+
+def valid_signal_link(value: str) -> bool:
+    if value.startswith("/"):
+        return not value.startswith("//")
+    return bool(re.match(r"^https?://[^\s]+$", value, flags=re.IGNORECASE))
+
+
+def signal_values(data: dict[str, Any], current: Optional[SignalBarItem] = None):
+    title = text_value(data.get("title"), current.title if current is not None else "")
+    link = text_value(data.get("link"), current.link if current is not None else "")
+    if not title:
+        return None, "title is required"
+    if len(title) > SIGNAL_TITLE_MAX_LENGTH:
+        return None, f"title must be at most {SIGNAL_TITLE_MAX_LENGTH} characters"
+    if not link:
+        return None, "link is required"
+    if len(link) > SIGNAL_LINK_MAX_LENGTH:
+        return None, f"link must be at most {SIGNAL_LINK_MAX_LENGTH} characters"
+    if not valid_signal_link(link):
+        return None, "link must be an internal path or an absolute HTTP(S) URL"
+    return {"title": title, "link": link}, None
 
 
 def get_first(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -822,6 +1067,13 @@ def role_value(value: Any) -> str:
     return role if role in CLUB_MEMBER_ROLES else "member"
 
 
+def strict_role_value(value: Any) -> Optional[str]:
+    role = slugify(value, "").replace("-", "_")
+    if role == "vice_chariman":
+        role = "vice_chairman"
+    return role if role in CLUB_MEMBER_ROLES else None
+
+
 def role_label(value: Any) -> str:
     return text_value(value, "member").replace("_", " ").title()
 
@@ -866,7 +1118,15 @@ def current_auth_user() -> Optional[AuthUser]:
     if claims["role"] != "student":
         return None
     user = get_user(claims["sub"])
-    return user if user is not None and user.isActive else None
+    if user is None or not user.isActive:
+        return None
+    now = utcnow()
+    if user.lastActiveAt is None or now - as_utc(user.lastActiveAt) >= LAST_ACTIVE_WRITE_INTERVAL:
+        user.lastActiveAt = now
+        db().commit()
+        db().refresh(user)
+    g.activity_user_id = user.userId
+    return user
 
 
 def bearer_token() -> Optional[str]:
@@ -888,6 +1148,15 @@ def require_admin_user():
     if not is_admin_user(user):
         return jsonify({"error": "admin access required"}), 403
     return None
+
+
+def require_user_owner_or_admin(target: User):
+    user = current_auth_user()
+    if user is None:
+        return jsonify({"error": "unauthorized"}), 401
+    if is_admin_user(user) or (isinstance(user, User) and user.userId == target.userId):
+        return None
+    return jsonify({"error": "profile owner or admin access required"}), 403
 
 
 def create_auth_token(user: AuthUser) -> str:
@@ -935,9 +1204,11 @@ def serialize_post(post: Post, viewerUserId: Optional[str] = None) -> dict[str, 
     author = db().get(User, post.authorId)
     club = db().get(Club, post.clubId) if post.clubId is not None else None
     likedByCurrentUser = False
+    savedByCurrentUser = False
     viewer_pk = user_pk(viewerUserId)
     if viewer_pk is not None:
         likedByCurrentUser = post_like_for_user(post.postId, viewer_pk) is not None
+        savedByCurrentUser = post_bookmark_for_user(post.postId, viewer_pk) is not None
     return {
         **post.to_dict(
             author.fullName if author is not None else None,
@@ -946,6 +1217,9 @@ def serialize_post(post: Post, viewerUserId: Optional[str] = None) -> dict[str, 
         ),
         "likedByCurrentUser": likedByCurrentUser,
         "viewerHasLiked": likedByCurrentUser,
+        "savedByCurrentUser": savedByCurrentUser,
+        "bookmarkedByCurrentUser": savedByCurrentUser,
+        "viewerHasSaved": savedByCurrentUser,
     }
 
 
@@ -955,6 +1229,14 @@ def post_like_for_user(postId: Any, userId: Any) -> Optional[PostLike]:
     if post_pk is None or user_id_pk is None:
         return None
     return db().get(PostLike, {"postId": post_pk, "userId": user_id_pk})
+
+
+def post_bookmark_for_user(postId: Any, userId: Any) -> Optional[PostBookmark]:
+    post_pk = optional_int(postId)
+    user_id_pk = optional_int(userId)
+    if post_pk is None or user_id_pk is None:
+        return None
+    return db().get(PostBookmark, {"postId": post_pk, "userId": user_id_pk})
 
 
 def resolve_post_author_id(data: dict[str, Any]) -> Optional[int]:
@@ -1035,6 +1317,15 @@ def validate_post(post: Post, mediaUrls: Optional[list[str]] = None):
 
 
 def create_post_from_payload(data: dict[str, Any]):
+    actor = current_auth_user()
+    if actor is None:
+        return jsonify({"error": "unauthorized"}), 401
+    if not isinstance(actor, User):
+        return jsonify({"error": "student account required"}), 403
+    requested_author_id = optional_int(data.get("authorId"))
+    if requested_author_id is not None and requested_author_id != actor.userId:
+        return jsonify({"error": "post author must match the authenticated user"}), 403
+    data = {**data, "authorId": actor.userId}
     code = post_type_code(get_first(data, "type", "postType"), default=0)
     if code is None:
         return jsonify({"error": "type must be 0, 1, 2, or 3"}), 400
@@ -1062,8 +1353,8 @@ def update_post_from_payload(post: Post, data: dict[str, Any]):
     post.postType = CODE_TO_POST_TYPE[code]
     if "authorId" in data:
         authorId = optional_int(data.get("authorId"))
-        if authorId is not None:
-            post.authorId = authorId
+        if authorId != post.authorId:
+            return jsonify({"error": "post author cannot be changed"}), 400
     if "clubId" in data or "clubSlug" in data:
         post.clubId = resolve_post_club_id(data)
     media_changed = any(key in data for key in ("mediaUrl", "mediaUrls", "image"))
@@ -1260,9 +1551,12 @@ def create_club_member_resource(club: Club, actor: Optional[AuthUser]):
     user = resolve_member_user(data)
     if user is None:
         return jsonify({"error": "userId, username, or email must reference an existing user"}), 400
-    role = role_value(data.get("title") or data.get("role"))
+    role = strict_role_value(data.get("title") or data.get("role") or "Member")
+    if role is None:
+        return jsonify({"error": "unsupported club role"}), 400
     if not can_add_club_member(club, actor, role):
         return jsonify({"error": "admin or club president access required"}), 403
+    db().scalar(select(Club).where(Club.clubId == club.clubId).with_for_update())
     existing = db().scalar(select(ClubMember).where((ClubMember.clubId == club.clubId) & (ClubMember.userId == user.userId)))
     if existing is not None:
         return jsonify({"error": "user is already a club member"}), 409
@@ -1623,12 +1917,16 @@ def create_user_from_payload(data: dict[str, Any], require_password: bool = Fals
     password = text_value(data.get("password"))
     if require_password and len(password) < 6:
         return None, jsonify({"error": "password must be at least 6 characters"}), 400
+    batch_year = optional_int(data.get("batchYear"))
+    if data.get("batchYear") not in (None, "") and batch_year is None:
+        return None, jsonify({"error": "batchYear must be an integer or null"}), 400
     user = User(
         fullName=values["name"],
         username=values["username"],
         email=values["mail"],
         dateOfBirth=values["dob"],
         semester=values["year"],
+        batchYear=batch_year,
         department=values["department"],
         passwordHash=generate_password_hash(password or os.urandom(32).hex()),
     )
@@ -1663,6 +1961,11 @@ def update_user_from_payload(user: User, data: dict[str, Any]):
     user.dateOfBirth = values["dob"]
     user.semester = values["year"]
     user.department = values["department"]
+    if "batchYear" in data:
+        batch_year = optional_int(data.get("batchYear"))
+        if data.get("batchYear") not in (None, "") and batch_year is None:
+            return jsonify({"error": "batchYear must be an integer or null"}), 400
+        user.batchYear = batch_year
     return None
 
 
@@ -1888,12 +2191,23 @@ def create_marketplace_item_from_payload(data: dict[str, Any]):
     return jsonify(serialize_marketplace_item(item)), 201
 
 
-def marketplace_posts() -> list[MarketplaceItem]:
-    return db().scalars(
-        select(MarketplaceItem)
-        .where(MarketplaceItem.status != "removed")
-        .order_by(MarketplaceItem.createdAt.desc(), MarketplaceItem.itemId.asc())
-    ).all()
+def marketplace_posts(
+    seller_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: Optional[int] = None,
+    cursor: Optional[int] = None,
+) -> list[MarketplaceItem]:
+    statement = select(MarketplaceItem).where(MarketplaceItem.status != "removed")
+    if seller_id is not None:
+        statement = statement.where(MarketplaceItem.sellerId == seller_id)
+    if status is not None:
+        statement = statement.where(MarketplaceItem.status == status)
+    if cursor is not None:
+        statement = statement.where(MarketplaceItem.itemId < cursor)
+    statement = statement.order_by(MarketplaceItem.createdAt.desc(), MarketplaceItem.itemId.desc())
+    if limit is not None:
+        statement = statement.limit(limit)
+    return db().scalars(statement).all()
 
 
 def serialize_marketplace_item(item: MarketplaceItem) -> dict[str, Any]:
@@ -1902,6 +2216,7 @@ def serialize_marketplace_item(item: MarketplaceItem) -> dict[str, Any]:
     return {
         "id": str(item.itemId),
         "postId": str(item.itemId),
+        "sellerId": str(item.sellerId),
         "title": item.title,
         "owner": user.fullName if user is not None else str(item.sellerId),
         "mode": "Sell",
@@ -1914,6 +2229,7 @@ def serialize_marketplace_item(item: MarketplaceItem) -> dict[str, Any]:
         "tags": [],
         "contact": user.email if user is not None else "",
         "preferredExchange": "",
+        "status": item.status,
         "createdAt": createdAt,
     }
 
@@ -1950,38 +2266,83 @@ def award_user_xp(user: User, xp: int) -> int:
     return int(total or 0)
 
 
-def serialize_conversations() -> list[dict[str, Any]]:
-    threads = db().scalars(select(ChatThread).order_by(ChatThread.createdAt.desc(), ChatThread.threadId.asc())).all()
-    return [
-        {
-            "id": thread.threadId,
-            "name": f"{thread.threadType.title()} Chat",
-            "preview": "",
-            "time": utc_isoformat(thread.createdAt),
-            "active": index == 0,
-        }
-        for index, thread in enumerate(threads)
-    ]
+def direct_conversation_key(user_a_id: int, user_b_id: int) -> str:
+    lower, upper = sorted((user_a_id, user_b_id))
+    return f"{lower}:{upper}"
 
 
-def serialize_messages() -> list[dict[str, Any]]:
-    messages = db().scalars(select(ChatMessage).where(ChatMessage.isDeleted.is_(False)).order_by(ChatMessage.createdAt.asc(), ChatMessage.messageId.asc())).all()
-    current_user = current_auth_user()
-    current_user_id = current_user.userId if isinstance(current_user, User) else None
+def is_chat_participant(thread_id: int, user_id: int) -> bool:
+    return db().get(ChatParticipant, {"threadId": thread_id, "userId": user_id}) is not None
+
+
+def serialize_conversation(thread: ChatThread, viewer: User, active: bool = False) -> dict[str, Any]:
+    participants = db().scalars(
+        select(User)
+        .join(ChatParticipant, ChatParticipant.userId == User.userId)
+        .where((ChatParticipant.threadId == thread.threadId) & (User.userId != viewer.userId))
+        .order_by(User.fullName.asc())
+    ).all()
+    name = participants[0].fullName if thread.threadType == "direct" and participants else f"{thread.threadType.title()} Chat"
+    latest = db().scalar(
+        select(ChatMessage)
+        .where((ChatMessage.threadId == thread.threadId) & (ChatMessage.isDeleted.is_(False)))
+        .order_by(ChatMessage.createdAt.desc(), ChatMessage.messageId.desc())
+        .limit(1)
+    )
+    return {
+        "id": thread.threadId,
+        "threadId": thread.threadId,
+        "name": name,
+        "preview": latest.content or "" if latest is not None else "",
+        "time": utc_isoformat(latest.createdAt if latest is not None else thread.createdAt),
+        "active": active,
+        "href": f"/chat?thread={thread.threadId}",
+        "participants": [user.to_dict() for user in participants],
+    }
+
+
+def post_bookmark_payload(post: Post, user: User) -> dict[str, Any]:
+    saved = post_bookmark_for_user(post.postId, user.userId) is not None
+    bookmark_count = db().scalar(select(func.count()).select_from(PostBookmark).where(PostBookmark.postId == post.postId)) or 0
+    return {
+        "post": serialize_post(post, str(user.userId)),
+        "postId": str(post.postId),
+        "bookmarks": bookmark_count,
+        "saved": saved,
+        "savedByCurrentUser": saved,
+        "bookmarkedByCurrentUser": saved,
+    }
+
+
+def serialize_conversations(viewer: User) -> list[dict[str, Any]]:
+    threads = db().scalars(
+        select(ChatThread)
+        .join(ChatParticipant, ChatParticipant.threadId == ChatThread.threadId)
+        .where(ChatParticipant.userId == viewer.userId)
+        .order_by(ChatThread.createdAt.desc(), ChatThread.threadId.desc())
+    ).all()
+    return [serialize_conversation(thread, viewer, active=index == 0) for index, thread in enumerate(threads)]
+
+
+def serialize_messages(viewer: User, thread_id: Optional[int] = None) -> list[dict[str, Any]]:
+    participant_thread_ids = select(ChatParticipant.threadId).where(ChatParticipant.userId == viewer.userId)
+    statement = select(ChatMessage).where(
+        (ChatMessage.isDeleted.is_(False)) & ChatMessage.threadId.in_(participant_thread_ids)
+    )
+    if thread_id is not None:
+        statement = statement.where(ChatMessage.threadId == thread_id)
+    messages = db().scalars(statement.order_by(ChatMessage.createdAt.asc(), ChatMessage.messageId.asc())).all()
     return [
         {
             "id": message.messageId,
-            "side": "right" if current_user_id is not None and message.senderId == current_user_id else "left",
+            "threadId": message.threadId,
+            "side": "right" if message.senderId == viewer.userId else "left",
             "text": message.content or "",
             "time": utc_isoformat(message.createdAt),
             "status": None,
         }
         for message in messages
     ]
-
-
-def profile_payload(user: User) -> dict[str, Any]:
-    return {"avatar": user.profilePhotoUrl or PROFILE_AVATAR, "major": user.department or "", "bio": user.bio or ""}
 
 
 def profile_user(identifier: str) -> Optional[User]:
@@ -1992,6 +2353,264 @@ def profile_user(identifier: str) -> Optional[User]:
             return user
     username = normalize_username(identifier)
     return db().scalar(select(User).where(User.username == username)) if username else None
+
+
+def user_interests(userId: int) -> list[str]:
+    return list(
+        db().scalars(
+            select(UserInterest.interest)
+            .where(UserInterest.userId == userId)
+            .order_by(UserInterest.interest.asc())
+        ).all()
+    )
+
+
+def replace_user_interests(user: User, value: Any) -> Optional[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        return "interests must be an array of strings"
+    interests = unique_preserving_order([text_value(item) for item in value if text_value(item)])
+    if len(interests) > 20:
+        return "interests must contain at most 20 items"
+    if any(len(item) > 80 for item in interests):
+        return "each interest must be at most 80 characters"
+    for row in db().scalars(select(UserInterest).where(UserInterest.userId == user.userId)).all():
+        db().delete(row)
+    for interest in interests:
+        db().add(UserInterest(userId=user.userId, interest=interest))
+    return None
+
+
+def profile_payload(user: User) -> dict[str, Any]:
+    return {
+        "user": user.username,
+        "userId": str(user.userId),
+        "avatar": user.profilePhotoUrl or PROFILE_AVATAR,
+        "major": user.department or "",
+        "bio": user.bio or "",
+        "batchYear": user.batchYear,
+        "lastActiveAt": utc_isoformat(user.lastActiveAt) if user.lastActiveAt else None,
+        "isOnline": bool(user.lastActiveAt and utcnow() - as_utc(user.lastActiveAt) <= ONLINE_WINDOW),
+        "interests": user_interests(user.userId),
+    }
+
+
+def update_profile_from_payload(user: User, data: dict[str, Any]):
+    if "avatar" in data:
+        user.profilePhotoUrl = optional_text(data.get("avatar"))
+    if "major" in data:
+        major = text_value(data.get("major"))
+        if major and major not in DEPARTMENTS:
+            return jsonify({"error": "major must be a supported department"}), 400
+        user.department = major or None
+    if "bio" in data:
+        bio = text_value(data.get("bio"))
+        if len(bio) > 500:
+            return jsonify({"error": "bio must be at most 500 characters"}), 400
+        user.bio = bio or None
+    if "batchYear" in data:
+        batch_year = optional_int(data.get("batchYear"))
+        if data.get("batchYear") not in (None, "") and batch_year is None:
+            return jsonify({"error": "batchYear must be an integer or null"}), 400
+        user.batchYear = batch_year
+    if "interests" in data:
+        interest_error = replace_user_interests(user, data.get("interests"))
+        if interest_error is not None:
+            return jsonify({"error": interest_error}), 400
+    return None
+
+
+def get_user_preference(userId: int) -> Optional[UserPreference]:
+    return db().get(UserPreference, userId)
+
+
+def ensure_user_preference(userId: int) -> UserPreference:
+    preference = get_user_preference(userId)
+    if preference is None:
+        preference = UserPreference(userId=userId)
+        db().add(preference)
+        try:
+            db().flush()
+        except IntegrityError:
+            db().rollback()
+            preference = get_user_preference(userId)
+            if preference is None:
+                raise
+    return preference
+
+
+def preference_payload(preference: Optional[UserPreference]) -> dict[str, Any]:
+    return {
+        "notificationSources": {
+            "official": preference.notifyOfficial if preference is not None else True,
+            "department": preference.notifyDepartment if preference is not None else True,
+            "club": preference.notifyClub if preference is not None else True,
+            "student": preference.notifyStudent if preference is not None else False,
+            "external": preference.notifyExternal if preference is not None else False,
+        },
+        "privacy": {
+            "profileVisibility": preference.profileVisibility if preference is not None else "campus",
+            "eventHistoryVisibility": preference.eventHistoryVisibility if preference is not None else "friends",
+            "marketplaceActivityVisibility": preference.marketplaceActivityVisibility if preference is not None else "campus",
+        },
+    }
+
+
+def visibility_allows(target: User, field: str, viewer: Optional[AuthUser]) -> bool:
+    if is_admin_user(viewer) or (isinstance(viewer, User) and viewer.userId == target.userId):
+        return True
+    preference = get_user_preference(target.userId)
+    visibility = getattr(preference, field, "campus") if preference is not None else "campus"
+    if visibility == "campus":
+        return True
+    if visibility == "private" or not isinstance(viewer, User):
+        return False
+    return friendship_between(viewer.userId, target.userId) is not None
+
+
+def badge_items_for_user(user: User) -> list[dict[str, Any]]:
+    awards = {
+        award.badgeId: award
+        for award in db().scalars(select(UserBadge).where(UserBadge.userId == user.userId)).all()
+    }
+    badges = db().scalars(select(Badge).where(Badge.isActive.is_(True)).order_by(Badge.name.asc(), Badge.badgeId.asc())).all()
+    return [
+        {
+            "id": badge.badgeId,
+            "name": badge.name,
+            "icon": badge.icon,
+            "description": badge.description or "",
+            "earned": badge.badgeId in awards,
+            "earnedAt": utc_isoformat(awards[badge.badgeId].earnedAt) if badge.badgeId in awards else None,
+        }
+        for badge in badges
+    ]
+
+
+def award_badge(user_id: int, badge_id: str) -> tuple[Optional[UserBadge], bool]:
+    if db().get(User, user_id) is None or db().get(Badge, badge_id) is None:
+        return None, False
+    existing = db().get(UserBadge, {"userId": user_id, "badgeId": badge_id})
+    if existing is not None:
+        return existing, False
+    award = UserBadge(userId=user_id, badgeId=badge_id)
+    db().add(award)
+    db().flush()
+    return award, True
+
+
+def marketplace_seller_summary(user: User) -> dict[str, Any]:
+    completed_trades = db().scalars(
+        select(MarketplaceTrade).where(
+            (MarketplaceTrade.sellerId == user.userId) & (MarketplaceTrade.status == "completed")
+        )
+    ).all()
+    ratings = list(
+        db().scalars(
+            select(MarketplaceReview.rating)
+            .join(MarketplaceTrade, MarketplaceTrade.tradeId == MarketplaceReview.tradeId)
+            .where(
+                (MarketplaceReview.revieweeId == user.userId)
+                & (MarketplaceReview.reviewerId == MarketplaceTrade.buyerId)
+                & (MarketplaceTrade.sellerId == user.userId)
+                & (MarketplaceTrade.status == "completed")
+            )
+        ).all()
+    )
+    return {
+        "sellerId": str(user.userId),
+        "sellerRating": round(sum(ratings) / len(ratings), 2) if ratings else None,
+        "sellerRatingCount": len(ratings),
+        "successfulTrades": len(completed_trades),
+    }
+
+
+def user_clubs_payload(target: User, include_following: bool) -> dict[str, Any]:
+    member_rows = db().execute(
+        select(ClubMember, Club)
+        .join(Club, Club.clubId == ClubMember.clubId)
+        .where(
+            (ClubMember.userId == target.userId)
+            & (ClubMember.status == "active")
+            & (Club.isActive.is_(True))
+        )
+        .order_by(Club.name.asc())
+    ).all()
+    following: list[dict[str, Any]] = []
+    if include_following:
+        followed_clubs = db().scalars(
+            select(Club)
+            .join(ClubFollower, ClubFollower.clubId == Club.clubId)
+            .where((ClubFollower.userId == target.userId) & (Club.isActive.is_(True)))
+            .order_by(Club.name.asc())
+        ).all()
+        following = [
+            {**club.to_dict(), "followers": club_followers_count(club)}
+            for club in followed_clubs
+        ]
+    return {
+        "memberOf": [
+            {
+                "club": {**club.to_dict(), "followers": club_followers_count(club)},
+                "membership": serialize_club_member(member),
+            }
+            for member, club in member_rows
+        ],
+        "following": following,
+        "followingVisible": include_following,
+    }
+
+
+def profile_overview_payload(target: User, viewer: Optional[AuthUser]) -> dict[str, Any]:
+    is_owner_or_admin = is_admin_user(viewer) or (isinstance(viewer, User) and viewer.userId == target.userId)
+    try:
+        friends = friendship_rows(target.userId)
+        viewer_friend_ids = set() if not isinstance(viewer, User) else {user.userId for user, _ in friendship_rows(viewer.userId)}
+    except GraphUnavailable:
+        app.logger.warning("Neo4j unavailable; serving profile overview without friendship data")
+        friends = []
+        viewer_friend_ids = set()
+    mutuals = [(user, friendship) for user, friendship in friends if user.userId in viewer_friend_ids]
+    preview_rows = friends if is_owner_or_admin else mutuals
+    entries = leaderboard_entries()
+    leaderboard = next((entry for entry in entries if entry["userId"] == str(target.userId)), None)
+    clubs = user_clubs_payload(target, include_following=is_owner_or_admin)
+    marketplace_visible = visibility_allows(target, "marketplaceActivityVisibility", viewer)
+    listings = [
+        serialize_marketplace_item(item)
+        for item in marketplace_posts(seller_id=target.userId, status="available", limit=20)
+    ] if marketplace_visible else []
+    payload = {
+        "user": target.to_dict(),
+        "profile": profile_payload(target),
+        "stats": {
+            "friends": len(friends),
+            "mutualFriends": len(mutuals),
+            "rank": leaderboard["rank"] if leaderboard is not None else None,
+            "totalXp": leaderboard["totalXp"] if leaderboard is not None else 0,
+        },
+        "friendsPreview": [friendship_user_payload(user, friendship) for user, friendship in preview_rows[:6]],
+        "mutualFriendsPreview": [friendship_user_payload(user, friendship) for user, friendship in mutuals[:6]],
+        "badges": badge_items_for_user(target),
+        "clubs": clubs,
+        "marketplace": {
+            "activeListings": listings,
+            **marketplace_seller_summary(target),
+        },
+    }
+    if is_owner_or_admin:
+        payload["preferences"] = preference_payload(get_user_preference(target.userId))
+    return payload
+
+
+def serialize_signal_bar_item(item: SignalBarItem) -> dict[str, Any]:
+    return {
+        "id": str(item.signalBarItemId),
+        "title": item.title,
+        "link": item.link,
+        "position": item.position,
+        "createdAt": utc_isoformat(item.createdAt),
+        "updatedAt": utc_isoformat(item.updatedAt),
+    }
 
 
 def empty_resource_collection() -> list[dict[str, Any]]:
@@ -2040,7 +2659,20 @@ def handle_database_error(error):
     session = g.get("db")
     if session is not None:
         session.rollback()
+    app.logger.error(
+        "Database operation failed",
+        exc_info=(type(error), error, error.__traceback__),
+    )
     return jsonify({"error": "database error"}), 500
+
+
+@app.errorhandler(DatabaseSchemaError)
+def handle_database_schema_error(error):
+    app.logger.error(
+        "Database schema validation failed",
+        exc_info=(type(error), error, error.__traceback__),
+    )
+    return jsonify({"error": "database schema is not ready"}), 503
 
 
 @app.errorhandler(GraphUnavailable)
@@ -2062,7 +2694,75 @@ def add_cors_headers(response):
 
 @app.route("/health")
 def health():
-    return jsonify({"ok": True, "service": "campus-nexus-backend"})
+    try:
+        ensure_database_initialized()
+        with engine.connect() as connection:
+            connection.execute(sql_text("SELECT 1"))
+    except (RuntimeError, SQLAlchemyError) as error:
+        app.logger.error(
+            "Backend readiness check failed",
+            exc_info=(type(error), error, error.__traceback__),
+        )
+        return jsonify({"ok": False, "service": "campus-nexus-backend", "database": "unavailable"}), 503
+    return jsonify({"ok": True, "service": "campus-nexus-backend", "database": "ready"})
+
+
+@app.route("/api/signal-bar", methods=["GET", "POST"])
+def signal_bar_collection():
+    if request.method == "GET":
+        items = db().scalars(
+            select(SignalBarItem).order_by(SignalBarItem.position.asc(), SignalBarItem.signalBarItemId.asc())
+        ).all()
+        return jsonify({"items": [serialize_signal_bar_item(item) for item in items], "total": len(items)})
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
+    data = read_json()
+    values, validation_error = signal_values(data)
+    if validation_error is not None:
+        return jsonify({"error": validation_error}), 400
+    requested_position = optional_int(data.get("position"))
+    if "position" in data and (requested_position is None or requested_position < 1):
+        return jsonify({"error": "position must be a positive integer"}), 400
+    for attempt in range(3):
+        position = requested_position or int(
+            db().scalar(select(func.coalesce(func.max(SignalBarItem.position), 0))) or 0
+        ) + 1
+        if requested_position and db().scalar(select(SignalBarItem).where(SignalBarItem.position == position)) is not None:
+            return jsonify({"error": "position is already in use"}), 409
+        item = SignalBarItem(title=values["title"], link=values["link"], position=position)
+        db().add(item)
+        try:
+            db().commit()
+        except IntegrityError:
+            db().rollback()
+            if requested_position or attempt == 2:
+                return jsonify({"error": "signal position conflict; retry the request"}), 409
+            continue
+        db().refresh(item)
+        return jsonify(serialize_signal_bar_item(item)), 201
+    return jsonify({"error": "signal position conflict; retry the request"}), 409
+
+
+@app.route("/api/signal-bar/<int:item_id>", methods=["PATCH"])
+def signal_bar_item(item_id: int):
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
+    item = db().get(SignalBarItem, item_id)
+    if item is None:
+        return jsonify({"error": "not found"}), 404
+    data = read_json()
+    if not any(key in data for key in ("title", "link")):
+        return jsonify({"error": "title or link is required"}), 400
+    values, validation_error = signal_values(data, item)
+    if validation_error is not None:
+        return jsonify({"error": validation_error}), 400
+    item.title = values["title"]
+    item.link = values["link"]
+    db().commit()
+    db().refresh(item)
+    return jsonify(serialize_signal_bar_item(item))
 
 
 @app.route("/api/feed")
@@ -2092,6 +2792,9 @@ def users_collection():
         if username_query:
             statement = statement.where(User.username.contains(username_query)).limit(10)
         return jsonify([user.to_dict() for user in db().scalars(statement.order_by(User.username.asc())).all()])
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
     user, error_response, status = create_user_from_payload(read_json())
     if error_response is not None:
         return error_response, status
@@ -2104,12 +2807,15 @@ def users_collection():
 @app.route("/api/users/<userId>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def users_item(userId: str):
     user = get_user(userId)
-    if user is None:
+    if user is None or not user.isActive:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(user.to_dict())
+    owner_error = require_user_owner_or_admin(user)
+    if owner_error is not None:
+        return owner_error
     if request.method == "DELETE":
-        db().delete(user)
+        user.isActive = False
         db().commit()
         return ("", 204)
     update_error = update_user_from_payload(user, read_json())
@@ -2158,8 +2864,44 @@ def user_friendship_collection(userId: str):
 def posts_collection():
     if request.method == "POST":
         return create_post_from_payload(read_json())
-    posts = db().scalars(select(Post).where(Post.isDeleted.is_(False)).order_by(Post.createdAt.desc(), Post.postId.asc())).all()
-    return jsonify([serialize_post(post) for post in posts])
+    author_id = optional_int(request.args.get("authorId"))
+    if request.args.get("authorId") is not None and author_id is None:
+        return jsonify({"error": "authorId must be an integer"}), 400
+    author = db().get(User, author_id) if author_id is not None else None
+    if author_id is not None and author is None:
+        return jsonify([])
+    viewer = current_auth_user()
+    if author is not None and not visibility_allows(author, "profileVisibility", viewer):
+        return jsonify({"error": "profile is private"}), 403
+    statement = select(Post).where(Post.isDeleted.is_(False))
+    if author_id is not None:
+        statement = statement.where(Post.authorId == author_id)
+    cursor = optional_int(request.args.get("cursor"))
+    if cursor is not None:
+        statement = statement.where(Post.postId < cursor)
+    statement = statement.order_by(Post.createdAt.desc(), Post.postId.desc())
+    if request.args.get("limit") is not None:
+        statement = statement.limit(bounded_limit(request.args.get("limit")))
+    posts = db().scalars(statement).all()
+    viewer_id = str(viewer.userId) if isinstance(viewer, User) else None
+    return jsonify([serialize_post(post, viewer_id) for post in posts])
+
+
+@app.route("/api/saved-posts", methods=["GET"])
+def saved_posts_collection():
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    posts = db().scalars(
+        select(Post)
+        .join(PostBookmark, PostBookmark.postId == Post.postId)
+        .where((PostBookmark.userId == user.userId) & (Post.isDeleted.is_(False)))
+        .order_by(PostBookmark.createdAt.desc(), Post.postId.desc())
+    ).all()
+    return jsonify({
+        "items": [serialize_post(post, str(user.userId)) for post in posts],
+        "total": len(posts),
+    })
 
 
 @app.route("/api/posts/<postId>", methods=["GET", "PATCH", "PUT", "DELETE"])
@@ -2176,6 +2918,9 @@ def posts_item(postId: str):
         post.isDeleted = True
         db().commit()
         return ("", 204)
+    owner_error = require_post_owner_or_admin(post)
+    if owner_error is not None:
+        return owner_error
     return update_post_from_payload(post, read_json())
 
 
@@ -2216,6 +2961,29 @@ def posts_like_item(postId: str):
         db().refresh(post)
         return jsonify(post_like_payload(post, user)), 201
     return jsonify(post_like_payload(post, user))
+
+
+@app.route("/api/posts/<postId>/save", methods=["GET", "POST", "DELETE"])
+def posts_save_item(postId: str):
+    post = db().get(Post, optional_int(postId))
+    if post is None or post.isDeleted:
+        return jsonify({"error": "not found"}), 404
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    existing = post_bookmark_for_user(post.postId, user.userId)
+    if request.method == "GET":
+        return jsonify(post_bookmark_payload(post, user))
+    if request.method == "DELETE":
+        if existing is not None:
+            db().delete(existing)
+            db().commit()
+        return jsonify(post_bookmark_payload(post, user))
+    if existing is None:
+        db().add(PostBookmark(postId=post.postId, userId=user.userId))
+        db().commit()
+        return jsonify(post_bookmark_payload(post, user)), 201
+    return jsonify(post_bookmark_payload(post, user))
 
 
 @app.route("/api/notifications", methods=["GET"])
@@ -2429,7 +3197,10 @@ def club_member_item(slug: str, member_id: int):
             return jsonify({"error": "canPost must be a boolean"}), 400
         member.canPost = data["canPost"]
     if "title" in data or "role" in data:
-        role = role_value(data.get("title") or data.get("role"))
+        role = strict_role_value(data.get("title") or data.get("role"))
+        if role is None:
+            return jsonify({"error": "unsupported club role"}), 400
+        db().scalar(select(Club).where(Club.clubId == club.clubId).with_for_update())
         role_error = club_member_role_error(club, role, member.clubMemberId)
         if role_error is not None:
             return jsonify({"error": role_error}), 409
@@ -2471,6 +3242,9 @@ def award_game_xp():
 @app.route("/api/games/items", methods=["GET", "POST"])
 def game_items_collection():
     if request.method == "POST":
+        admin_error = require_admin_user()
+        if admin_error is not None:
+            return admin_error
         data = read_json()
         item = Game(name=text_value(get_first(data, "title", "name")), description=optional_text(data.get("description")))
         if not item.name:
@@ -2489,6 +3263,9 @@ def game_item(itemId: int):
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(item.to_dict())
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
     if request.method == "DELETE":
         item.isActive = False
         db().commit()
@@ -2505,7 +3282,28 @@ def game_item(itemId: int):
 
 @app.route("/api/marketplace")
 def marketplace():
-    return jsonify({"items": [serialize_marketplace_item(item) for item in marketplace_posts()]})
+    seller_id = optional_int(request.args.get("sellerId"))
+    if request.args.get("sellerId") is not None and seller_id is None:
+        return jsonify({"error": "sellerId must be an integer"}), 400
+    seller = db().get(User, seller_id) if seller_id is not None else None
+    if seller_id is not None and seller is None:
+        return jsonify({"error": "seller not found"}), 404
+    status_value = text_value(request.args.get("status")).lower()
+    status = "available" if status_value == "active" else status_value or None
+    if status not in {None, "available", "sold"}:
+        return jsonify({"error": "status must be active, available, or sold"}), 400
+    if seller is not None and not visibility_allows(seller, "marketplaceActivityVisibility", current_auth_user()):
+        return jsonify({"error": "marketplace activity is private"}), 403
+    items = marketplace_posts(
+        seller_id=seller_id,
+        status=status,
+        limit=bounded_limit(request.args.get("limit")) if request.args.get("limit") is not None else None,
+        cursor=optional_int(request.args.get("cursor")),
+    )
+    payload: dict[str, Any] = {"items": [serialize_marketplace_item(item) for item in items]}
+    if seller is not None:
+        payload["sellerSummary"] = marketplace_seller_summary(seller)
+    return jsonify(payload)
 
 
 @app.route("/api/marketplace", methods=["POST"])
@@ -2527,8 +3325,10 @@ def marketplace_item(postId: str):
     if request.method == "GET":
         return jsonify(serialize_marketplace_item(item))
     user = current_auth_user()
-    if not (is_admin_user(user) or (isinstance(user, User) and item.sellerId == user.userId)):
+    if user is None:
         return jsonify({"error": "unauthorized"}), 401
+    if not (is_admin_user(user) or (isinstance(user, User) and item.sellerId == user.userId)):
+        return jsonify({"error": "marketplace owner or admin access required"}), 403
     if request.method == "DELETE":
         item.status = "removed"
         db().commit()
@@ -2551,58 +3351,104 @@ def marketplace_item(postId: str):
 
 @app.route("/api/messages")
 def messages():
-    return jsonify({"conversations": serialize_conversations(), "messages": serialize_messages()})
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    thread_id = optional_int(request.args.get("threadId"))
+    return jsonify({"conversations": serialize_conversations(user), "messages": serialize_messages(user, thread_id)})
 
 
 @app.route("/api/messages/conversations", methods=["GET", "POST"])
 def conversations_collection():
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
     if request.method == "POST":
-        thread = ChatThread(threadType=text_value(read_json().get("threadType"), "direct"))
+        data = read_json()
+        if text_value(data.get("threadType"), "direct") != "direct":
+            return jsonify({"error": "only direct conversation creation is supported"}), 400
+        participant_id = optional_int(data.get("participantUserId"))
+        participant = db().get(User, participant_id) if participant_id is not None else None
+        if participant is None or not participant.isActive:
+            return jsonify({"error": "participantUserId must reference an active user"}), 400
+        if participant.userId == user.userId:
+            return jsonify({"error": "direct conversations require another participant"}), 400
+        direct_key = direct_conversation_key(user.userId, participant.userId)
+        existing = db().scalar(select(ChatThread).where(ChatThread.directKey == direct_key))
+        if existing is not None:
+            return jsonify(serialize_conversation(existing, user))
+        current_user_id = user.userId
+        thread = ChatThread(threadType="direct", directKey=direct_key)
         db().add(thread)
-        db().commit()
+        try:
+            db().flush()
+            db().add_all(
+                [
+                    ChatParticipant(threadId=thread.threadId, userId=current_user_id),
+                    ChatParticipant(threadId=thread.threadId, userId=participant.userId),
+                ]
+            )
+            db().commit()
+        except IntegrityError:
+            db().rollback()
+            existing = db().scalar(select(ChatThread).where(ChatThread.directKey == direct_key))
+            current_user = db().get(User, current_user_id)
+            if existing is None or current_user is None:
+                raise
+            return jsonify(serialize_conversation(existing, current_user))
         db().refresh(thread)
-        return jsonify(serialize_conversations()[0] if serialize_conversations() else {"id": thread.threadId}), 201
-    return jsonify(serialize_conversations())
+        return jsonify(serialize_conversation(thread, user)), 201
+    return jsonify(serialize_conversations(user))
 
 
 @app.route("/api/messages/conversations/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def conversation_item(itemId: int):
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
     item = db().get(ChatThread, itemId)
-    if item is None:
+    if item is None or not is_chat_participant(item.threadId, user.userId):
         return jsonify({"error": "not found"}), 404
     if request.method == "DELETE":
+        db().execute(delete(ChatMessage).where(ChatMessage.threadId == item.threadId))
+        db().execute(delete(ChatParticipant).where(ChatParticipant.threadId == item.threadId))
         db().delete(item)
         db().commit()
         return ("", 204)
-    return jsonify({"id": item.threadId, "name": f"{item.threadType.title()} Chat", "preview": "", "time": utc_isoformat(item.createdAt)})
+    return jsonify(serialize_conversation(item, user))
 
 
 @app.route("/api/messages/items", methods=["GET", "POST"])
 def messages_collection():
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
     if request.method == "POST":
-        user = current_auth_user()
-        if not isinstance(user, User):
-            return jsonify({"error": "unauthorized"}), 401
         data = read_json()
-        threadId = optional_int(data.get("threadId")) or optional_int(data.get("threadId"))
-        if threadId is None:
-            thread = ChatThread(threadType="direct")
-            db().add(thread)
-            db().flush()
-            threadId = thread.threadId
-        item = ChatMessage(threadId=threadId, senderId=user.userId, content=text_value(get_first(data, "text", "content")))
+        threadId = optional_int(data.get("threadId"))
+        if threadId is None or not is_chat_participant(threadId, user.userId):
+            return jsonify({"error": "threadId must reference one of the user's conversations"}), 400
+        content = text_value(get_first(data, "text", "content"))
+        if not content:
+            return jsonify({"error": "content is required"}), 400
+        item = ChatMessage(threadId=threadId, senderId=user.userId, content=content)
         db().add(item)
         db().commit()
         db().refresh(item)
         return jsonify({"id": item.messageId, "side": "right", "text": item.content or "", "time": utc_isoformat(item.createdAt)}), 201
-    return jsonify(serialize_messages())
+    return jsonify(serialize_messages(user, optional_int(request.args.get("threadId"))))
 
 
 @app.route("/api/messages/items/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def message_item(itemId: int):
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
     item = db().get(ChatMessage, itemId)
-    if item is None:
+    if item is None or not is_chat_participant(item.threadId, user.userId):
         return jsonify({"error": "not found"}), 404
+    if request.method in {"PATCH", "PUT", "DELETE"} and item.senderId != user.userId:
+        return jsonify({"error": "only the sender can modify this message"}), 403
     if request.method == "DELETE":
         item.isDeleted = True
         db().commit()
@@ -2611,7 +3457,7 @@ def message_item(itemId: int):
         item.content = text_value(get_first(read_json(), "text", "content"), item.content or "")
         db().commit()
         db().refresh(item)
-    return jsonify({"id": item.messageId, "side": "left", "text": item.content or "", "time": utc_isoformat(item.createdAt)})
+    return jsonify({"id": item.messageId, "threadId": item.threadId, "side": "right" if item.senderId == user.userId else "left", "text": item.content or "", "time": utc_isoformat(item.createdAt)})
 
 
 @app.route("/api/auth/signup", methods=["POST"])
@@ -2659,45 +3505,140 @@ def auth_logout():
 @app.route("/api/profile/<user>")
 def profile(user: str):
     row = profile_user(user)
-    return jsonify(profile_payload(row) if row is not None else {"avatar": PROFILE_AVATAR, "major": "", "bio": ""})
+    if row is None or not row.isActive:
+        return jsonify({"error": "not found"}), 404
+    if not visibility_allows(row, "profileVisibility", current_auth_user()):
+        return jsonify({"error": "profile is private"}), 403
+    return jsonify(profile_payload(row))
 
 
 @app.route("/api/profiles", methods=["GET", "POST"])
 def profiles_collection():
     if request.method == "GET":
-        return jsonify([{"user": row.username, **profile_payload(row)} for row in db().scalars(select(User).order_by(User.username.asc())).all()])
-    user = profile_user(text_value(get_first(read_json(), "user", "username")))
-    if user is None:
-        return jsonify({"error": "user is required"}), 400
+        viewer = current_auth_user()
+        rows = db().scalars(select(User).where(User.isActive.is_(True)).order_by(User.username.asc())).all()
+        return jsonify([profile_payload(row) for row in rows if visibility_allows(row, "profileVisibility", viewer)])
     data = read_json()
-    user.profilePhotoUrl = text_value(data.get("avatar"), user.profilePhotoUrl or PROFILE_AVATAR)
-    user.department = text_value(data.get("major"), user.department or "")
-    user.bio = text_value(data.get("bio"), user.bio or "")
+    user = profile_user(text_value(get_first(data, "user", "username", "userId")))
+    if user is None:
+        return jsonify({"error": "user must reference an existing profile"}), 400
+    owner_error = require_user_owner_or_admin(user)
+    if owner_error is not None:
+        return owner_error
+    update_error = update_profile_from_payload(user, data)
+    if update_error is not None:
+        return update_error
     db().commit()
-    return jsonify({"user": user.username, **profile_payload(user)}), 201
+    db().refresh(user)
+    return jsonify(profile_payload(user)), 201
 
 
 @app.route("/api/profiles/<user>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def profile_item(user: str):
     row = profile_user(user)
-    if row is None:
+    if row is None or not row.isActive:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
-        return jsonify({"user": row.username, **profile_payload(row)})
+        if not visibility_allows(row, "profileVisibility", current_auth_user()):
+            return jsonify({"error": "profile is private"}), 403
+        return jsonify(profile_payload(row))
+    owner_error = require_user_owner_or_admin(row)
+    if owner_error is not None:
+        return owner_error
     if request.method == "DELETE":
         row.profilePhotoUrl = None
         row.bio = None
+        for interest in db().scalars(select(UserInterest).where(UserInterest.userId == row.userId)).all():
+            db().delete(interest)
         db().commit()
         return ("", 204)
     data = read_json()
-    if "avatar" in data:
-        row.profilePhotoUrl = text_value(data.get("avatar"), PROFILE_AVATAR)
-    if "major" in data:
-        row.department = text_value(data.get("major"))
-    if "bio" in data:
-        row.bio = text_value(data.get("bio"))
+    update_error = update_profile_from_payload(row, data)
+    if update_error is not None:
+        return update_error
     db().commit()
-    return jsonify({"user": row.username, **profile_payload(row)})
+    db().refresh(row)
+    return jsonify(profile_payload(row))
+
+
+@app.route("/api/users/<identifier>/clubs")
+def user_clubs(identifier: str):
+    target = profile_user(identifier)
+    if target is None or not target.isActive:
+        return jsonify({"error": "not found"}), 404
+    viewer = current_auth_user()
+    if not visibility_allows(target, "profileVisibility", viewer):
+        return jsonify({"error": "profile is private"}), 403
+    include_following = is_admin_user(viewer) or (isinstance(viewer, User) and viewer.userId == target.userId)
+    return jsonify(user_clubs_payload(target, include_following))
+
+
+@app.route("/api/users/<identifier>/badges")
+def user_badges(identifier: str):
+    target = profile_user(identifier)
+    if target is None or not target.isActive:
+        return jsonify({"error": "not found"}), 404
+    if not visibility_allows(target, "profileVisibility", current_auth_user()):
+        return jsonify({"error": "profile is private"}), 403
+    items = badge_items_for_user(target)
+    return jsonify({"items": items, "total": len(items)})
+
+
+@app.route("/api/users/<identifier>/preferences", methods=["GET", "PATCH"])
+def user_preferences(identifier: str):
+    target = profile_user(identifier)
+    if target is None or not target.isActive:
+        return jsonify({"error": "not found"}), 404
+    owner_error = require_user_owner_or_admin(target)
+    if owner_error is not None:
+        return owner_error
+    preference = ensure_user_preference(target.userId)
+    if request.method == "GET":
+        db().commit()
+        return jsonify(preference_payload(preference))
+    data = read_json()
+    notification_sources = data.get("notificationSources")
+    privacy = data.get("privacy")
+    if notification_sources is None and privacy is None:
+        return jsonify({"error": "notificationSources or privacy is required"}), 400
+    if notification_sources is not None:
+        if not isinstance(notification_sources, dict):
+            return jsonify({"error": "notificationSources must be an object"}), 400
+        notification_fields = {
+            "official": "notifyOfficial",
+            "department": "notifyDepartment",
+            "club": "notifyClub",
+            "student": "notifyStudent",
+            "external": "notifyExternal",
+        }
+        for key, attribute in notification_fields.items():
+            if key in notification_sources:
+                if not isinstance(notification_sources[key], bool):
+                    return jsonify({"error": f"notificationSources.{key} must be a boolean"}), 400
+                setattr(preference, attribute, notification_sources[key])
+    if privacy is not None:
+        if not isinstance(privacy, dict):
+            return jsonify({"error": "privacy must be an object"}), 400
+        for field in ("profileVisibility", "eventHistoryVisibility", "marketplaceActivityVisibility"):
+            if field in privacy:
+                value = text_value(privacy[field]).lower()
+                if value not in PROFILE_VISIBILITY_VALUES:
+                    return jsonify({"error": f"privacy.{field} must be private, friends, or campus"}), 400
+                setattr(preference, field, value)
+    db().commit()
+    db().refresh(preference)
+    return jsonify(preference_payload(preference))
+
+
+@app.route("/api/users/<identifier>/profile-overview")
+def user_profile_overview(identifier: str):
+    target = profile_user(identifier)
+    if target is None or not target.isActive:
+        return jsonify({"error": "not found"}), 404
+    viewer = current_auth_user()
+    if not visibility_allows(target, "profileVisibility", viewer):
+        return jsonify({"error": "profile is private"}), 403
+    return jsonify(profile_overview_payload(target, viewer))
 
 
 if __name__ == "__main__":

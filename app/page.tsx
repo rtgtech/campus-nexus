@@ -4,7 +4,13 @@ import { CampusShell } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { fallbackFeed, fallbackSignalBarItems, getInitials, type FeedData } from "@/lib/app-data";
+import {
+  fallbackFeed,
+  fallbackSignalBarData,
+  getInitials,
+  type FeedData,
+  type SignalBarData,
+} from "@/lib/app-data";
 import { getCampusData } from "@/lib/campus-api";
 import { cn } from "@/lib/utils";
 
@@ -57,12 +63,6 @@ const radarEvents = [
   },
 ];
 
-const savedEvents = [
-  { month: "AUG", day: "14", title: "HackCX Finals", detail: "Closes tonight" },
-  { month: "AUG", day: "16", title: "Battle of Bands", detail: "Amphitheatre · 7 PM" },
-  { month: "AUG", day: "19", title: "Career Fair", detail: "Main Ground · All day" },
-];
-
 const fallbackPeople = [
   { name: "Riya Kapoor", subtitle: "ECE · Year 2 · 4 mutual" },
   { name: "Sam Verghese", subtitle: "Design Club · 2 mutual" },
@@ -72,11 +72,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const feedView = resolvedSearchParams.view === "discover" ? "discover" : "home";
   const token = (await cookies()).get("campusNexusToken")?.value;
-  const feedData = await getCampusData<FeedData>(
-    "/api/feed",
-    fallbackFeed,
-    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
-  );
+  const [feedData, signalBarData] = await Promise.all([
+    getCampusData<FeedData>(
+      "/api/feed",
+      fallbackFeed,
+      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+    ),
+    getCampusData<SignalBarData>("/api/signal-bar", fallbackSignalBarData),
+  ]);
   const suggestedPeople = feedData.suggestedPeople.length > 0 ? feedData.suggestedPeople : fallbackPeople;
 
   return (
@@ -90,28 +93,30 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     >
       {feedView === "home" ? (
         <>
-          <section
-            aria-label="Live campus updates"
-            className="mb-6 flex h-11 overflow-hidden rounded-full border border-outline-variant/70 bg-white"
-          >
-            <div className="z-10 flex shrink-0 items-center gap-2 bg-on-surface px-4 font-mono text-[11px] font-bold tracking-[0.08em] text-white">
-              <span className="size-2 animate-pulse rounded-full bg-white" />
-              LIVE
-            </div>
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <div className="campus-signal-scroll flex h-full w-max items-center gap-10 whitespace-nowrap px-5">
-                {[...fallbackSignalBarItems, ...fallbackSignalBarItems].map((signal, index) => (
-                  <a
-                    key={`${signal.id}-${index}`}
-                    className="text-[13px] font-medium text-on-surface underline-offset-4 transition hover:underline focus-visible:underline focus-visible:outline-none"
-                    href={signal.link}
-                  >
-                    {signal.title}
-                  </a>
-                ))}
+          {signalBarData.items.length > 0 ? (
+            <section
+              aria-label="Live campus updates"
+              className="mb-6 flex h-11 overflow-hidden rounded-full border border-outline-variant/70 bg-white"
+            >
+              <div className="z-10 flex shrink-0 items-center gap-2 bg-on-surface px-4 font-mono text-[11px] font-bold tracking-[0.08em] text-white">
+                <span className="size-2 animate-pulse rounded-full bg-white" />
+                LIVE
               </div>
-            </div>
-          </section>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="campus-signal-scroll flex h-full w-max items-center gap-10 whitespace-nowrap px-5">
+                  {[...signalBarData.items, ...signalBarData.items].map((signal, index) => (
+                    <a
+                      key={`${signal.id}-${index}`}
+                      className="text-[13px] font-medium text-on-surface underline-offset-4 transition hover:underline focus-visible:underline focus-visible:outline-none"
+                      href={signal.link}
+                    >
+                      {signal.title}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div className="min-w-0">
@@ -236,24 +241,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
 
             <aside className="space-y-4">
-              <section className="rounded-[10px] border border-outline-variant/70 bg-white p-4" aria-labelledby="saved-heading">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 id="saved-heading" className="font-['Space_Grotesk'] text-[13px] font-semibold">Saved for you</h2>
-                  <Link className="text-[11px] text-on-surface-variant hover:text-on-surface" href="/?view=discover">See all</Link>
-                </div>
-                {savedEvents.map((event) => (
-                  <div key={event.title} className="flex items-center gap-2.5 border-b border-outline-variant/60 py-2 last:border-0">
-                    <time className="flex size-9 shrink-0 flex-col items-center justify-center rounded-[9px] bg-surface-container-low text-[8px] font-bold text-on-surface-variant">
-                      {event.month}
-                      <span className="text-xs text-on-surface">{event.day}</span>
-                    </time>
-                    <div className="min-w-0">
-                      <h3 className="truncate text-xs font-semibold text-on-surface">{event.title}</h3>
-                      <p className="truncate text-[10px] text-on-surface-variant">{event.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </section>
 
               <Link
                 className="flex items-center justify-between border-b border-outline-variant py-2 text-sm font-semibold text-on-surface transition hover:border-on-surface"

@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type NavKey = "feed" | "clubs" | "marketplace" | "games" | "messages" | "profile";
-type NavItemKey = NavKey | "create-post";
+type NavItemKey = NavKey | "create-post" | "saved";
 
 type CollapsibleSidebarProps = {
   active: NavKey;
@@ -17,6 +17,7 @@ type CollapsibleSidebarProps = {
 const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
   { key: "create-post", label: "Create post", href: "/?=createpost", icon: "add" },
+  { key: "saved", label: "Saved", href: "/viewsavedposts?=True", icon: "bookmark" },
   { key: "clubs", label: "Clubs", href: "/clubs", icon: "groups" },
   { key: "marketplace", label: "Marketplace", href: "/marketplace", icon: "storefront" },
   { key: "messages", label: "Chat", href: "/chat", icon: "forum" },

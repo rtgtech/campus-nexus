@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { CampusShell } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -6,9 +7,22 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { getCampusData } from "@/lib/campus-api";
 import { fallbackMessages, profileAvatar, type MessagesData } from "@/lib/app-data";
 
-export default async function ChatPage() {
-  const messagesData = await getCampusData<MessagesData>("/api/messages", fallbackMessages);
-  const activeConversation = messagesData.conversations.find((conversation) => conversation.active) ?? messagesData.conversations[0];
+type ChatPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function ChatPage({ searchParams }: ChatPageProps) {
+  const params = (await searchParams) ?? {};
+  const requestedThread = Array.isArray(params.thread) ? params.thread[0] : params.thread;
+  const token = (await cookies()).get("campusNexusToken")?.value;
+  const messagesData = await getCampusData<MessagesData>(
+    `/api/messages${requestedThread ? `?threadId=${encodeURIComponent(requestedThread)}` : ""}`,
+    fallbackMessages,
+    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+  );
+  const activeConversation = messagesData.conversations.find(
+    (conversation) => requestedThread && String(conversation.threadId ?? conversation.id) === requestedThread,
+  ) ?? messagesData.conversations.find((conversation) => conversation.active) ?? messagesData.conversations[0];
 
   if (messagesData.conversations.length === 0) {
     return (

@@ -53,13 +53,21 @@ npm run dev:backend
 Apply the camelCase column migration once before deploying this version:
 
 ```powershell
-psql $env:DATABASE_URL -f backend/migrations/001_camel_case_columns.sql
+$psqlUrl = $env:DATABASE_URL -replace '^postgresql\+psycopg://', 'postgresql://'
+psql $psqlUrl -v ON_ERROR_STOP=1 -f backend/migrations/001_camel_case_columns.sql
 ```
 
 Apply the matching Neo4j property migration with Neo4j Browser or `cypher-shell`:
 
 ```powershell
 cypher-shell -f backend/migrations/002_neo4j_camel_case.cypher
+```
+
+Apply the saved-posts migration before deploying the bookmark API:
+
+```powershell
+$psqlUrl = $env:DATABASE_URL -replace '^postgresql\+psycopg://', 'postgresql://'
+psql $psqlUrl -v ON_ERROR_STOP=1 -f backend/migrations/002_saved_posts.postgresql
 ```
 
 ## Feed graph maintenance
@@ -84,17 +92,27 @@ Friend and unfriend requests update Neo4j immediately. Other graph topology chan
 | --- | --- | --- |
 | `GET` | `/health` | Health check. |
 | `GET` | `/api/feed` | Feed cards, trending topics, and suggested people. |
+| `GET` | `/api/saved-posts` | Posts saved by the authenticated user. |
+| `GET,POST,DELETE` | `/api/posts/<id>/save` | Read, save, or unsave a post for the authenticated user. |
 | `GET` | `/api/clubs` | Spotlight clubs, club cards, and club stats. |
 | `GET` | `/api/clubs/<slug>` | Club detail with club info, members, and club posts. |
 | `GET` | `/api/clubs/<slug>/members` | Members for a club. |
 | `GET` | `/api/games` | Game cards, top-rated games, and recent activity. |
 | `GET` | `/api/marketplace` | Marketplace listings. |
 | `GET` | `/api/messages` | Conversations and chat messages. |
+| `GET` | `/api/signal-bar` | Ordered Signal Bar titles and links. |
+| `POST` | `/api/signal-bar` | Create a Signal Bar item (admin only). |
+| `PATCH` | `/api/signal-bar/<id>` | Update a Signal Bar item (admin only). |
+| `GET` | `/api/users/<identifier>/profile-overview` | Consolidated profile, stats, badges, clubs, marketplace trust, and owner preferences. |
+| `GET` | `/api/users/<identifier>/clubs` | Club memberships and owner-only followed clubs. |
+| `GET` | `/api/users/<identifier>/badges` | Earned and locked badge definitions. |
+| `GET,PATCH` | `/api/users/<identifier>/preferences` | Owner/admin notification and privacy preferences. |
 | `POST` | `/api/auth/signup` | Create a student account with `email`, `username`, `name`, `dateOfBirth`, `department`, `yearOfStudy`, and `password`. |
 | `POST` | `/api/auth/login` | Login with email or username and password. |
 | `GET` | `/api/auth/me` | Return the authenticated user for a bearer token. |
 | `POST` | `/api/auth/logout` | Acknowledge client-side logout. JWTs expire automatically. |
-| `GET` | `/api/profile/<user>` | Stored profile when present, otherwise an empty default profile. |
+| `GET` | `/api/profile/<user>` | Stored profile, or `404` when the user is unknown. |
+| `GET` | `/health` | Database-aware readiness check; returns `503` until the required schema migration is present. |
 
 The backend stores an HS256 JWT in the HttpOnly `campusNexusToken` cookie. Browser JavaScript stores only the returned user profile, never the token.
 
@@ -140,3 +158,36 @@ Compatibility aliases are preserved:
 Club member create, update, and delete requests under `/api/clubs/<slug>/members` also require admin access.
 Club posts and announcements use `/api/posts` with `type: 1` or `type: 3` plus `clubSlug` or `clubId`; club leaders can publish both, and admins can grant or revoke a member's post access with `PATCH /api/clubs/<slug>/members/<id>` and `{"canPost": true|false}`.
 Regular posts accept mixed image/MP4 arrays in `mediaUrls`; announcements require exactly one image in `mediaUrls` as their poster.
+
+Student account creation remains public through `POST /api/auth/signup`. The lower-level `POST /api/users` endpoint is admin-only because it does not accept a login password. Creating a post requires a student session and always binds the post to the authenticated student. Updating or deleting a post requires its owner or an administrator. Creating, updating, and deleting game records requires administrator access.
+
+Profile and user mutations require the profile owner or administrator. `GET /api/posts` accepts `authorId`, `limit`, and `cursor`. `GET /api/marketplace` accepts `sellerId`, `status`, `limit`, and `cursor`, includes `sellerId` on each item, and returns `sellerSummary` when filtering by a seller.
+
+Direct conversations require authentication and are created idempotently with:
+
+```http
+POST /api/messages/conversations
+Content-Type: application/json
+
+{"participantUserId": "42", "threadType": "direct"}
+```
+
+Only thread participants can read a conversation or create messages in it.
+
+## Schema migration
+
+New databases can use the root `campus_nexus_schema.sql`. Existing PostgreSQL databases must apply `backend/migrations/001_frontend_api_requirements.postgresql` before starting the updated backend. Startup now validates the required tables, columns, time-zone-aware timestamps, and migration marker instead of attempting to upgrade an existing database with `create_all()`.
+
+The migration is transactional and idempotent. It also repairs databases where SQLAlchemy already created the new tables with naive timestamps, missing server defaults, or missing cascade actions. Apply it with PostgreSQL's client after taking a database backup:
+
+```powershell
+$psqlUrl = $env:DATABASE_URL -replace '^postgresql\+psycopg://', 'postgresql://'
+psql $psqlUrl -v ON_ERROR_STOP=1 -f backend/migrations/001_frontend_api_requirements.postgresql
+```
+
+An opt-in PostgreSQL integration test creates and removes an isolated schema and runs the migration twice. Point it only at a disposable test database:
+
+```powershell
+$env:TEST_POSTGRES_DATABASE_URL="postgresql://user:password@localhost:5432/campus_nexus_test"
+backend\venv\Scripts\python.exe -m unittest backend.tests.test_postgresql_migration -v
+```

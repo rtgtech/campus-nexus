@@ -6,7 +6,7 @@ import { CreatePostLink } from "@/components/create-post-route";
 import type { HeaderSearchProps } from "@/components/header-search";
 import { ProfileNavLink } from "@/components/profile-nav-link";
 
-type NavItemKey = CampusNavKey | "create-post";
+type NavItemKey = CampusNavKey | "create-post" | "saved";
 
 type CampusShellProps = {
   active: CampusNavKey;
@@ -18,6 +18,7 @@ type CampusShellProps = {
 const navItems: Array<{ key: NavItemKey; label: string; href: string; icon: string }> = [
   { key: "feed", label: "Feed", href: "/", icon: "grid_view" },
   { key: "create-post", label: "Create post", href: "/?=createpost", icon: "add" },
+  { key: "saved", label: "Saved", href: "/viewsavedposts?=True", icon: "bookmark" },
   { key: "clubs", label: "Clubs", href: "/clubs", icon: "groups" },
   { key: "marketplace", label: "Marketplace", href: "/marketplace", icon: "storefront" },
   { key: "games", label: "Games", href: "/games", icon: "sports_esports" },

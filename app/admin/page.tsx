@@ -1,7 +1,13 @@
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { CreateClubOverlay } from "@/components/create-club-overlay";
 import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
-import { fallbackClubs, type ClubDetailData, type ClubsData } from "@/lib/app-data";
+import {
+  fallbackClubs,
+  fallbackSignalBarData,
+  type ClubDetailData,
+  type ClubsData,
+  type SignalBarData,
+} from "@/lib/app-data";
 
 type AdminPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -33,7 +39,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const requestedTab = getSearchValue(resolvedSearchParams.tab);
   const initialTab = requestedTab === "clubs" || requestedTab === "signals" ? requestedTab : "profiles";
   const requestedSlug = getSearchValue(resolvedSearchParams.club);
-  const clubsData = await getCampusData<ClubsData>("/api/clubs", fallbackClubs);
+  const [clubsData, signalBarData] = await Promise.all([
+    getCampusData<ClubsData>("/api/clubs", fallbackClubs),
+    getCampusData<SignalBarData>("/api/signal-bar", fallbackSignalBarData),
+  ]);
   const selectedSlug = requestedSlug ?? clubsData.clubCards[0]?.slug ?? "";
   const selectedClub = selectedSlug ? await getClubDetail(selectedSlug) : null;
 
@@ -43,6 +52,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <AdminDashboard
         clubsData={clubsData}
         initialTab={initialTab}
+        initialSignalItems={signalBarData.items}
         selectedClub={selectedClub}
         selectedSlug={selectedSlug}
       />

@@ -38,11 +38,22 @@ class AuthTest(unittest.TestCase):
 
         with patch("graph_store._get_driver", side_effect=AssertionError("account creation touched Neo4j")):
             self.assertEqual(self.client.post("/api/auth/signup", json=payload).status_code, 201)
+            public_client = backend_app.app.test_client()
+            self.assertEqual(
+                public_client.post(
+                    "/api/users",
+                    json={**payload, "username": "blocked", "email": "blocked@example.edu"},
+                ).status_code,
+                401,
+            )
             self.assertEqual(
                 self.client.post(
                     "/api/users",
                     json={**payload, "username": "second", "email": "second@example.edu"},
-                    headers={"Origin": backend_app.CORS_ORIGIN},
+                    headers={
+                        "Authorization": f"Bearer {backend_app.create_auth_token(backend_app.AdminIdentity())}",
+                        "Origin": backend_app.CORS_ORIGIN,
+                    },
                 ).status_code,
                 201,
             )

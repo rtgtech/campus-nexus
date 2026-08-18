@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ProfilePostsGrid } from "@/components/profile-posts-grid";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, authFetch } from "@/lib/auth-client";
@@ -17,7 +19,12 @@ import {
   type FeedCard,
   type LeaderboardEntry,
   type MarketplaceItem,
+  type MarketplaceSellerSummary,
+  type ProfileBadge,
   type ProfileData,
+  type ProfileFriend,
+  type ProfileOverviewData,
+  type ProfilePreferences,
 } from "@/lib/app-data";
 import { formatPostTime } from "@/lib/post-time";
 import { cn } from "@/lib/utils";
@@ -45,13 +52,19 @@ type FriendshipStatus = {
 };
 
 type ProfilePageViewProps = {
+  badges: ProfileBadge[];
   currentUserId?: string;
   followedClubs: ClubCard[];
+  friendsPreview: ProfileFriend[];
   leaderboardEntry?: LeaderboardEntry;
   listings: MarketplaceItem[];
+  marketplaceSummary: MarketplaceSellerSummary;
   memberships: ProfileClubSummary[];
+  mutualFriendsPreview: ProfileFriend[];
   posts: FeedCard[];
+  preferences?: ProfilePreferences;
   profile: ProfileData;
+  profileStats: ProfileOverviewData["stats"];
   user: CampusUser;
 };
 
@@ -62,6 +75,20 @@ const baseTabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "posts", label: "Posts" },
   { id: "clubs", label: "Clubs" },
   { id: "marketplace", label: "Marketplace" },
+];
+
+const notificationSourceLabels: Array<{ key: keyof ProfilePreferences["notificationSources"]; label: string }> = [
+  { key: "official", label: "Official" },
+  { key: "department", label: "Department" },
+  { key: "club", label: "Club" },
+  { key: "student", label: "Student" },
+  { key: "external", label: "External" },
+];
+
+const privacyLabels: Array<{ key: keyof ProfilePreferences["privacy"]; label: string }> = [
+  { key: "profileVisibility", label: "Profile visibility" },
+  { key: "eventHistoryVisibility", label: "Event history" },
+  { key: "marketplaceActivityVisibility", label: "Marketplace activity" },
 ];
 
 function profileHref(user: FriendshipUser) {
@@ -134,15 +161,22 @@ function PlaceholderCard({ title, children }: { title: string; children: React.R
 }
 
 export function ProfilePageView({
+  badges,
   currentUserId,
   followedClubs,
+  friendsPreview,
   leaderboardEntry,
   listings,
+  marketplaceSummary,
   memberships,
+  mutualFriendsPreview,
   posts,
+  preferences: initialPreferences,
   profile: initialProfile,
+  profileStats,
   user,
 }: ProfilePageViewProps) {
+  const router = useRouter();
   const isSelf = currentUserId === user.userId;
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [friendship, setFriendship] = useState<FriendshipStatus | null>(null);
@@ -153,8 +187,15 @@ export function ProfilePageView({
   const [editOpen, setEditOpen] = useState(false);
   const [editMajor, setEditMajor] = useState(initialProfile.major);
   const [editBio, setEditBio] = useState(initialProfile.bio);
+  const [editBatchYear, setEditBatchYear] = useState(initialProfile.batchYear?.toString() ?? "");
+  const [editInterests, setEditInterests] = useState(initialProfile.interests.join(", "));
   const [editStatus, setEditStatus] = useState<RequestStatus>("idle");
   const [editMessage, setEditMessage] = useState("");
+  const [messageStatus, setMessageStatus] = useState<RequestStatus>("idle");
+  const [messageError, setMessageError] = useState("");
+  const [preferences, setPreferences] = useState<ProfilePreferences | undefined>(initialPreferences);
+  const [preferencesStatus, setPreferencesStatus] = useState<RequestStatus>("idle");
+  const [preferencesMessage, setPreferencesMessage] = useState("");
   const [now, setNow] = useState(0);
 
   const tabs = useMemo(
@@ -163,6 +204,10 @@ export function ProfilePageView({
   );
 
   const loadFriendship = useCallback(async () => {
+    if (!currentUserId) {
+      setFriendStatus("idle");
+      return;
+    }
     setFriendStatus("loading");
     setFriendMessage("");
     try {
@@ -179,7 +224,7 @@ export function ProfilePageView({
       setFriendStatus("error");
       setFriendMessage(error instanceof Error ? error.message : "Friends could not be loaded");
     }
-  }, [user.userId]);
+  }, [currentUserId, user.userId]);
 
   useEffect(() => {
     setNow(Date.now());
@@ -230,6 +275,30 @@ export function ProfilePageView({
     await navigator.clipboard?.writeText(url).catch(() => undefined);
   }
 
+  async function startConversation() {
+    if (isSelf || messageStatus === "saving") {
+      return;
+    }
+    setMessageStatus("saving");
+    setMessageError("");
+    try {
+      const response = await authFetch(`${API_BASE_URL}/api/messages/conversations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantUserId: user.userId, threadType: "direct" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Conversation could not be created");
+      }
+      const href = typeof data.href === "string" ? data.href : `/chat?thread=${encodeURIComponent(String(data.threadId ?? data.id))}`;
+      router.push(href);
+    } catch (error) {
+      setMessageStatus("error");
+      setMessageError(error instanceof Error ? error.message : "Conversation could not be created");
+    }
+  }
+
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isSelf || editStatus === "saving") {
@@ -241,7 +310,12 @@ export function ProfilePageView({
       const response = await authFetch(`${API_BASE_URL}/api/profiles/${encodeURIComponent(user.username || user.userId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ major: editMajor.trim(), bio: editBio.trim() }),
+        body: JSON.stringify({
+          major: editMajor.trim(),
+          bio: editBio.trim(),
+          batchYear: editBatchYear.trim() ? Number(editBatchYear) : null,
+          interests: editInterests.split(",").map((interest) => interest.trim()).filter(Boolean),
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -251,6 +325,8 @@ export function ProfilePageView({
         ...current,
         major: typeof data.major === "string" ? data.major : editMajor.trim(),
         bio: typeof data.bio === "string" ? data.bio : editBio.trim(),
+        batchYear: typeof data.batchYear === "number" ? data.batchYear : null,
+        interests: Array.isArray(data.interests) ? data.interests : current.interests,
       }));
       setEditStatus("idle");
       setEditOpen(false);
@@ -260,12 +336,43 @@ export function ProfilePageView({
     }
   }
 
-  const friends = friendship?.friendsList ?? [];
-  const mutuals = friendship?.mutualsList ?? [];
+  async function savePreferences() {
+    if (!isSelf || !preferences || preferencesStatus === "saving") {
+      return;
+    }
+    setPreferencesStatus("saving");
+    setPreferencesMessage("");
+    try {
+      const response = await authFetch(`${API_BASE_URL}/api/users/${encodeURIComponent(user.userId)}/preferences`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preferences),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Preferences could not be saved");
+      }
+      setPreferences(data as ProfilePreferences);
+      setPreferencesStatus("idle");
+      setPreferencesMessage("Preferences saved.");
+      router.refresh();
+    } catch (error) {
+      setPreferencesStatus("error");
+      setPreferencesMessage(error instanceof Error ? error.message : "Preferences could not be saved");
+    }
+  }
+
+  const friends = friendship?.friendsList ?? friendsPreview;
+  const mutuals = friendship?.mutualsList ?? mutualFriendsPreview;
   const visibleFriendPreview = isSelf ? friends.slice(0, 3) : mutuals.slice(0, 3);
-  const friendCount = friendship?.friends;
+  const friendCount = friendship?.friends ?? profileStats.friends;
   const yearLabel = user.yearOfStudy ? `Year ${user.yearOfStudy}` : "Year —";
   const rankLabel = leaderboardEntry ? `Rank #${leaderboardEntry.rank}` : "Rank —";
+  const activityLabel = profile.isOnline
+    ? "Active now"
+    : profile.lastActiveAt
+      ? `Active ${listingTime(profile.lastActiveAt, now)}`
+      : "Activity not recorded";
 
   return (
     <div className="mx-auto max-w-[1100px] pb-12 md:pl-16">
@@ -290,20 +397,24 @@ export function ProfilePageView({
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-[#6d6d67]">
-                  {profile.major || user.department || "Department —"} · {yearLabel} · Batch —
+                  {profile.major || user.department || "Department —"} · {yearLabel} · {profile.batchYear ? `Batch ${profile.batchYear}` : "Batch —"}
                 </p>
-                {!isSelf ? (
-                  <p className="mt-2 flex items-center gap-1.5 font-mono text-[10px] uppercase text-[#85857e]">
-                    <span className="h-[7px] w-[7px] rounded-full bg-[#92928b]" />
-                    Activity status unavailable
-                  </p>
-                ) : null}
+                <p className="mt-2 flex items-center gap-1.5 font-mono text-[10px] uppercase text-[#85857e]">
+                  <span className={cn("h-[7px] w-[7px] rounded-full", profile.isOnline ? "bg-emerald-500" : "bg-[#92928b]")} />
+                  {activityLabel}
+                </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {!isSelf ? (
-                  <Button className="h-9 rounded-[8px] border-[#d8d8d2] px-4 text-xs text-[#888]" disabled variant="outline">
-                    Message
+                  <Button
+                    className="h-9 rounded-[8px] border-[#d8d8d2] px-4 text-xs"
+                    disabled={messageStatus === "saving"}
+                    type="button"
+                    variant="outline"
+                    onClick={startConversation}
+                  >
+                    {messageStatus === "saving" ? "Opening…" : "Message"}
                   </Button>
                 ) : null}
                 <Button className="h-9 rounded-[8px] border-[#d8d8d2] px-4 text-xs" type="button" variant="outline" onClick={shareProfile}>
@@ -336,10 +447,16 @@ export function ProfilePageView({
               {profile.bio || "Bio not added yet."}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full border border-dashed border-[#d3d3cd] px-2.5 py-1 font-mono text-[9px] uppercase text-[#85857e]">
-                Interests not available
-              </span>
+              {profile.interests.length > 0 ? profile.interests.map((interest) => (
+                <span key={interest} className="rounded-full border border-[#d3d3cd] px-2.5 py-1 font-mono text-[9px] uppercase text-[#686862]">
+                  {interest}
+                </span>
+              )) : (
+                <span className="text-[10px] text-[#85857e]">No interests added.</span>
+              )}
             </div>
+
+            {messageError ? <p className="mt-2 text-xs font-semibold text-destructive">{messageError}</p> : null}
 
             <button className="mt-4 text-left" type="button" onClick={() => setFriendsOpen(true)}>
               <strong className="block text-base">{friendCount === undefined ? "—" : friendCount}</strong>
@@ -401,18 +518,27 @@ export function ProfilePageView({
           </div>
 
           <aside className="space-y-3">
-            {isSelf ? (
-              <PlaceholderCard title="Badges">
+            <PlaceholderCard title="Badges">
+              {badges.length > 0 ? (
                 <div className="grid grid-cols-4 gap-2">
-                  {[0, 1, 2, 3].map((item) => (
-                    <span key={item} className="flex aspect-square items-center justify-center rounded-[9px] border border-dashed border-[#d8d8d2] bg-[#f7f7f4] text-[#aaa]">
-                      <span className="material-symbols-outlined text-base">lock</span>
+                  {badges.map((badge) => (
+                    <span
+                      key={badge.id}
+                      aria-label={`${badge.name}${badge.earned ? ", earned" : ", locked"}`}
+                      className={cn(
+                        "flex aspect-square items-center justify-center rounded-[9px] border bg-[#f7f7f4]",
+                        badge.earned ? "border-[#aaa] text-[#353532]" : "border-dashed border-[#d8d8d2] text-[#aaa]",
+                      )}
+                      title={badge.name}
+                    >
+                      <span className="material-symbols-outlined text-base">{badge.earned ? badge.icon : "lock"}</span>
                     </span>
                   ))}
                 </div>
-                <p className="mt-3 text-[10px] leading-5 text-[#85857e]">Badge data is not available yet.</p>
-              </PlaceholderCard>
-            ) : null}
+              ) : (
+                <p className="text-[11px] text-[#777770]">No badges are configured.</p>
+              )}
+            </PlaceholderCard>
 
             <PlaceholderCard title={isSelf ? "Friends" : `Mutual friends (${mutuals.length})`}>
               {visibleFriendPreview.length > 0 ? (
@@ -466,10 +592,14 @@ export function ProfilePageView({
           </PlaceholderCard>
           <PlaceholderCard title="Trust">
             <div className="space-y-3">
-              <div><strong className="block text-base">—</strong><span className="text-[10px] text-[#777770]">Seller rating</span></div>
-              <div><strong className="block text-base">—</strong><span className="text-[10px] text-[#777770]">Successful trades</span></div>
+              <div>
+                <strong className="block text-base">
+                  {marketplaceSummary.sellerRating === null ? "No ratings" : `${marketplaceSummary.sellerRating.toFixed(1)} / 5`}
+                </strong>
+                <span className="text-[10px] text-[#777770]">Seller rating · {marketplaceSummary.sellerRatingCount} reviews</span>
+              </div>
+              <div><strong className="block text-base">{marketplaceSummary.successfulTrades}</strong><span className="text-[10px] text-[#777770]">Successful trades</span></div>
             </div>
-            <p className="mt-3 text-[10px] leading-5 text-[#85857e]">Marketplace trust metrics are not available yet.</p>
           </PlaceholderCard>
         </section>
       ) : null}
@@ -477,22 +607,69 @@ export function ProfilePageView({
       {activeTab === "settings" && isSelf ? (
         <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" role="tabpanel">
           <PlaceholderCard title="Notification sources">
-            <div className="flex flex-wrap gap-2">
-              {["Official", "Department", "Club", "Student", "External"].map((source) => (
-                <span key={source} className="rounded-[6px] border border-dashed border-[#d8d8d2] px-3 py-2 font-mono text-[9px] uppercase text-[#85857e]">
-                  {source} · —
-                </span>
-              ))}
-            </div>
-            <p className="mt-3 text-[10px] leading-5 text-[#85857e]">Notification source preferences are not exposed by the API.</p>
+            {preferences ? (
+              <div className="flex flex-wrap gap-2">
+                {notificationSourceLabels.map(({ key, label }) => {
+                  const enabled = preferences.notificationSources[key];
+                  return (
+                    <button
+                      key={key}
+                      aria-pressed={enabled}
+                      className={cn(
+                        "rounded-[6px] border px-3 py-2 font-mono text-[9px] uppercase",
+                        enabled ? "border-[#171717] bg-[#171717] text-white" : "border-[#d8d8d2] text-[#686862]",
+                      )}
+                      type="button"
+                      onClick={() => setPreferences((current) => current ? {
+                        ...current,
+                        notificationSources: {
+                          ...current.notificationSources,
+                          [key]: !current.notificationSources[key],
+                        },
+                      } : current)}
+                    >
+                      {label} · {enabled ? "On" : "Off"}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : <p className="text-[11px] text-[#777770]">Preferences could not be loaded.</p>}
           </PlaceholderCard>
           <PlaceholderCard title="Privacy">
-            {["Profile visibility", "Event history", "Marketplace activity"].map((setting) => (
-              <div key={setting} className="flex items-center justify-between border-b border-[#e8e8e2] py-3 first:pt-0 last:border-0 last:pb-0">
-                <div><p className="text-xs font-semibold">{setting}</p><p className="mt-0.5 text-[9px] text-[#85857e]">Not available</p></div>
-                <span className="h-5 w-9 rounded-full border border-dashed border-[#cfcfc9] bg-[#f5f5f1]" />
+            {preferences ? privacyLabels.map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between gap-3 border-b border-[#e8e8e2] py-3 first:pt-0 last:border-0 last:pb-0">
+                <p className="text-xs font-semibold">{label}</p>
+                <NativeSelect
+                  aria-label={label}
+                  className="w-28 [&_select]:rounded-[6px]"
+                  size="sm"
+                  value={preferences.privacy[key]}
+                  onChange={(event) => setPreferences((current) => current ? {
+                    ...current,
+                    privacy: {
+                      ...current.privacy,
+                      [key]: event.target.value as ProfilePreferences["privacy"][typeof key],
+                    },
+                  } : current)}
+                >
+                  {(["campus", "friends", "private"] as const).map((value) => (
+                    <NativeSelectOption key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</NativeSelectOption>
+                  ))}
+                </NativeSelect>
               </div>
-            ))}
+            )) : <p className="text-[11px] text-[#777770]">Preferences could not be loaded.</p>}
+            {preferencesMessage ? (
+              <p className={cn("mt-3 text-[10px]", preferencesStatus === "error" ? "text-destructive" : "text-[#5f5f59]")}>{preferencesMessage}</p>
+            ) : null}
+            <Button
+              className="mt-4 w-full rounded-[7px] bg-[#171717] text-white hover:bg-[#353532]"
+              disabled={!preferences || preferencesStatus === "saving"}
+              size="sm"
+              type="button"
+              onClick={savePreferences}
+            >
+              {preferencesStatus === "saving" ? "Saving…" : "Save settings"}
+            </Button>
           </PlaceholderCard>
         </section>
       ) : null}
@@ -538,6 +715,27 @@ export function ProfilePageView({
             <label className="block text-xs font-semibold">
               Major
               <Input className="mt-2 h-10 rounded-[8px] bg-[#f7f7f4]" value={editMajor} onChange={(event) => setEditMajor(event.target.value)} />
+            </label>
+            <label className="block text-xs font-semibold">
+              Batch year
+              <Input
+                className="mt-2 h-10 rounded-[8px] bg-[#f7f7f4]"
+                inputMode="numeric"
+                placeholder="2027"
+                type="number"
+                value={editBatchYear}
+                onChange={(event) => setEditBatchYear(event.target.value)}
+              />
+            </label>
+            <label className="block text-xs font-semibold">
+              Interests
+              <Input
+                className="mt-2 h-10 rounded-[8px] bg-[#f7f7f4]"
+                placeholder="Robotics, design, music"
+                value={editInterests}
+                onChange={(event) => setEditInterests(event.target.value)}
+              />
+              <span className="mt-1 block text-[10px] font-normal text-[#777770]">Separate interests with commas.</span>
             </label>
             <label className="block text-xs font-semibold">
               Bio

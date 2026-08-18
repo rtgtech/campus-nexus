@@ -12,7 +12,15 @@ import { formatPostTime } from "@/lib/post-time";
 
 type FeedPostCardProps = {
   post: FeedCard;
+  onSavedChange?: (postId: string, saved: boolean) => void;
 };
+
+type PostSaveEventDetail = {
+  postId: string;
+  saved: boolean;
+};
+
+const POST_SAVE_EVENT = "campus-nexus:post-save-change";
 
 function isMp4(url: string) {
   const normalizedUrl = url.toLowerCase().split("?", 1)[0];
@@ -49,13 +57,17 @@ function profileHref(post: FeedCard) {
   return `/${encodeURIComponent(authorKey)}`;
 }
 
-export function FeedPostCard({ post }: FeedPostCardProps) {
+export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
   const router = useRouter();
   const initialLiked =
     post.likedByCurrentUser ?? post.viewerHasLiked ?? false;
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(readMetricCount(post.likes));
   const [isLikePending, setIsLikePending] = useState(false);
+  const [saved, setSaved] = useState(
+    post.savedByCurrentUser ?? post.bookmarkedByCurrentUser ?? post.viewerHasSaved ?? false,
+  );
+  const [isSavePending, setIsSavePending] = useState(false);
   const [now, setNow] = useState(0);
   const mediaUrl = post.mediaUrl || post.image;
   const mediaUrls = post.mediaUrls?.length ? post.mediaUrls : mediaUrl ? [mediaUrl] : [];
@@ -84,6 +96,20 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    function handleSaveChange(event: Event) {
+      const detail = (event as CustomEvent<PostSaveEventDetail>).detail;
+      if (!detail || detail.postId !== post.postId) {
+        return;
+      }
+      setSaved(detail.saved);
+      onSavedChange?.(detail.postId, detail.saved);
+    }
+
+    window.addEventListener(POST_SAVE_EVENT, handleSaveChange);
+    return () => window.removeEventListener(POST_SAVE_EVENT, handleSaveChange);
+  }, [onSavedChange, post.postId]);
 
   async function handleLike() {
     if (!post.postId || isLikePending) {
@@ -133,6 +159,40 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
     }
 
     await navigator.clipboard?.writeText(shareUrl).catch(() => undefined);
+  }
+
+  async function handleSave() {
+    if (!post.postId || isSavePending) {
+      return;
+    }
+
+    const nextSaved = !saved;
+    const previousSaved = saved;
+    setIsSavePending(true);
+    setSaved(nextSaved);
+
+    try {
+      const response = await authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(post.postId)}/save`, {
+        method: nextSaved ? "POST" : "DELETE",
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error("Save request failed");
+      }
+      const confirmedSaved = Boolean(
+        data?.saved ?? data?.savedByCurrentUser ?? data?.bookmarkedByCurrentUser ?? nextSaved,
+      );
+      setSaved(confirmedSaved);
+      window.dispatchEvent(
+        new CustomEvent<PostSaveEventDetail>(POST_SAVE_EVENT, {
+          detail: { postId: post.postId, saved: confirmedSaved },
+        }),
+      );
+    } catch {
+      setSaved(previousSaved);
+    } finally {
+      setIsSavePending(false);
+    }
   }
 
   return (
@@ -253,8 +313,17 @@ export function FeedPostCard({ post }: FeedPostCardProps) {
               <span className="material-symbols-outlined">send</span>
             </Button>
           </div>
-          <Button aria-label="Save post" className="rounded-full text-on-surface" size="icon" type="button" variant="ghost">
-            <span className="material-symbols-outlined">bookmark_add</span>
+          <Button
+            aria-label={saved ? "Unsave post" : "Save post"}
+            aria-pressed={saved}
+            className={saved ? "rounded-full text-secondary" : "rounded-full text-on-surface"}
+            disabled={isSavePending}
+            size="icon"
+            type="button"
+            variant="ghost"
+            onClick={handleSave}
+          >
+            <span className="material-symbols-outlined">{saved ? "bookmark" : "bookmark_add"}</span>
           </Button>
         </div>
 

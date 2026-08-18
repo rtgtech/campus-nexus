@@ -23,6 +23,9 @@ export type FeedCard = {
   createdAt?: string;
   likedByCurrentUser?: boolean;
   viewerHasLiked?: boolean;
+  savedByCurrentUser?: boolean;
+  bookmarkedByCurrentUser?: boolean;
+  viewerHasSaved?: boolean;
 };
 
 export type TrendingItem = {
@@ -40,6 +43,14 @@ export type SignalBarItem = {
   id: string;
   title: string;
   link: string;
+  position?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SignalBarData = {
+  items: SignalBarItem[];
+  total: number;
 };
 
 export const fallbackSignalBarItems: SignalBarItem[] = [
@@ -70,6 +81,11 @@ export const fallbackSignalBarItems: SignalBarItem[] = [
   },
 ];
 
+export const fallbackSignalBarData: SignalBarData = {
+  items: fallbackSignalBarItems,
+  total: fallbackSignalBarItems.length,
+};
+
 export type CampusUser = {
   userId: string;
   name: string;
@@ -77,8 +93,11 @@ export type CampusUser = {
   email: string;
   dateOfBirth: string;
   yearOfStudy: number;
+  batchYear?: number | null;
   department: string;
   initials: string;
+  lastActiveAt?: string | null;
+  isOnline?: boolean;
 };
 
 export type FeedData = {
@@ -218,6 +237,9 @@ export type LeaderboardData = {
 };
 
 export type Conversation = {
+  id?: number;
+  threadId?: number;
+  href?: string;
   name: string;
   preview: string;
   time: string;
@@ -243,6 +265,7 @@ export type MessagesData = {
 export type MarketplaceItem = {
   id?: string;
   postId?: string;
+  sellerId?: string;
   title: string;
   owner: string;
   mode: string;
@@ -255,17 +278,94 @@ export type MarketplaceItem = {
   tags: string[];
   contact: string;
   preferredExchange: string;
+  status?: string;
   createdAt: string;
+};
+
+export type MarketplaceSellerSummary = {
+  sellerId: string;
+  sellerRating: number | null;
+  sellerRatingCount: number;
+  successfulTrades: number;
 };
 
 export type MarketplaceData = {
   items: MarketplaceItem[];
+  sellerSummary?: MarketplaceSellerSummary;
+};
+
+export type ProfileBadge = {
+  id: string;
+  name: string;
+  icon: string;
+  description?: string;
+  earned: boolean;
+  earnedAt: string | null;
+};
+
+export type NotificationSourcePreferences = {
+  official: boolean;
+  department: boolean;
+  club: boolean;
+  student: boolean;
+  external: boolean;
+};
+
+export type ProfilePrivacyPreferences = {
+  profileVisibility: "private" | "friends" | "campus";
+  eventHistoryVisibility: "private" | "friends" | "campus";
+  marketplaceActivityVisibility: "private" | "friends" | "campus";
+};
+
+export type ProfilePreferences = {
+  notificationSources: NotificationSourcePreferences;
+  privacy: ProfilePrivacyPreferences;
+};
+
+export type ProfileFriend = {
+  userId: string;
+  id?: string;
+  name: string;
+  username?: string;
+  initials?: string;
+  acronym?: string;
+  friendshipId?: string;
+  createdAt?: string;
 };
 
 export type ProfileData = {
   avatar?: string;
   major: string;
   bio: string;
+  user?: string;
+  userId?: string;
+  batchYear: number | null;
+  lastActiveAt: string | null;
+  isOnline: boolean;
+  interests: string[];
+};
+
+export type ProfileOverviewData = {
+  user: CampusUser;
+  profile: ProfileData;
+  stats: {
+    friends: number;
+    mutualFriends: number;
+    rank: number | null;
+    totalXp: number;
+  };
+  friendsPreview: ProfileFriend[];
+  mutualFriendsPreview: ProfileFriend[];
+  badges: ProfileBadge[];
+  clubs: {
+    memberOf: Array<{ club: ClubCard; membership: ClubMember }>;
+    following: ClubCard[];
+    followingVisible: boolean;
+  };
+  marketplace: MarketplaceSellerSummary & {
+    activeListings: MarketplaceItem[];
+  };
+  preferences?: ProfilePreferences;
 };
 
 export const profileAvatar =
@@ -340,4 +440,8 @@ export const fallbackMarketplace: MarketplaceData = {
 export const fallbackProfile: ProfileData = {
   major: "",
   bio: "",
+  batchYear: null,
+  lastActiveAt: null,
+  isOnline: false,
+  interests: [],
 };
