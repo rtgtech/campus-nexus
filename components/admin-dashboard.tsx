@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { CampusHeader } from "@/components/campus-header";
 import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
-import { EntityListItem, clubEntityHref, profileEntityHref } from "@/components/entity-list-item";
+import { clubEntityHref, profileEntityHref } from "@/components/entity-list-item";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,19 +18,62 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { API_BASE_URL, authFetch, type CampusAuthSession, isAdminUser, readAuthSession } from "@/lib/auth-client";
-import { type CampusUser, type ClubDetailData, type ClubsData, type ClubMember } from "@/lib/app-data";
+import {
+  type CampusUser,
+  type ClubDetailData,
+  type ClubMember,
+  type ClubsData,
+  fallbackSignalBarItems,
+  getInitials,
+  type SignalBarItem,
+} from "@/lib/app-data";
 import { cn } from "@/lib/utils";
+
+type AdminTab = "profiles" | "clubs" | "signals";
 
 type AdminDashboardProps = {
   clubsData: ClubsData;
+  initialTab: AdminTab;
   selectedClub: ClubDetailData | null;
   selectedSlug: string;
 };
 
-export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminDashboardProps) {
+const tabs: Array<{ id: AdminTab; label: string }> = [
+  { id: "profiles", label: "Profiles" },
+  { id: "clubs", label: "Clubs" },
+  { id: "signals", label: "Signal Bar" },
+];
+
+const clubRoles = [
+  "President",
+  "Vice President",
+  "Chairman",
+  "Vice Chairman",
+  "Secretary",
+  "Treasurer",
+  "Member",
+];
+
+function isSafeSignalLink(value: string) {
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return true;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function AdminDashboard({ clubsData, initialTab, selectedClub, selectedSlug }: AdminDashboardProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [session, setSession] = useState<CampusAuthSession | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
@@ -38,12 +81,24 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
   const [deletingClub, setDeletingClub] = useState(false);
   const [memberMessage, setMemberMessage] = useState("");
   const [users, setUsers] = useState<CampusUser[]>([]);
-  const [usersMessage, setUsersMessage] = useState("Loading users...");
+  const [usersMessage, setUsersMessage] = useState("Loading profiles...");
+  const [signalItems, setSignalItems] = useState<SignalBarItem[]>(() =>
+    fallbackSignalBarItems.map((item) => ({ ...item })),
+  );
+  const [signalFormOpen, setSignalFormOpen] = useState(false);
+  const [editingSignalId, setEditingSignalId] = useState<string | null>(null);
+  const [signalTitle, setSignalTitle] = useState("");
+  const [signalLink, setSignalLink] = useState("");
+  const [signalMessage, setSignalMessage] = useState("");
 
   useEffect(() => {
     setSession(readAuthSession());
     setSessionLoaded(true);
   }, []);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const isAdmin = isAdminUser(session?.user);
 
@@ -57,37 +112,25 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
       .then(async (response) => {
         const data = await response.json().catch(() => []);
         if (!response.ok) {
-          throw new Error(typeof data.error === "string" ? data.error : "Loading users failed");
+          throw new Error(typeof data.error === "string" ? data.error : "Loading profiles failed");
         }
         setUsers(Array.isArray(data) ? data : []);
         setUsersMessage("");
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
-          setUsersMessage(error instanceof Error ? error.message : "Loading users failed");
+          setUsersMessage(error instanceof Error ? error.message : "Loading profiles failed");
         }
       });
+
     return () => controller.abort();
   }, [isAdmin]);
 
-  const clubCards = clubsData.clubCards;
-  const stats = useMemo(
-    () => [
-      { label: "Clubs", value: String(clubCards.length), icon: "groups" },
-      { label: "Spotlight", value: String(clubsData.spotlightClubs.length), icon: "stars" },
-      {
-        label: "Club posts",
-        value: String(clubCards.reduce((total, club) => total + (club.postsCount ?? 0), 0)),
-        icon: "article",
-      },
-      {
-        label: "Open clubs",
-        value: String(clubCards.filter((club) => club.status.toLowerCase() === "open").length),
-        icon: "lock_open",
-      },
-    ],
-    [clubCards, clubsData.spotlightClubs.length],
-  );
+  function selectTab(tab: AdminTab) {
+    setActiveTab(tab);
+    setMemberMessage("");
+    router.replace(`/admin?tab=${tab}`, { scroll: false });
+  }
 
   async function removeMember(member: ClubMember) {
     if (!session || !selectedClub) {
@@ -100,9 +143,7 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
     try {
       const response = await authFetch(
         `${API_BASE_URL}/api/clubs/${encodeURIComponent(selectedClub.club.slug)}/members/${member.id}`,
-        {
-          method: "DELETE",
-        },
+        { method: "DELETE" },
       );
 
       if (!response.ok) {
@@ -110,7 +151,7 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
         throw new Error(typeof data.error === "string" ? data.error : "Remove member failed");
       }
 
-      setMemberMessage(`${member.name} removed.`);
+      setMemberMessage(`${member.name} was removed from the club.`);
       router.refresh();
     } catch (error) {
       setMemberMessage(error instanceof Error ? error.message : "Remove member failed");
@@ -119,27 +160,32 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
     }
   }
 
-  async function togglePosting(member: ClubMember) {
-    if (!session || !selectedClub) return;
+  async function updateMemberRole(member: ClubMember, title: string) {
+    if (!session || !selectedClub || title === member.title) {
+      return;
+    }
 
     setUpdatingMemberId(member.id);
     setMemberMessage("");
+
     try {
       const response = await authFetch(
         `${API_BASE_URL}/api/clubs/${encodeURIComponent(selectedClub.club.slug)}/members/${member.id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ canPost: !member.canPost }),
+          body: JSON.stringify({ title }),
         },
       );
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Updating posting privilege failed");
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Role update failed");
+      }
 
-      setMemberMessage(`${member.name} ${member.canPost ? "can no longer post" : "can now post"}.`);
+      setMemberMessage(`${member.name} is now ${title}.`);
       router.refresh();
     } catch (error) {
-      setMemberMessage(error instanceof Error ? error.message : "Updating posting privilege failed");
+      setMemberMessage(error instanceof Error ? error.message : "Role update failed");
     } finally {
       setUpdatingMemberId(null);
     }
@@ -159,7 +205,7 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
         const data = await response.json().catch(() => ({}));
         throw new Error(typeof data.error === "string" ? data.error : "Delete club failed");
       }
-      router.push("/admin");
+      router.push("/admin?tab=clubs");
       router.refresh();
     } catch (error) {
       setMemberMessage(error instanceof Error ? error.message : "Delete club failed");
@@ -167,305 +213,463 @@ export function AdminDashboard({ clubsData, selectedClub, selectedSlug }: AdminD
     }
   }
 
+  function beginAddSignal() {
+    setEditingSignalId(null);
+    setSignalTitle("");
+    setSignalLink("");
+    setSignalMessage("");
+    setSignalFormOpen(true);
+  }
+
+  function beginEditSignal(signal: SignalBarItem) {
+    setEditingSignalId(signal.id);
+    setSignalTitle(signal.title);
+    setSignalLink(signal.link);
+    setSignalMessage("");
+    setSignalFormOpen(true);
+  }
+
+  function cancelSignalForm() {
+    setEditingSignalId(null);
+    setSignalTitle("");
+    setSignalLink("");
+    setSignalMessage("");
+    setSignalFormOpen(false);
+  }
+
+  function saveSignal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = signalTitle.trim();
+    const link = signalLink.trim();
+
+    if (!title || !link) {
+      setSignalMessage("Title and link are required.");
+      return;
+    }
+    if (!isSafeSignalLink(link)) {
+      setSignalMessage("Use an internal path beginning with / or a full http(s) link.");
+      return;
+    }
+
+    if (editingSignalId) {
+      setSignalItems((items) =>
+        items.map((item) => (item.id === editingSignalId ? { ...item, title, link } : item)),
+      );
+      setSignalMessage("Mock title updated for this page view.");
+    } else {
+      setSignalItems((items) => [
+        ...items,
+        { id: `mock-signal-${Date.now()}`, title, link },
+      ]);
+      setSignalMessage("Mock title added for this page view.");
+    }
+
+    setEditingSignalId(null);
+    setSignalTitle("");
+    setSignalLink("");
+    setSignalFormOpen(false);
+  }
+
+  const panelClassName = "border border-outline-variant/70 bg-white";
+
   return (
-    <div className="min-h-screen bg-background font-body-md text-on-background">
+    <div className="min-h-screen bg-[#f7f7f4] font-sans text-on-background">
       <CampusHeader
         contextAction={
-            <Link
-              href="/clubs"
-              className={cn(buttonVariants({ variant: "outline" }), "hidden rounded-full bg-white px-4 text-on-surface-variant hover:text-primary xl:inline-flex")}
-            >
-              Public clubs
-            </Link>
+          <Link
+            href="/clubs"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "hidden rounded-[3px] border-outline-variant bg-white px-3 text-on-surface-variant hover:text-on-surface xl:inline-flex",
+            )}
+          >
+            Public clubs
+          </Link>
         }
       />
 
       {!sessionLoaded ? (
-        <main className="mx-auto max-w-7xl px-5 py-10">
-          <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs">
-            <p className="text-sm font-semibold text-on-surface-variant">Checking admin access...</p>
+        <main className="mx-auto max-w-6xl px-4 py-10 md:px-6">
+          <section className={cn(panelClassName, "p-6")}>
+            <p className="text-sm text-on-surface-variant">Checking admin access...</p>
           </section>
         </main>
       ) : !isAdmin ? (
-        <main className="mx-auto max-w-3xl px-5 py-10">
-          <section className="rounded-[10px] border border-surface-container-highest bg-white p-8 shadow-xs">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Admin only</p>
-            <h1 className="mt-2 font-headline-lg text-3xl text-on-background">Sign in with the admin account.</h1>
-            <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-              Club creation and member management now live only on this page.
+        <main className="mx-auto max-w-2xl px-4 py-12 md:px-6">
+          <section className={cn(panelClassName, "p-7")}>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Admin only</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Administrator sign-in required</h1>
+            <p className="mt-3 max-w-lg text-sm leading-6 text-on-surface-variant">
+              Profiles, clubs, roles, and signal-bar settings are available to the administrator account.
             </p>
-            <Link
-              href="/auth"
-              className={cn(buttonVariants({ size: "lg" }), "mt-6 rounded-full px-5")}
-            >
-              <span className="material-symbols-outlined text-base">login</span>
+            <Link href="/auth" className={cn(buttonVariants({ size: "lg" }), "mt-6 rounded-[3px] px-4")}>
               Sign in
             </Link>
           </section>
         </main>
       ) : (
-        <main className="mx-auto max-w-7xl space-y-6 px-5 py-8">
-          <section className="flex flex-wrap items-end justify-between gap-4">
+        <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-10">
+          <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Dashboard</p>
-              <h1 className="mt-2 font-headline-lg text-4xl text-on-background">Administration</h1>
+              <p className="text-xs font-medium text-on-surface-variant">Campus Nexus</p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-[-0.03em] md:text-4xl">Administration</h1>
             </div>
-            <Link
-              href="/admin?mode=createclub"
-              className={cn(buttonVariants({ size: "lg" }), "rounded-full px-5")}
-            >
-              <span className="material-symbols-outlined text-base">group_add</span>
-              Create club
-            </Link>
-          </section>
+            <p className="text-sm text-on-surface-variant">Signed in as {session?.user.name}</p>
+          </header>
 
-          <section className="grid gap-4 md:grid-cols-4">
-            {stats.map((stat) => (
-              <div key={stat.label} className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs">
-                <span className="material-symbols-outlined rounded-full bg-primary-fixed p-3 text-primary">
-                  {stat.icon}
-                </span>
-                <p className="mt-4 font-headline-md text-3xl text-primary">{stat.value}</p>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-                  {stat.label}
-                </p>
-              </div>
-            ))}
-          </section>
+          <nav aria-label="Admin sections" className="mt-8 flex gap-7 border-b border-outline-variant/70">
+            {tabs.map((tab) => {
+              const selected = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  aria-current={selected ? "page" : undefined}
+                  className={cn(
+                    "-mb-px border-b-2 px-0.5 pb-3 text-sm font-medium transition-colors",
+                    selected
+                      ? "border-on-surface text-on-surface"
+                      : "border-transparent text-on-surface-variant hover:text-on-surface",
+                  )}
+                  type="button"
+                  onClick={() => selectTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
 
-          <section className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Users</p>
-              <h2 className="mt-1 font-headline-md text-2xl text-on-background">All users ({users.length})</h2>
-            </div>
-
-            {usersMessage ? (
-              <p className="mt-5 rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">{usersMessage}</p>
-            ) : (
-              <div className="mt-5 rounded-2xl border border-outline-variant/60">
-                <Table className="min-w-[640px]">
-                  <TableHeader className="bg-surface-container-low text-xs uppercase tracking-[0.14em] text-on-surface-variant">
-                    <TableRow>
-                      <TableHead className="px-4 py-3 font-semibold">Name</TableHead>
-                      <TableHead className="px-4 py-3 font-semibold">User ID</TableHead>
-                      <TableHead className="px-4 py-3 font-semibold">Year</TableHead>
-                      <TableHead className="px-4 py-3 font-semibold">Department</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="divide-y divide-outline-variant/60">
-                    {users.map((user) => (
-                      <TableRow key={user.userId} className="text-on-surface">
-                        <TableCell className="px-4 py-3 font-semibold">
-                          <Link href={profileEntityHref(user)} className="hover:text-primary hover:underline">
-                            {user.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="px-4 py-3 font-mono text-xs text-on-surface-variant">{user.userId}</TableCell>
-                        <TableCell className="px-4 py-3">{user.yearOfStudy}</TableCell>
-                        <TableCell className="px-4 py-3">{user.department}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </section>
-
-          <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-            <section className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs">
-              <div className="flex items-center justify-between gap-3">
+          {activeTab === "profiles" ? (
+            <section aria-labelledby="profiles-heading" className="mt-7">
+              <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Clubs</p>
-                  <h2 className="mt-1 font-headline-md text-2xl text-on-background">Manage records</h2>
+                  <h2 id="profiles-heading" className="text-xl font-semibold">Registered profiles</h2>
+                  <p className="mt-1 text-sm text-on-surface-variant">Every student account registered in the app.</p>
                 </div>
+                {!usersMessage ? <p className="text-sm text-on-surface-variant">{users.length} total</p> : null}
               </div>
 
-              <div className="mt-5 space-y-2">
-                {clubCards.length === 0 ? (
-                  <p className="rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
-                    No clubs yet.
-                  </p>
+              <div className={cn(panelClassName, "mt-5 overflow-hidden")}>
+                {usersMessage ? (
+                  <p className="p-5 text-sm text-on-surface-variant">{usersMessage}</p>
+                ) : users.length === 0 ? (
+                  <p className="p-5 text-sm text-on-surface-variant">No registered profiles.</p>
                 ) : (
-                  clubCards.map((club) => {
-                    const selected = club.slug === selectedSlug;
-                    return (
-                      <EntityListItem
-                        key={club.slug}
-                        href={clubEntityHref(club)}
-                        title={club.title}
-                        subtitle={club.status || "No status"}
-                        kind="club"
-                        icon={club.icon}
-                        selected={selected}
-                        className={[
-                          "flex min-w-0 items-center gap-3 rounded-2xl px-3 py-2 transition",
-                          selected ? "bg-primary text-on-primary" : "bg-surface-container-low text-on-surface hover:bg-primary-fixed",
-                        ].join(" ")}
-                        avatarClassName={`rounded-xl text-white ${selected ? "bg-white/18" : club.iconBg}`}
-                        titleClassName={selected ? "block truncate text-sm font-semibold text-white" : undefined}
-                        subtitleClassName={selected ? "block truncate text-xs text-white/75" : undefined}
-                        trailing={
-                          <Link
-                            href={`/admin?club=${encodeURIComponent(club.slug)}`}
-                            className={cn(
-                              buttonVariants({ size: "sm", variant: selected ? "secondary" : "outline" }),
-                              "rounded-full px-3 text-xs",
-                              selected && "bg-white/16 text-white",
-                            )}
-                          >
-                            {selected ? "Selected" : "Manage"}
-                          </Link>
-                        }
-                      />
-                    );
-                  })
+                  <div className="divide-y divide-outline-variant/60">
+                    {users.map((user) => (
+                      <Link
+                        key={user.userId}
+                        href={profileEntityHref(user)}
+                        className="grid gap-3 px-4 py-4 transition-colors hover:bg-[#f3f3ef] focus-visible:bg-[#f3f3ef] focus-visible:outline-none sm:grid-cols-[minmax(0,1.5fr)_minmax(110px,0.7fr)_minmax(100px,0.6fr)] sm:items-center"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="flex size-9 shrink-0 items-center justify-center border border-outline-variant bg-[#fafaf7] text-xs font-semibold">
+                            {user.initials || getInitials(user.name)}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">{user.name}</span>
+                            <span className="block truncate text-xs text-on-surface-variant">@{user.username}</span>
+                          </span>
+                        </span>
+                        <span className="text-xs text-on-surface-variant">
+                          {user.department || "Department unavailable"} · Year {user.yearOfStudy}
+                        </span>
+                        <span className="flex items-center justify-between gap-2 text-xs text-on-surface-variant sm:justify-end">
+                          ID {user.userId}
+                          <span aria-hidden="true">→</span>
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </div>
             </section>
+          ) : null}
 
-            <section className="rounded-[10px] border border-surface-container-highest bg-white p-5 shadow-xs">
-              {!selectedClub ? (
-                <div className="flex min-h-72 flex-col items-center justify-center rounded-[10px] border border-dashed border-outline-variant/70 bg-surface-container-low p-6 text-center">
-                  <span className="material-symbols-outlined rounded-full bg-primary-fixed p-4 text-3xl text-primary">
-                    groups
-                  </span>
-                  <h2 className="mt-4 font-headline-md text-2xl text-on-background">Select a club</h2>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
-                    Create a club or pick one from the list to manage members.
-                  </p>
+          {activeTab === "clubs" ? (
+            <section aria-labelledby="clubs-heading" className="mt-7">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 id="clubs-heading" className="text-xl font-semibold">Clubs</h2>
+                  <p className="mt-1 text-sm text-on-surface-variant">Create clubs and manage member roles.</p>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="overflow-hidden rounded-[10px] border border-surface-container-highest">
-                    <div className={`relative h-44 ${selectedClub.club.bannerBg}`}>
-                      {selectedClub.club.bannerImage ? (
-                        <img
-                          alt={selectedClub.club.title}
-                          className="absolute inset-0 h-full w-full object-cover"
-                          src={selectedClub.club.bannerImage}
-                        />
-                      ) : null}
-                      <div className="absolute inset-0 bg-primary/65" />
-                      <div className="relative flex h-full items-end justify-between gap-4 p-5 text-white">
+                <Link
+                  href="/admin?tab=clubs&mode=createclub"
+                  className={cn(buttonVariants({ size: "lg" }), "rounded-[3px] px-4")}
+                >
+                  Create club
+                </Link>
+              </div>
+
+              <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <aside className={cn(panelClassName, "self-start p-3")}>
+                  <p className="px-2 pb-3 text-xs font-medium text-on-surface-variant">{clubsData.clubCards.length} clubs</p>
+                  {clubsData.clubCards.length === 0 ? (
+                    <p className="border-t border-outline-variant/60 px-2 py-4 text-sm text-on-surface-variant">No clubs yet.</p>
+                  ) : (
+                    <div className="divide-y divide-outline-variant/60 border-t border-outline-variant/60">
+                      {clubsData.clubCards.map((club) => {
+                        const selected = club.slug === selectedSlug;
+                        return (
+                          <Link
+                            key={club.slug}
+                            href={`/admin?tab=clubs&club=${encodeURIComponent(club.slug)}`}
+                            className={cn(
+                              "block border-l-2 px-3 py-3 transition-colors",
+                              selected
+                                ? "border-on-surface bg-[#f1f1ec]"
+                                : "border-transparent hover:bg-[#f7f7f3]",
+                            )}
+                          >
+                            <span className="block truncate text-sm font-semibold">{club.title}</span>
+                            <span className="mt-0.5 block text-xs text-on-surface-variant">{club.status || "Status unavailable"}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </aside>
+
+                <div className={cn(panelClassName, "min-w-0 p-5 md:p-6")}>
+                  {!selectedClub ? (
+                    <div className="flex min-h-64 items-center justify-center text-center">
+                      <div>
+                        <h3 className="text-lg font-semibold">Select a club</h3>
+                        <p className="mt-2 text-sm text-on-surface-variant">Choose a club from the list to manage it.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-outline-variant/70 pb-5">
                         <div className="min-w-0">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/75">
-                            Selected club
+                          <div className="flex items-center gap-2">
+                            <h3 className="truncate text-2xl font-semibold tracking-tight">{selectedClub.club.title}</h3>
+                            <span className="border border-outline-variant px-2 py-0.5 text-[11px] text-on-surface-variant">
+                              {selectedClub.club.status}
+                            </span>
+                          </div>
+                          <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                            {selectedClub.club.description || "No club description."}
                           </p>
-                          <h2 className="mt-2 truncate font-headline-lg text-3xl text-white">
-                            {selectedClub.club.title}
-                          </h2>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <Link
                             href={clubEntityHref(selectedClub.club)}
-                            className={cn(buttonVariants({ variant: "ghost" }), "rounded-full bg-white/14 px-4 text-xs font-bold uppercase tracking-[0.16em] text-white backdrop-blur-sm hover:bg-white/24")}
+                            className={cn(buttonVariants({ variant: "outline" }), "rounded-[3px] border-outline-variant")}
                           >
-                            View public
+                            View
                           </Link>
                           <AlertDialog>
                             <AlertDialogTrigger
                               render={
                                 <Button
-                                  className="rounded-full px-3 text-xs font-bold uppercase tracking-[0.12em]"
+                                  className="rounded-[3px]"
                                   disabled={deletingClub}
-                                  size="sm"
                                   variant="destructive"
                                 />
                               }
                             >
-                              <span className="material-symbols-outlined text-base">delete</span>
                               {deletingClub ? "Deleting" : "Delete"}
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete {selectedClub.club.title}?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will remove the club from Campus Nexus.
-                                </AlertDialogDescription>
+                                <AlertDialogDescription>This will remove the club from Campus Nexus.</AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction variant="destructive" onClick={deleteClub}>
-                                  Delete club
-                                </AlertDialogAction>
+                                <AlertDialogAction variant="destructive" onClick={deleteClub}>Delete club</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Members</p>
-                      <h3 className="mt-1 font-headline-md text-2xl text-on-background">
-                        {selectedClub.members.length} members
-                      </h3>
-                    </div>
-                    <ClubMemberAdminPanel
-                      clubSlug={selectedClub.club.slug}
-                      existingUserIds={selectedClub.members.map((member) => member.userId)}
-                      existingTitles={selectedClub.members.map((member) => member.title || "Member")}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    {selectedClub.members.length === 0 ? (
-                      <p className="rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
-                        No members yet.
-                      </p>
-                    ) : (
-                      selectedClub.members.map((member) => (
-                        <EntityListItem
-                          key={member.id}
-                          href={profileEntityHref(member)}
-                          title={member.name}
-                          subtitle={`${member.title || "Member"}${member.username ? ` - @${member.username}` : ""}`}
-                          kind="user"
-                          initials={member.initials}
-                          trailing={
-                            <div className="flex items-center gap-1">
-                              {member.title.toLowerCase() === "member" ? (
-                                <Button
-                                  aria-label={`${member.canPost ? "Revoke" : "Grant"} posting privilege for ${member.name}`}
-                                  className={`rounded-full px-3 text-xs ${member.canPost ? "bg-primary text-white" : "bg-white text-primary hover:bg-primary-fixed"}`}
-                                  disabled={updatingMemberId === member.id}
-                                  size="sm"
-                                  type="button"
-                                  variant={member.canPost ? "default" : "ghost"}
-                                  onClick={() => togglePosting(member)}
-                                >
-                                  {member.canPost ? "Can post" : "Allow posting"}
-                                </Button>
-                              ) : null}
-                              <Button
-                                aria-label={`Remove ${member.name}`}
-                                className="rounded-full text-on-surface-variant hover:bg-white hover:text-secondary"
-                                disabled={removingMemberId === member.id}
-                                size="icon-sm"
-                                type="button"
-                                variant="ghost"
-                                onClick={() => removeMember(member)}
-                              >
-                                <span className="material-symbols-outlined text-lg">close</span>
-                              </Button>
-                            </div>
-                          }
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-base font-semibold">Members</h4>
+                          <p className="mt-1 text-xs text-on-surface-variant">Assign a designation or return a user to Member.</p>
+                        </div>
+                        <ClubMemberAdminPanel
+                          clubSlug={selectedClub.club.slug}
+                          existingUserIds={selectedClub.members.map((member) => member.userId)}
+                          existingTitles={selectedClub.members.map((member) => member.title || "Member")}
                         />
-                      ))
-                    )}
-                  </div>
+                      </div>
 
-                  {memberMessage ? (
-                    <p className="rounded-2xl bg-surface-container-low p-3 text-sm font-semibold text-on-surface-variant">
-                      {memberMessage}
-                    </p>
-                  ) : null}
+                      <div className="mt-4 overflow-x-auto border border-outline-variant/70">
+                        {selectedClub.members.length === 0 ? (
+                          <p className="p-4 text-sm text-on-surface-variant">No members yet.</p>
+                        ) : (
+                          <table className="w-full min-w-[620px] border-collapse text-left">
+                            <thead className="border-b border-outline-variant/70 bg-[#f7f7f4] text-xs font-medium text-on-surface-variant">
+                              <tr>
+                                <th className="px-3 py-2.5 font-medium">Member</th>
+                                <th className="px-3 py-2.5 font-medium">Role</th>
+                                <th className="px-3 py-2.5 text-right font-medium">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-outline-variant/60">
+                              {selectedClub.members.map((member) => {
+                                const rolesUsedByOthers = new Set(
+                                  selectedClub.members
+                                    .filter((candidate) => candidate.id !== member.id)
+                                    .map((candidate) => candidate.title),
+                                );
+                                return (
+                                  <tr key={member.id}>
+                                    <td className="px-3 py-3">
+                                      <Link href={profileEntityHref(member)} className="group flex min-w-0 items-center gap-3">
+                                        <span className="flex size-8 shrink-0 items-center justify-center border border-outline-variant bg-[#fafaf7] text-[11px] font-semibold">
+                                          {member.initials || getInitials(member.name)}
+                                        </span>
+                                        <span className="min-w-0">
+                                          <span className="block truncate text-sm font-semibold group-hover:underline">{member.name}</span>
+                                          <span className="block truncate text-xs text-on-surface-variant">@{member.username}</span>
+                                        </span>
+                                      </Link>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      <NativeSelect
+                                        aria-label={`Role for ${member.name}`}
+                                        className="w-48 [&_select]:rounded-[3px] [&_select]:border-outline-variant [&_select]:bg-white"
+                                        disabled={updatingMemberId === member.id}
+                                        value={member.title || "Member"}
+                                        onChange={(event) => updateMemberRole(member, event.target.value)}
+                                      >
+                                        {clubRoles.map((role) => (
+                                          <NativeSelectOption
+                                            key={role}
+                                            disabled={role !== "Member" && rolesUsedByOthers.has(role)}
+                                            value={role}
+                                          >
+                                            {role}
+                                          </NativeSelectOption>
+                                        ))}
+                                      </NativeSelect>
+                                    </td>
+                                    <td className="px-3 py-3 text-right">
+                                      <Button
+                                        aria-label={`Remove ${member.name} from ${selectedClub.club.title}`}
+                                        className="rounded-[3px] text-on-surface-variant"
+                                        disabled={removingMemberId === member.id}
+                                        size="sm"
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => removeMember(member)}
+                                      >
+                                        {removingMemberId === member.id ? "Removing" : "Remove"}
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+
+                      {memberMessage ? (
+                        <p aria-live="polite" className="mt-3 border-l-2 border-on-surface bg-[#f3f3ef] px-3 py-2 text-sm text-on-surface-variant">
+                          {memberMessage}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </section>
-          </div>
+          ) : null}
+
+          {activeTab === "signals" ? (
+            <section aria-labelledby="signals-heading" className="mt-7">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 id="signals-heading" className="text-xl font-semibold">Signal Bar</h2>
+                  <p className="mt-1 text-sm text-on-surface-variant">Review the titles and destinations shown above the home feed.</p>
+                </div>
+                <Button className="rounded-[3px] px-4" type="button" onClick={beginAddSignal}>Add title</Button>
+              </div>
+
+              <div className="mt-5 border-l-2 border-[#8a6d1d] bg-[#fffaf0] px-4 py-3 text-sm text-[#66521d]">
+                <p className="font-semibold">Placeholder data</p>
+                <p className="mt-1 leading-5">The Signal Bar API is not available. Additions and edits below are mock changes and reset when this page reloads.</p>
+              </div>
+
+              {signalFormOpen ? (
+                <form className={cn(panelClassName, "mt-4 p-4")} onSubmit={saveSignal}>
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+                    <div>
+                      <Label htmlFor="signal-title">Title</Label>
+                      <Input
+                        id="signal-title"
+                        className="mt-1.5 h-10 rounded-[3px] border-outline-variant bg-white"
+                        placeholder="Campus update title"
+                        value={signalTitle}
+                        onChange={(event) => setSignalTitle(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="signal-link">Link</Label>
+                      <Input
+                        id="signal-link"
+                        className="mt-1.5 h-10 rounded-[3px] border-outline-variant bg-white"
+                        placeholder="/clubs or https://example.com"
+                        value={signalLink}
+                        onChange={(event) => setSignalLink(event.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button className="h-10 rounded-[3px] px-4" type="submit">
+                        {editingSignalId ? "Update" : "Add"}
+                      </Button>
+                      <Button className="h-10 rounded-[3px]" type="button" variant="outline" onClick={cancelSignalForm}>Cancel</Button>
+                    </div>
+                  </div>
+                  {signalMessage ? <p className="mt-3 text-sm text-destructive">{signalMessage}</p> : null}
+                </form>
+              ) : signalMessage ? (
+                <p aria-live="polite" className="mt-4 border-l-2 border-on-surface bg-[#f3f3ef] px-3 py-2 text-sm text-on-surface-variant">
+                  {signalMessage}
+                </p>
+              ) : null}
+
+              <div className={cn(panelClassName, "mt-4 overflow-hidden")}>
+                <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto] gap-4 border-b border-outline-variant/70 bg-[#f7f7f4] px-4 py-2.5 text-xs font-medium text-on-surface-variant md:grid">
+                  <span>Title</span>
+                  <span>Link</span>
+                  <span>Action</span>
+                </div>
+                <div className="divide-y divide-outline-variant/60">
+                  {signalItems.map((signal) => (
+                    <div key={signal.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto] md:items-center">
+                      <a className="min-w-0 truncate text-sm font-semibold underline-offset-4 hover:underline" href={signal.link}>
+                        {signal.title}
+                      </a>
+                      <span className="min-w-0 truncate font-mono text-xs text-on-surface-variant">{signal.link}</span>
+                      <Button className="w-fit rounded-[3px]" size="sm" type="button" variant="outline" onClick={() => beginEditSignal(signal)}>
+                        Edit
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className={cn(panelClassName, "mt-5 overflow-hidden")}>
+                <div className="border-b border-outline-variant/70 px-4 py-3">
+                  <h3 className="text-sm font-semibold">Preview</h3>
+                </div>
+                <div className="flex min-h-12 items-center overflow-x-auto whitespace-nowrap px-4">
+                  {signalItems.map((signal, index) => (
+                    <span key={signal.id} className="flex items-center">
+                      {index > 0 ? <span className="mx-4 text-outline">/</span> : null}
+                      <a className="text-sm underline-offset-4 hover:underline" href={signal.link}>{signal.title}</a>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
         </main>
       )}
     </div>

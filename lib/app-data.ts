@@ -36,6 +36,40 @@ export type SuggestedPerson = {
   subtitle: string;
 };
 
+export type SignalBarItem = {
+  id: string;
+  title: string;
+  link: string;
+};
+
+export const fallbackSignalBarItems: SignalBarItem[] = [
+  {
+    id: "robotics-demo",
+    title: "Robotics Club demo starts in 20 min — Amphitheatre",
+    link: "/clubs",
+  },
+  {
+    id: "hackcx-registration",
+    title: "HackCX registrations close tonight at 11:59 PM",
+    link: "/?view=discover",
+  },
+  {
+    id: "cs-seminar",
+    title: "CS Dept seminar moved to Room 204",
+    link: "/?view=discover",
+  },
+  {
+    id: "case-crack",
+    title: "Case Crack Championship — 2 team spots open",
+    link: "/?view=discover",
+  },
+  {
+    id: "summer-internship",
+    title: "Unstop: Summer Internship deadline in 3 days",
+    link: "https://unstop.com/",
+  },
+];
+
 export type CampusUser = {
   userId: string;
   name: string;

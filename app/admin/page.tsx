@@ -30,6 +30,8 @@ async function getClubDetail(slug: string): Promise<ClubDetailData | null> {
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const mode = getSearchValue(resolvedSearchParams.mode);
+  const requestedTab = getSearchValue(resolvedSearchParams.tab);
+  const initialTab = requestedTab === "clubs" || requestedTab === "signals" ? requestedTab : "profiles";
   const requestedSlug = getSearchValue(resolvedSearchParams.club);
   const clubsData = await getCampusData<ClubsData>("/api/clubs", fallbackClubs);
   const selectedSlug = requestedSlug ?? clubsData.clubCards[0]?.slug ?? "";
@@ -37,8 +39,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   return (
     <>
-      {mode === "createclub" ? <CreateClubOverlay returnHref="/admin" /> : null}
-      <AdminDashboard clubsData={clubsData} selectedClub={selectedClub} selectedSlug={selectedSlug} />
+      {mode === "createclub" ? <CreateClubOverlay returnHref="/admin?tab=clubs" /> : null}
+      <AdminDashboard
+        clubsData={clubsData}
+        initialTab={initialTab}
+        selectedClub={selectedClub}
+        selectedSlug={selectedSlug}
+      />
     </>
   );
 }

@@ -4,21 +4,13 @@ import { CampusShell } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { fallbackFeed, getInitials, type FeedData } from "@/lib/app-data";
+import { fallbackFeed, fallbackSignalBarItems, getInitials, type FeedData } from "@/lib/app-data";
 import { getCampusData } from "@/lib/campus-api";
 import { cn } from "@/lib/utils";
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
-
-const signals = [
-  ["CLUB", "Robotics Club demo starts in 20 min — Amphitheatre"],
-  ["OFFICIAL", "HackCX registrations close tonight at 11:59 PM"],
-  ["DEPT", "CS Dept seminar moved to Room 204"],
-  ["STUDENT", "Case Crack Championship — 2 team spots open"],
-  ["EXTERNAL", "Unstop: Summer Internship deadline in 3 days"],
-];
 
 const radarEvents = [
   {
@@ -108,17 +100,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </div>
             <div className="min-w-0 flex-1 overflow-hidden">
               <div className="campus-signal-scroll flex h-full w-max items-center gap-10 whitespace-nowrap px-5">
-                {[...signals, ...signals].map(([source, message], index) => (
-                  <button
-                    key={`${source}-${index}`}
-                    className="flex items-center gap-2 text-[13px] font-medium text-on-surface outline-none transition hover:text-on-surface-variant focus-visible:underline"
-                    type="button"
+                {[...fallbackSignalBarItems, ...fallbackSignalBarItems].map((signal, index) => (
+                  <a
+                    key={`${signal.id}-${index}`}
+                    className="text-[13px] font-medium text-on-surface underline-offset-4 transition hover:underline focus-visible:underline focus-visible:outline-none"
+                    href={signal.link}
                   >
-                    <span className="rounded-[5px] border border-outline-variant px-1.5 py-0.5 font-mono text-[10px] font-bold text-on-surface-variant">
-                      {source}
-                    </span>
-                    {message}
-                  </button>
+                    {signal.title}
+                  </a>
                 ))}
               </div>
             </div>

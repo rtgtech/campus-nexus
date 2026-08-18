@@ -141,14 +141,13 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="rounded-full shadow-[0_14px_34px_rgba(34,29,92,0.2)]" />}>
-        <span className="material-symbols-outlined text-base">person_add</span>
+      <DialogTrigger render={<Button className="rounded-[3px] px-4" />}>
         Add member
       </DialogTrigger>
-      <DialogContent className="max-w-3xl rounded-[10px] p-5 md:p-6">
+      <DialogContent className="max-w-3xl rounded-[3px] border-outline-variant bg-white p-5 md:p-6">
             <DialogHeader className="pr-10">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Admin</p>
-                <DialogTitle className="mt-1 font-headline-md text-lg text-on-background">Add member</DialogTitle>
+                <p className="text-xs font-medium text-on-surface-variant">Club administration</p>
+                <DialogTitle className="mt-1 text-xl font-semibold text-on-background">Add member</DialogTitle>
                 <DialogDescription className="sr-only">Search for a user and assign a club designation</DialogDescription>
             </DialogHeader>
 
@@ -158,7 +157,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                   <FieldLabel htmlFor="club-member-username">Username</FieldLabel>
                   <Input
                     id="club-member-username"
-                    className="h-11 rounded-2xl bg-surface-container-low px-4"
+                    className="h-10 rounded-[3px] border-outline-variant bg-white px-3"
                     placeholder="Search username"
                     type="text"
                     value={query}
@@ -173,7 +172,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                 <Field>
                   <FieldLabel htmlFor="member-designation">Designation</FieldLabel>
                   <NativeSelect
-                    className="w-full [&_select]:h-11 [&_select]:rounded-2xl [&_select]:bg-surface-container-low"
+                    className="w-full [&_select]:h-10 [&_select]:rounded-[3px] [&_select]:border-outline-variant [&_select]:bg-white"
                     id="member-designation"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
@@ -191,7 +190,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
 
                 <div className="flex items-end">
                   <Button
-                    className="h-11 w-full rounded-full px-5 shadow-[0_14px_34px_rgba(34,29,92,0.2)] lg:w-auto"
+                    className="h-10 w-full rounded-[3px] px-4 lg:w-auto"
                     disabled={!selectedUser || status === "saving"}
                     type="submit"
                   >
@@ -207,11 +206,11 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                   subtitle={`@${selectedUser.username}`}
                   kind="user"
                   initials={selectedUser.initials}
-                  className="flex min-w-0 items-center gap-3 rounded-2xl bg-primary-fixed/70 p-3"
-                  avatarClassName="rounded-full bg-primary text-on-primary"
+                  className="flex min-w-0 items-center gap-3 border border-outline-variant bg-[#f7f7f4] p-3"
+                  avatarClassName="rounded-[3px] bg-primary text-on-primary"
                   trailing={
                     <Button
-                      className="rounded-full text-on-surface-variant hover:bg-white hover:text-secondary"
+                      className="rounded-[3px] text-on-surface-variant hover:bg-white hover:text-secondary"
                       size="icon-sm"
                       type="button"
                       onClick={() => {
@@ -238,7 +237,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                       initials={user.initials}
                       trailing={
                         <Button
-                          className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:text-secondary"
+                          className="rounded-[3px] bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:text-secondary"
                           size="sm"
                           type="button"
                           onClick={() => {
@@ -256,7 +255,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
                   ))}
                 </div>
               ) : !selectedUser && query.trim().length >= 2 && status !== "searching" ? (
-                <p className="rounded-2xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
+                <p className="border border-outline-variant bg-[#f7f7f4] p-3 text-sm text-on-surface-variant">
                   No available users found.
                 </p>
               ) : null}
