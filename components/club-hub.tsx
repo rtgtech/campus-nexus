@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClubFollowButton } from "@/components/club-follow-button";
 import { ClubPostComposer } from "@/components/club-post-composer";
+import { PostDeleteButton } from "@/components/post-delete-button";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { getInitials, type ClubDetailData, type ClubEvent, type ClubMember, type FeedCard } from "@/lib/app-data";
@@ -15,10 +16,10 @@ type ClubHubProps = {
   detail: ClubDetailData;
 };
 
-type HubTab = "feed" | "events" | "members" | "about";
+type HubTab = "posts" | "events" | "members" | "about";
 
 const tabs: Array<{ id: HubTab; label: string }> = [
-  { id: "feed", label: "Feed" },
+  { id: "posts", label: "Posts" },
   { id: "events", label: "Events" },
   { id: "members", label: "Members" },
   { id: "about", label: "About" },
@@ -77,9 +78,11 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
   const [liked, setLiked] = useState(post.likedByCurrentUser ?? post.viewerHasLiked ?? false);
   const [likes, setLikes] = useState(readMetric(post.likes));
   const [pending, setPending] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const timestamp = post.createdAt || post.meta;
   const postedAt = now && timestamp ? formatPostTime(timestamp, now) : "Time unavailable";
-  const tag = post.type === 3 ? "Announcement" : post.hashtags?.[0] || post.tag;
+  const isAnnouncement = post.type === 3;
+  const tag = isAnnouncement ? "Announcement" : post.hashtags?.[0] || post.tag;
   const mediaUrls = post.mediaUrls?.length
     ? post.mediaUrls
     : post.mediaUrl || post.image
@@ -116,12 +119,6 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
     }
   }
 
-  function openDiscussion() {
-    if (post.postId) {
-      router.push(`/viewpost?=${encodeURIComponent(post.postId)}&comments=1`);
-    }
-  }
-
   async function sharePost() {
     const url = `${window.location.origin}/viewpost?=${encodeURIComponent(post.postId ?? "")}`;
     if (navigator.share) {
@@ -129,6 +126,15 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
       return;
     }
     await navigator.clipboard?.writeText(url).catch(() => undefined);
+  }
+
+  function handleDeleted() {
+    setDeleted(true);
+    router.refresh();
+  }
+
+  if (deleted) {
+    return null;
   }
 
   return (
@@ -142,12 +148,15 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
       </Link>
 
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] text-[#686862]">
-          <Link className="font-semibold text-[#171717] hover:underline" href={`/${encodeURIComponent(post.authorId || post.author)}`}>
-            {post.author}
-          </Link>
-          <span> · posted · </span>
-          <time dateTime={timestamp}>{postedAt}</time>
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-[12px] text-[#686862]">
+            <Link className="font-semibold text-[#171717] hover:underline" href={`/${encodeURIComponent(post.authorId || post.author)}`}>
+              {post.author}
+            </Link>
+            <span> · posted · </span>
+            <time dateTime={timestamp}>{postedAt}</time>
+          </div>
+          <PostDeleteButton authorId={post.authorId} postId={post.postId} onDeleted={handleDeleted} />
         </div>
         <p className="mt-1.5 whitespace-pre-wrap text-[14px] leading-6 text-[#242422]">{postText(post)}</p>
 
@@ -181,14 +190,23 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
             <span className="material-symbols-outlined text-[17px]">{liked ? "favorite" : "favorite_border"}</span>
             {formatMetric(likes)}
           </button>
-          <button className="inline-flex items-center gap-1.5 hover:text-[#171717]" type="button" onClick={openDiscussion}>
-            <span className="material-symbols-outlined text-[17px]">chat_bubble_outline</span>
-            {formatMetric(readMetric(post.comments))}
-          </button>
           <button className="inline-flex items-center gap-1.5 hover:text-[#171717]" type="button" onClick={sharePost}>
             <span className="material-symbols-outlined text-[17px]">arrow_outward</span>
             Share
           </button>
+          {isAnnouncement ? (
+            post.registrationLink ? (
+              <a className="inline-flex items-center gap-1.5 rounded-[3px] border border-[#deded8] px-2 py-1 hover:text-[#171717]" href={post.registrationLink}>
+                <span className="material-symbols-outlined text-[17px]">how_to_reg</span>
+                Apply
+              </a>
+            ) : (
+              <span aria-disabled="true" className="inline-flex items-center gap-1.5 rounded-[3px] border border-[#deded8] px-2 py-1 opacity-50">
+                <span className="material-symbols-outlined text-[17px]">how_to_reg</span>
+                Apply
+              </span>
+            )
+          ) : null}
         </div>
       </div>
     </article>
@@ -234,11 +252,10 @@ function MemberRow({ member }: { member: ClubMember }) {
 export function ClubHub({ detail }: ClubHubProps) {
   const { club, members, posts } = detail;
   const initialFollowers = detail.followers ?? club.followers ?? 0;
-  const [activeTab, setActiveTab] = useState<HubTab>("feed");
+  const [activeTab, setActiveTab] = useState<HubTab>("posts");
   const [followers, setFollowers] = useState(initialFollowers);
   const [now, setNow] = useState(0);
   const events = detail.events ?? [];
-  const visiblePosts = useMemo(() => posts.slice(0, 2), [posts]);
   const postsCount = detail.postsCount ?? club.postsCount ?? posts.length;
   const membersCount = club.memberCount ?? club.membersCount ?? members.length;
   const recruiting = club.status.toLowerCase().includes("recruit");
@@ -344,13 +361,13 @@ export function ClubHub({ detail }: ClubHubProps) {
         ))}
       </div>
 
-      {activeTab === "feed" ? (
-        <section aria-labelledby="club-tab-feed" className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" id="club-panel-feed" role="tabpanel">
+      {activeTab === "posts" ? (
+        <section aria-labelledby="club-tab-posts" className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" id="club-panel-posts" role="tabpanel">
           <div className="min-w-0">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold">Latest posts</h2>
-                <p className="mt-1 text-[10px] text-[#72726c]">Showing {visiblePosts.length} of {postsCount}</p>
+                <h2 className="text-sm font-semibold">Club posts</h2>
+                <p className="mt-1 text-[10px] text-[#72726c]">Showing all {posts.length} of {postsCount}</p>
               </div>
               <ClubPostComposer
                 clubSlug={club.slug}
@@ -359,14 +376,14 @@ export function ClubHub({ detail }: ClubHubProps) {
               />
             </div>
 
-            {visiblePosts.length === 0 ? (
+            {posts.length === 0 ? (
               <div className="rounded-[12px] border border-[#deded8] bg-white px-6 py-12 text-center">
                 <p className="text-sm font-semibold">No club posts yet</p>
                 <p className="mt-1 text-xs text-[#72726c]">Posts will appear here when club members publish updates.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {visiblePosts.map((post) => (
+                {posts.map((post) => (
                   <ClubHubPostCard key={post.postId ?? post.title} now={now} post={post} />
                 ))}
               </div>

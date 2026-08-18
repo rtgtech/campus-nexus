@@ -4,12 +4,13 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { type ClubMember } from "@/lib/app-data";
+import { isValidExternalHttpUrl } from "@/lib/external-link";
 import { cn } from "@/lib/utils";
 
 function readMedia(file: File) {
@@ -34,6 +35,7 @@ export function ClubPostComposer({
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<1 | 3>(1);
   const [content, setContent] = useState("");
+  const [announcementLink, setAnnouncementLink] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -51,6 +53,11 @@ export function ClubPostComposer({
     event.preventDefault();
     const session = readAuthSession();
     if (!session || !content.trim() || (type === 3 && files.length !== 1)) return;
+    if (type === 3 && !isValidExternalHttpUrl(announcementLink)) {
+      setStatus("error");
+      setMessage("Enter a complete HTTP(S) link, including its domain.");
+      return;
+    }
 
     setStatus("saving");
     setMessage("");
@@ -59,12 +66,19 @@ export function ClubPostComposer({
       const response = await authFetch(`${API_BASE_URL}/api/posts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, clubSlug, caption: content.trim(), mediaUrls }),
+        body: JSON.stringify({
+          type,
+          clubSlug,
+          caption: content.trim(),
+          mediaUrls,
+          ...(type === 3 ? { registrationLink: announcementLink.trim() } : {}),
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Publishing failed");
 
       setContent("");
+      setAnnouncementLink("");
       setFiles([]);
       setStatus("idle");
       setOpen(false);
@@ -95,7 +109,7 @@ export function ClubPostComposer({
         <span className="material-symbols-outlined text-lg">add</span>
         Create
       </DialogTrigger>
-      <DialogContent className="max-w-2xl rounded-2xl p-6">
+      <DialogContent className="max-w-2xl rounded-[3px] border border-outline-variant p-6">
         <DialogHeader>
           <DialogTitle className="font-headline-md text-2xl text-on-background">Create club content</DialogTitle>
           <DialogDescription className="sr-only">Publish a post or announcement to this club</DialogDescription>
@@ -110,6 +124,7 @@ export function ClubPostComposer({
                 if (nextType !== 1 && nextType !== 3) return;
                 setType(nextType);
                 setFiles([]);
+                setMessage("");
                 setStatus("idle");
               }}
             >
@@ -139,6 +154,34 @@ export function ClubPostComposer({
                 className="h-11 bg-surface-container-low"
               />
             </Field>
+
+            {type === 3 ? (
+              <Field className="mt-5" data-invalid={Boolean(announcementLink) && !isValidExternalHttpUrl(announcementLink)}>
+                <FieldLabel htmlFor="announcement-link">Link</FieldLabel>
+                <Input
+                  aria-describedby="announcement-link-description"
+                  aria-invalid={Boolean(announcementLink) && !isValidExternalHttpUrl(announcementLink)}
+                  className="h-11 rounded-[3px] bg-surface-container-low"
+                  id="announcement-link"
+                  name="registrationLink"
+                  placeholder="https://register.example.edu/event"
+                  required
+                  type="url"
+                  value={announcementLink}
+                  onChange={(event) => {
+                    setAnnouncementLink(event.target.value);
+                    setMessage("");
+                    setStatus("idle");
+                  }}
+                />
+                <FieldDescription id="announcement-link-description">
+                  Add link to landing page or registration form.
+                </FieldDescription>
+                {announcementLink && !isValidExternalHttpUrl(announcementLink) ? (
+                  <FieldError>Use a complete URL such as https://register.example.edu/event.</FieldError>
+                ) : null}
+              </Field>
+            ) : null}
 
             {files.length ? (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -171,7 +214,15 @@ export function ClubPostComposer({
             {message ? <p className="mt-3 text-sm font-semibold text-secondary">{message}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
               <Button type="button" onClick={() => setOpen(false)} variant="ghost">Cancel</Button>
-              <Button disabled={status === "saving" || !content.trim() || (type === 3 && files.length !== 1)} type="submit" className="bg-secondary text-white hover:bg-secondary/90">
+              <Button
+                disabled={
+                  status === "saving" ||
+                  !content.trim() ||
+                  (type === 3 && (files.length !== 1 || !isValidExternalHttpUrl(announcementLink)))
+                }
+                type="submit"
+                className="rounded-[3px] bg-secondary text-white hover:bg-secondary/90"
+              >
                 {status === "saving" ? "Publishing..." : "Publish"}
               </Button>
             </div>

@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { CreatePostRoute } from "@/components/create-post-route";
+import { ExternalLinkGuard } from "@/components/external-link-guard";
 import "material-symbols/outlined.css";
 import "./globals.css";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Campus Nexus",
@@ -21,28 +18,14 @@ export default function RootLayout({
   modal: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("light", "font-sans", geist.variable)}>
-      <head>
-        <link
-          rel="preconnect"
-          href="https://fonts.googleapis.com"
-        />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className="light font-sans">
       <body>
         {children}
         {modal}
         <Suspense fallback={null}>
           <CreatePostRoute />
         </Suspense>
+        <ExternalLinkGuard />
       </body>
     </html>
   );

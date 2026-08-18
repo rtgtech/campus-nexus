@@ -20,6 +20,7 @@ export type FeedCard = {
   mentions?: string[];
   price?: string | null;
   description?: string | null;
+  registrationLink?: string | null;
   createdAt?: string;
   likedByCurrentUser?: boolean;
   viewerHasLiked?: boolean;

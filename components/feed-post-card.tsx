@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PostDeleteButton } from "@/components/post-delete-button";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 import { formatPostTime } from "@/lib/post-time";
@@ -13,6 +14,7 @@ import { formatPostTime } from "@/lib/post-time";
 type FeedPostCardProps = {
   post: FeedCard;
   onSavedChange?: (postId: string, saved: boolean) => void;
+  showDeleteButton?: boolean;
 };
 
 type PostSaveEventDetail = {
@@ -57,7 +59,7 @@ function profileHref(post: FeedCard) {
   return `/${encodeURIComponent(authorKey)}`;
 }
 
-export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
+export function FeedPostCard({ post, onSavedChange, showDeleteButton = true }: FeedPostCardProps) {
   const router = useRouter();
   const initialLiked =
     post.likedByCurrentUser ?? post.viewerHasLiked ?? false;
@@ -68,6 +70,7 @@ export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
     post.savedByCurrentUser ?? post.bookmarkedByCurrentUser ?? post.viewerHasSaved ?? false,
   );
   const [isSavePending, setIsSavePending] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [now, setNow] = useState(0);
   const mediaUrl = post.mediaUrl || post.image;
   const mediaUrls = post.mediaUrls?.length ? post.mediaUrls : mediaUrl ? [mediaUrl] : [];
@@ -79,15 +82,14 @@ export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
   const authorHref = profileHref(post);
   const postTimestamp = post.createdAt || post.meta;
   const postedAt = now ? formatPostTime(postTimestamp, now) : "";
-  const commentsCount = readMetricCount(post.comments);
   const sharesCount = readMetricCount(post.shares);
   const isMarketplacePost = post.type === 2;
   const isAnnouncement = post.type === 3;
   const clubHref = post.clubSlug ? `/clubs/${encodeURIComponent(post.clubSlug)}` : null;
 
-  function openPost(comments = false) {
+  function openPost() {
     if (!post.postId) return;
-    router.push(`/viewpost?=${encodeURIComponent(post.postId)}${comments ? "&comments=1" : ""}`);
+    router.push(`/viewpost?=${encodeURIComponent(post.postId)}`);
   }
 
   useEffect(() => {
@@ -195,6 +197,15 @@ export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
     }
   }
 
+  function handleDeleted() {
+    setDeleted(true);
+    router.refresh();
+  }
+
+  if (deleted) {
+    return null;
+  }
+
   return (
     <Card
       id={post.postId}
@@ -239,9 +250,14 @@ export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
             </div>
           </div>
         </div>
-        <Button aria-label="Post options" className="rounded-full text-on-surface-variant" size="icon" type="button" variant="ghost">
-          <span className="material-symbols-outlined">more_horiz</span>
-        </Button>
+        <div className="flex items-center gap-1">
+          {showDeleteButton ? (
+            <PostDeleteButton authorId={post.authorId} postId={post.postId} onDeleted={handleDeleted} />
+          ) : null}
+          <Button aria-label="Post options" className="rounded-full text-on-surface-variant" size="icon" type="button" variant="ghost">
+            <span className="material-symbols-outlined">more_horiz</span>
+          </Button>
+        </div>
       </div>
 
       {hasMedia ? (
@@ -303,33 +319,50 @@ export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
                 {liked ? "favorite" : "favorite_border"}
               </span>
             </Button>
-            <Button aria-label="Comment" className="rounded-full" size="icon" type="button" variant="ghost" onClick={() => openPost(true)}>
-              <span className="material-symbols-outlined">chat_bubble_outline</span>
-            </Button>
-            <Button aria-label="Repost" className="rounded-full" size="icon" type="button" variant="ghost" onClick={handleShare}>
-              <span className="material-symbols-outlined">repeat</span>
-            </Button>
+            {!isAnnouncement ? (
+              <Button aria-label="Repost" className="rounded-full" size="icon" type="button" variant="ghost" onClick={handleShare}>
+                <span className="material-symbols-outlined">repeat</span>
+              </Button>
+            ) : null}
             <Button aria-label="Share post" className="rounded-full" size="icon" type="button" variant="ghost" onClick={handleShare}>
               <span className="material-symbols-outlined">send</span>
             </Button>
+            {isAnnouncement ? (
+              post.registrationLink ? (
+                <a
+                  aria-label="Apply for announcement"
+                  className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-[3px] border border-outline-variant bg-white px-2.5 text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
+                  href={post.registrationLink}
+                >
+                  <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                  Apply
+                </a>
+              ) : (
+                <Button aria-label="Application link unavailable" className="ml-1 rounded-[3px]" disabled type="button" variant="outline">
+                  <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                  Apply
+                </Button>
+              )
+            ) : null}
           </div>
-          <Button
-            aria-label={saved ? "Unsave post" : "Save post"}
-            aria-pressed={saved}
-            className={saved ? "rounded-full text-secondary" : "rounded-full text-on-surface"}
-            disabled={isSavePending}
-            size="icon"
-            type="button"
-            variant="ghost"
-            onClick={handleSave}
-          >
-            <span className="material-symbols-outlined">{saved ? "bookmark" : "bookmark_add"}</span>
-          </Button>
+          {!isAnnouncement ? (
+            <Button
+              aria-label={saved ? "Unsave post" : "Save post"}
+              aria-pressed={saved}
+              className={saved ? "rounded-full text-secondary" : "rounded-full text-on-surface"}
+              disabled={isSavePending}
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={handleSave}
+            >
+              <span className="material-symbols-outlined">{saved ? "bookmark" : "bookmark_add"}</span>
+            </Button>
+          ) : null}
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-on-surface">
           <span>{formatMetricCount(likeCount)} likes</span>
-          <span className="text-on-surface-variant">{formatMetricCount(commentsCount)} comments</span>
           <span className="text-on-surface-variant">{formatMetricCount(sharesCount)} shares</span>
         </div>
 
@@ -348,18 +381,6 @@ export function FeedPostCard({ post, onSavedChange }: FeedPostCardProps) {
               ))}
             </p>
           ) : null}
-        </div>
-
-        <div className="mt-3 flex items-center justify-between border-t border-outline-variant/50 pt-3 text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
-          <Button
-            className="h-auto p-0 text-xs font-semibold uppercase tracking-[0.18em] hover:text-primary"
-            type="button"
-            variant="link"
-            onClick={() => openPost(true)}
-          >
-            View discussion
-          </Button>
-          <span>Campus Nexus</span>
         </div>
       </div>
     </Card>

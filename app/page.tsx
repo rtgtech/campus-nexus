@@ -129,10 +129,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     Six things are happening today, pulled from four sources so you don&apos;t miss them.
                   </p>
                 </div>
-                <div className="hidden shrink-0 items-center gap-2 rounded-full border border-outline-variant/70 bg-white px-4 py-2 text-xs font-semibold sm:flex">
-                  <span className="material-symbols-outlined text-[17px]">local_fire_department</span>
-                  12 day streak
-                </div>
               </div>
 
               <section aria-labelledby="campus-radar-heading">
@@ -233,7 +229,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 ) : (
                   <div className="grid gap-6 lg:grid-cols-2">
                     {feedData.feedCards.map((card) => (
-                      <FeedPostCard key={card.postId ?? card.title} post={card} />
+                      <FeedPostCard key={card.postId ?? card.title} post={card} showDeleteButton={false} />
                     ))}
                   </div>
                 )}

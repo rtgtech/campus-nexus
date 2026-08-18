@@ -2,25 +2,15 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { PostDeleteButton } from "@/components/post-delete-button";
 import { API_BASE_URL, authFetch } from "@/lib/auth-client";
 import { getInitials, type FeedCard } from "@/lib/app-data";
 
-type CommentItem = {
-  commentId: string;
-  userId: string;
-  author: string;
-  username: string;
-  content: string;
-  createdAt: string;
-};
-
 type ViewPostBoxProps = {
   postId: string;
-  initialCommentsOpen?: boolean;
   returnHref?: string;
 };
 
@@ -28,7 +18,7 @@ export function ViewPostRoute({ returnHref }: { returnHref?: string }) {
   const searchParams = useSearchParams();
   const postId = searchParams.get("") || "";
   if (!postId) return null;
-  return <ViewPostBox postId={postId} initialCommentsOpen={searchParams.get("comments") === "1"} returnHref={returnHref} />;
+  return <ViewPostBox postId={postId} returnHref={returnHref} />;
 }
 
 function isMp4(url: string) {
@@ -41,12 +31,9 @@ function count(value: string | number | undefined) {
   return Number.isFinite(number) ? number : 0;
 }
 
-export function ViewPostBox({ postId, initialCommentsOpen = false, returnHref }: ViewPostBoxProps) {
+export function ViewPostBox({ postId, returnHref }: ViewPostBoxProps) {
   const router = useRouter();
   const [post, setPost] = useState<FeedCard | null>(null);
-  const [comments, setComments] = useState<CommentItem[]>([]);
-  const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
-  const [comment, setComment] = useState("");
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -73,17 +60,6 @@ export function ViewPostBox({ postId, initialCommentsOpen = false, returnHref }:
       active = false;
     };
   }, [postId]);
-
-  useEffect(() => {
-    if (!commentsOpen) return;
-    authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(postId)}/comments`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Comments unavailable");
-        return (await response.json()) as { items?: CommentItem[] };
-      })
-      .then((data) => setComments(Array.isArray(data.items) ? data.items : []))
-      .catch(() => setMessage("Comments could not be loaded."));
-  }, [commentsOpen, postId]);
 
   function close() {
     if (returnHref) {
@@ -124,34 +100,16 @@ export function ViewPostBox({ postId, initialCommentsOpen = false, returnHref }:
     setMessage("Post link copied.");
   }
 
-  async function submitComment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const content = comment.trim();
-    if (!content) return;
-    try {
-      const response = await authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(postId)}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setMessage(typeof data.error === "string" ? data.error : "Comment could not be posted.");
-        return;
-      }
-      if (data.comment) setComments((current) => [...current, data.comment as CommentItem]);
-      setPost((current) => (current ? { ...current, comments: data.comments ?? count(current.comments) + 1 } : current));
-      setComment("");
-      setMessage("");
-    } catch {
-      setMessage("Comment could not be posted.");
-    }
+  function handleDeleted() {
+    close();
+    router.refresh();
   }
 
   const mediaUrl = post?.mediaUrl || post?.image || "";
   const mediaUrls = post?.mediaUrls?.length ? post.mediaUrls : mediaUrl ? [mediaUrl] : [];
   const title = post?.title || post?.caption || "Post";
   const caption = post?.caption || post?.body || title;
+  const isAnnouncement = post?.type === 3;
 
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
@@ -184,6 +142,12 @@ export function ViewPostBox({ postId, initialCommentsOpen = false, returnHref }:
           </div>
         ) : (
           <article className="relative flex h-full min-h-0 flex-col">
+            <PostDeleteButton
+              authorId={post.authorId}
+              className="absolute right-16 top-4 z-30 bg-white/70 backdrop-blur-md"
+              postId={post.postId}
+              onDeleted={handleDeleted}
+            />
             <header className="flex items-center gap-3 px-5 pb-3 pt-5 pr-20 md:px-7 md:pt-6">
               <Link
                 href={`/${encodeURIComponent(post.authorId || post.author)}`}
@@ -219,47 +183,6 @@ export function ViewPostBox({ postId, initialCommentsOpen = false, returnHref }:
               )}
             </div>
 
-            {commentsOpen ? (
-              <section className="absolute bottom-24 left-4 right-4 z-20 mx-auto flex max-h-[68%] max-w-xl flex-col rounded-[10px] border border-white/70 bg-white/78 p-4 shadow-[0_22px_70px_rgba(15,18,33,0.28)] backdrop-blur-xl md:p-5">
-                <span aria-hidden className="absolute -bottom-2.5 left-1/2 h-5 w-5 -translate-x-1/2 rotate-45 border-b border-r border-white/70 bg-white/78" />
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="font-['Space_Grotesk'] text-lg font-bold text-primary">Comments</h2>
-                  <Button aria-label="Close comments" className="rounded-full bg-white/50" size="icon-sm" type="button" variant="ghost" onClick={() => setCommentsOpen(false)}>
-                    <span className="material-symbols-outlined text-lg">close</span>
-                  </Button>
-                </div>
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                  {comments.length ? comments.map((item) => (
-                    <div key={item.commentId} className="flex gap-3 rounded-2xl bg-white/70 p-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-xs font-bold text-primary">
-                        {getInitials(item.author)}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-on-surface">{item.author}</p>
-                        <p className="mt-1 break-words text-sm leading-5 text-on-surface-variant">{item.content}</p>
-                      </div>
-                    </div>
-                  )) : (
-                    <p className="py-6 text-center text-sm font-semibold text-on-surface-variant">No comments yet.</p>
-                  )}
-                </div>
-                <form className="mt-3 flex items-end gap-2 border-t border-outline-variant/50 pt-3" onSubmit={submitComment}>
-                  <Textarea
-                    aria-label="Write a comment"
-                    className="min-h-10 resize-none rounded-2xl bg-white/70"
-                    maxLength={1000}
-                    placeholder="Write a comment..."
-                    rows={1}
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                  />
-                  <Button aria-label="Post comment" className="shrink-0 rounded-full bg-secondary text-white" disabled={!comment.trim()} size="icon" type="submit">
-                    <span className="material-symbols-outlined">send</span>
-                  </Button>
-                </form>
-              </section>
-            ) : null}
-
             {message ? (
               <p className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-full bg-on-surface/80 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md">
                 {message}
@@ -273,15 +196,27 @@ export function ViewPostBox({ postId, initialCommentsOpen = false, returnHref }:
                 </span>
               </Button>
               <span className="mr-1 text-xs font-bold text-on-surface">{likeCount}</span>
-              <Button aria-label="View comments" className="rounded-full" size="icon" type="button" variant="ghost" onClick={() => setCommentsOpen(true)}>
-                <span className="material-symbols-outlined">chat_bubble_outline</span>
-              </Button>
-              <Button aria-label="Repost" className="rounded-full" size="icon" type="button" variant="ghost" onClick={sharePost}>
-                <span className="material-symbols-outlined">repeat</span>
-              </Button>
+              {!isAnnouncement ? (
+                <Button aria-label="Repost" className="rounded-full" size="icon" type="button" variant="ghost" onClick={sharePost}>
+                  <span className="material-symbols-outlined">repeat</span>
+                </Button>
+              ) : null}
               <Button aria-label="Share post" className="rounded-full" size="icon" type="button" variant="ghost" onClick={sharePost}>
                 <span className="material-symbols-outlined">send</span>
               </Button>
+              {isAnnouncement ? (
+                post.registrationLink ? (
+                  <a className="inline-flex h-8 items-center gap-1.5 rounded-[3px] border border-outline-variant bg-white px-2.5 text-sm font-medium" href={post.registrationLink}>
+                    <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                    Apply
+                  </a>
+                ) : (
+                  <Button className="rounded-[3px]" disabled type="button" variant="outline">
+                    <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                    Apply
+                  </Button>
+                )
+              ) : null}
             </div>
           </article>
         )}

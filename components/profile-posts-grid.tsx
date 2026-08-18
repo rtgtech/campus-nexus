@@ -173,11 +173,16 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
                 <AlertDialog>
                   <AlertDialogTrigger
                     render={
-                      <Button className="mr-2 rounded-full shadow-xs" disabled={deleteStatus === "deleting"} variant="destructive" />
+                      <Button
+                        aria-label="Delete post"
+                        className="mr-2 size-7 rounded-[3px] border border-red-300 bg-white p-0 text-red-600 shadow-xs hover:border-red-400 hover:bg-red-50 hover:text-red-700"
+                        disabled={deleteStatus === "deleting"}
+                        size="icon-sm"
+                        variant="ghost"
+                      />
                     }
                   >
-                    <span className="material-symbols-outlined text-lg">delete</span>
-                    {deleteStatus === "deleting" ? "Deleting..." : "Delete post"}
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -204,7 +209,7 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
               </Button>
             </div>
             <ScrollArea className="max-h-[calc(100dvh-6rem)]">
-              <FeedPostCard post={selectedPost} />
+              <FeedPostCard post={selectedPost} showDeleteButton={false} />
             </ScrollArea>
           </DialogContent>
         ) : null}
