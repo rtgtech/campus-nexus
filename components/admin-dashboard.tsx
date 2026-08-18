@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { CampusHeader } from "@/components/campus-header";
+import { AdminEventsPanel } from "@/components/admin-events-panel";
 import { ClubMemberAdminPanel } from "@/components/club-member-admin-panel";
 import { clubEntityHref, profileEntityHref } from "@/components/entity-list-item";
 import {
@@ -24,6 +25,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { API_BASE_URL, authFetch, type CampusAuthSession, isAdminUser, readAuthSession } from "@/lib/auth-client";
 import {
   type CampusUser,
+  type CampusEvent,
   type ClubDetailData,
   type ClubMember,
   type ClubsData,
@@ -32,10 +34,11 @@ import {
 } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 
-type AdminTab = "profiles" | "clubs" | "signals";
+type AdminTab = "profiles" | "clubs" | "events" | "signals";
 
 type AdminDashboardProps = {
   clubsData: ClubsData;
+  initialEvents: CampusEvent[];
   initialTab: AdminTab;
   initialSignalItems: SignalBarItem[];
   selectedClub: ClubDetailData | null;
@@ -45,6 +48,7 @@ type AdminDashboardProps = {
 const tabs: Array<{ id: AdminTab; label: string }> = [
   { id: "profiles", label: "Profiles" },
   { id: "clubs", label: "Clubs" },
+  { id: "events", label: "Events" },
   { id: "signals", label: "Signal Bar" },
 ];
 
@@ -71,7 +75,7 @@ function isSafeSignalLink(value: string) {
   }
 }
 
-export function AdminDashboard({ clubsData, initialTab, initialSignalItems, selectedClub, selectedSlug }: AdminDashboardProps) {
+export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSignalItems, selectedClub, selectedSlug }: AdminDashboardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [session, setSession] = useState<CampusAuthSession | null>(null);
@@ -317,7 +321,7 @@ export function AdminDashboard({ clubsData, initialTab, initialSignalItems, sele
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Admin only</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">Administrator sign-in required</h1>
             <p className="mt-3 max-w-lg text-sm leading-6 text-on-surface-variant">
-              Profiles, clubs, roles, and signal-bar settings are available to the administrator account.
+              Profiles, clubs, events, roles, and signal-bar settings are available to the administrator account.
             </p>
             <Link href="/auth" className={cn(buttonVariants({ size: "lg" }), "mt-6 rounded-[3px] px-4")}>
               Sign in
@@ -686,6 +690,8 @@ export function AdminDashboard({ clubsData, initialTab, initialSignalItems, sele
               </div>
             </section>
           ) : null}
+
+          {activeTab === "events" ? <AdminEventsPanel initialEvents={initialEvents} /> : null}
         </main>
       )}
     </div>

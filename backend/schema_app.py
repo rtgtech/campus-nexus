@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any, Optional, Sequence
+from urllib.parse import urlsplit
 
 from flask import Flask, g, jsonify, request
 import jwt
@@ -105,9 +106,13 @@ DEPARTMENTS = {"CS", "Mech", "ECE", "Electrical"}
 PROFILE_VISIBILITY_VALUES = {"private", "friends", "campus"}
 SIGNAL_TITLE_MAX_LENGTH = 160
 SIGNAL_LINK_MAX_LENGTH = 2048
+EVENT_TITLE_MAX_LENGTH = 160
+EVENT_LINK_MAX_LENGTH = 2048
+EVENT_PLACE_MAX_LENGTH = 200
+EVENT_TYPES = {"Competition", "Workshop", "Alumni Talk"}
 LAST_ACTIVE_WRITE_INTERVAL = timedelta(minutes=5)
 ONLINE_WINDOW = timedelta(minutes=5)
-REQUIRED_SCHEMA_VERSION = "002_saved_posts"
+REQUIRED_SCHEMA_VERSION = "003_campus_events"
 REQUIRED_SCHEMA_COLUMNS = {
     "users": {"lastActiveAt"},
     "user_interests": {"userId", "interest", "createdAt"},
@@ -131,6 +136,7 @@ REQUIRED_SCHEMA_COLUMNS = {
     "marketplace_reviews": {"reviewId", "tradeId", "reviewerId", "revieweeId", "rating"},
     "chat_threads": {"directKey"},
     "post_bookmarks": {"postId", "userId", "createdAt"},
+    "campus_events": {"eventId", "title", "link", "eventType", "eventDate", "place", "createdAt", "updatedAt"},
 }
 REQUIRED_TIMEZONE_COLUMNS = {
     "users": {"lastActiveAt"},
@@ -142,6 +148,7 @@ REQUIRED_TIMEZONE_COLUMNS = {
     "marketplace_trades": {"completedAt", "createdAt", "updatedAt"},
     "marketplace_reviews": {"createdAt"},
     "post_bookmarks": {"createdAt"},
+    "campus_events": {"createdAt", "updatedAt"},
 }
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")
 VIDEO_EXTENSIONS = (".mp4",)
@@ -297,6 +304,25 @@ class SignalBarItem(Base):
     title: Mapped[str] = mapped_column(String(SIGNAL_TITLE_MAX_LENGTH), nullable=False)
     link: Mapped[str] = mapped_column(String(SIGNAL_LINK_MAX_LENGTH), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class CampusEvent(Base):
+    __tablename__ = "campus_events"
+    __table_args__ = (
+        CheckConstraint(
+            '"eventType" IN (\'Competition\', \'Workshop\', \'Alumni Talk\')',
+            name="ck_campus_events_type",
+        ),
+    )
+
+    eventId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(EVENT_TITLE_MAX_LENGTH), nullable=False)
+    link: Mapped[str] = mapped_column(String(EVENT_LINK_MAX_LENGTH), nullable=False)
+    eventType: Mapped[str] = mapped_column(String(32), nullable=False)
+    eventDate: Mapped[date] = mapped_column(nullable=False)
+    place: Mapped[str] = mapped_column(String(EVENT_PLACE_MAX_LENGTH), nullable=False)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -517,6 +543,7 @@ class Post(Base):
             "mentions": extract_mentions(caption),
             "price": None,
             "description": None,
+            "registrationLink": self.registrationLink,
             "createdAt": createdAt,
             "meta": createdAt,
             "title": title,
@@ -814,7 +841,8 @@ def ensure_database_initialized() -> None:
                 raise DatabaseSchemaError(
                     f"Database schema is not ready: {detail}. "
                     "Apply backend/migrations/001_frontend_api_requirements.postgresql and "
-                    "backend/migrations/002_saved_posts.postgresql."
+                    "backend/migrations/002_saved_posts.postgresql and "
+                    "backend/migrations/003_campus_events.postgresql."
                 )
         _database_initialized = True
 
@@ -865,6 +893,27 @@ def valid_signal_link(value: str) -> bool:
     return bool(re.match(r"^https?://[^\s]+$", value, flags=re.IGNORECASE))
 
 
+def valid_external_http_url(value: str) -> bool:
+    candidate = value.strip()
+    if not re.match(r"^https?://", candidate, flags=re.IGNORECASE) or re.search(r"\s", candidate):
+        return False
+    try:
+        parsed = urlsplit(candidate)
+        labels = (parsed.hostname or "").split(".")
+        _ = parsed.port
+    except ValueError:
+        return False
+    domain_label = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$")
+    return (
+        parsed.scheme.lower() in {"http", "https"}
+        and not parsed.username
+        and not parsed.password
+        and len(labels) >= 2
+        and all(domain_label.fullmatch(label) for label in labels)
+        and bool(re.fullmatch(r"[A-Za-z]{2,63}", labels[-1]))
+    )
+
+
 def signal_values(data: dict[str, Any], current: Optional[SignalBarItem] = None):
     title = text_value(data.get("title"), current.title if current is not None else "")
     link = text_value(data.get("link"), current.link if current is not None else "")
@@ -879,6 +928,33 @@ def signal_values(data: dict[str, Any], current: Optional[SignalBarItem] = None)
     if not valid_signal_link(link):
         return None, "link must be an internal path or an absolute HTTP(S) URL"
     return {"title": title, "link": link}, None
+
+
+def event_values(data: dict[str, Any], current: Optional[CampusEvent] = None):
+    title = text_value(data.get("title"), current.title if current is not None else "")
+    link = text_value(data.get("link"), current.link if current is not None else "")
+    event_type = text_value(data.get("type"), current.eventType if current is not None else "")
+    event_date = parse_date(data.get("date")) if "date" in data else current.eventDate if current is not None else None
+    place = text_value(data.get("place"), current.place if current is not None else "")
+    if not title:
+        return None, "title is required"
+    if len(title) > EVENT_TITLE_MAX_LENGTH:
+        return None, f"title must be at most {EVENT_TITLE_MAX_LENGTH} characters"
+    if not link:
+        return None, "link is required"
+    if len(link) > EVENT_LINK_MAX_LENGTH:
+        return None, f"link must be at most {EVENT_LINK_MAX_LENGTH} characters"
+    if not valid_external_http_url(link):
+        return None, "link must be a valid absolute HTTP(S) URL with a complete domain"
+    if event_type not in EVENT_TYPES:
+        return None, "type must be Competition, Workshop, or Alumni Talk"
+    if event_date is None:
+        return None, "date must be a valid ISO date"
+    if not place:
+        return None, "place is required"
+    if len(place) > EVENT_PLACE_MAX_LENGTH:
+        return None, f"place must be at most {EVENT_PLACE_MAX_LENGTH} characters"
+    return {"title": title, "link": link, "eventType": event_type, "eventDate": event_date, "place": place}, None
 
 
 def get_first(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
@@ -1286,6 +1362,7 @@ def make_post(data: dict[str, Any]) -> Post:
         content=decorated_caption,
         mediaUrl=mediaUrl,
         mediaType=media_kind(mediaUrl),
+        registrationLink=optional_text(get_first(data, "registrationLink", "link")) if code == 3 else None,
         likeCount=optional_int(data.get("likes")) or 0,
         shareCount=optional_int(data.get("shares")) or 0,
     )
@@ -1313,6 +1390,11 @@ def validate_post(post: Post, mediaUrls: Optional[list[str]] = None):
             return jsonify({"error": error}), 400
     if post.postType == "announcement" and (len(mediaUrls) != 1 or media_kind(mediaUrls[0]) != "image"):
         return jsonify({"error": "announcements require exactly one poster image"}), 400
+    if post.postType == "announcement":
+        if not post.registrationLink:
+            return jsonify({"error": "registrationLink is required for announcements"}), 400
+        if not valid_external_http_url(post.registrationLink):
+            return jsonify({"error": "registrationLink must be a valid absolute HTTP(S) URL with a complete domain"}), 400
     return None
 
 
@@ -1351,6 +1433,11 @@ def update_post_from_payload(post: Post, data: dict[str, Any]):
     if code is None or code == 2:
         return jsonify({"error": "type must be 0, 1, or 3 for feed posts"}), 400
     post.postType = CODE_TO_POST_TYPE[code]
+    if post.postType == "announcement":
+        if "registrationLink" in data or "link" in data:
+            post.registrationLink = optional_text(get_first(data, "registrationLink", "link"))
+    else:
+        post.registrationLink = None
     if "authorId" in data:
         authorId = optional_int(data.get("authorId"))
         if authorId != post.authorId:
@@ -2613,6 +2700,19 @@ def serialize_signal_bar_item(item: SignalBarItem) -> dict[str, Any]:
     }
 
 
+def serialize_campus_event(item: CampusEvent) -> dict[str, Any]:
+    return {
+        "id": str(item.eventId),
+        "title": item.title,
+        "link": item.link,
+        "type": item.eventType,
+        "date": item.eventDate.isoformat(),
+        "place": item.place,
+        "createdAt": utc_isoformat(item.createdAt),
+        "updatedAt": utc_isoformat(item.updatedAt),
+    }
+
+
 def empty_resource_collection() -> list[dict[str, Any]]:
     return []
 
@@ -2763,6 +2863,54 @@ def signal_bar_item(item_id: int):
     db().commit()
     db().refresh(item)
     return jsonify(serialize_signal_bar_item(item))
+
+
+@app.route("/api/events", methods=["GET", "POST"])
+def campus_events_collection():
+    if request.method == "GET":
+        items = db().scalars(
+            select(CampusEvent).order_by(CampusEvent.eventDate.asc(), CampusEvent.eventId.asc())
+        ).all()
+        return jsonify({"items": [serialize_campus_event(item) for item in items], "total": len(items)})
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
+    values, validation_error = event_values(read_json())
+    if validation_error is not None:
+        return jsonify({"error": validation_error}), 400
+    item = CampusEvent(**values)
+    db().add(item)
+    db().commit()
+    db().refresh(item)
+    return jsonify(serialize_campus_event(item)), 201
+
+
+@app.route("/api/events/<int:item_id>", methods=["PATCH", "DELETE"])
+def campus_event_item(item_id: int):
+    admin_error = require_admin_user()
+    if admin_error is not None:
+        return admin_error
+    item = db().get(CampusEvent, item_id)
+    if item is None:
+        return jsonify({"error": "not found"}), 404
+    if request.method == "DELETE":
+        db().delete(item)
+        db().commit()
+        return ("", 204)
+    data = read_json()
+    if not any(key in data for key in ("title", "link", "type", "date", "place")):
+        return jsonify({"error": "title, link, type, date, or place is required"}), 400
+    values, validation_error = event_values(data, item)
+    if validation_error is not None:
+        return jsonify({"error": validation_error}), 400
+    item.title = values["title"]
+    item.link = values["link"]
+    item.eventType = values["eventType"]
+    item.eventDate = values["eventDate"]
+    item.place = values["place"]
+    db().commit()
+    db().refresh(item)
+    return jsonify(serialize_campus_event(item))
 
 
 @app.route("/api/feed")

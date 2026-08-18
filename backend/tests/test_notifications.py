@@ -227,22 +227,68 @@ class NotificationsTest(unittest.TestCase):
             ("chairman", 3, ["data:image/png;base64,cG9zdGVy"]),
             ("secretary", 1, []),
         ):
+            payload = {
+                "type": postType,
+                "clubSlug": "robotics",
+                "caption": f"{role} update",
+                "mediaUrls": mediaUrls,
+            }
+            if postType == 3:
+                payload["registrationLink"] = "https://register.events.example.edu/robotics"
             response = self.client.post(
                 "/api/posts",
-                json={"type": postType, "clubSlug": "robotics", "caption": f"{role} update", "mediaUrls": mediaUrls},
+                json=payload,
                 headers=self.auth(f"{role}-token"),
             )
             self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
             created_posts.append(response.get_json())
 
         self.assertEqual(created_posts[0]["mediaUrls"], ["data:image/png;base64,cGhvdG8=", "data:video/mp4;base64,dmlkZW8="])
+        self.assertEqual(created_posts[1]["registrationLink"], "https://register.events.example.edu/robotics")
 
         invalid_announcement = self.client.post(
             "/api/posts",
-            json={"type": 3, "clubSlug": "robotics", "caption": "Too many posters", "mediaUrls": ["one.jpg", "two.jpg"]},
+            json={
+                "type": 3,
+                "clubSlug": "robotics",
+                "caption": "Too many posters",
+                "mediaUrls": ["one.jpg", "two.jpg"],
+                "registrationLink": "https://register.events.example.edu/robotics",
+            },
             headers=self.auth("president-token"),
         )
         self.assertEqual(invalid_announcement.status_code, 400)
+
+        missing_link_response = self.client.post(
+            "/api/posts",
+            json={
+                "type": 3,
+                "clubSlug": "robotics",
+                "caption": "Missing registration link",
+                "mediaUrls": ["poster.jpg"],
+            },
+            headers=self.auth("president-token"),
+        )
+        self.assertEqual(missing_link_response.status_code, 400)
+
+        for invalid_link in (
+            "register.events.example.edu/robotics",
+            "https:/register.events.example.edu/robotics",
+            "https://registration",
+            "https://-register.example.edu/robotics",
+        ):
+            invalid_link_response = self.client.post(
+                "/api/posts",
+                json={
+                    "type": 3,
+                    "clubSlug": "robotics",
+                    "caption": "Invalid registration link",
+                    "mediaUrls": ["poster.jpg"],
+                    "registrationLink": invalid_link,
+                },
+                headers=self.auth("president-token"),
+            )
+            self.assertEqual(invalid_link_response.status_code, 400, invalid_link)
 
         denied = self.client.post(
             "/api/posts",
@@ -279,6 +325,18 @@ class NotificationsTest(unittest.TestCase):
         posts = self.client.get("/api/clubs/robotics").get_json()["posts"]
         self.assertEqual({post["type"] for post in posts}, {1, 3})
         self.assertEqual(len(posts), 4)
+
+        announcement_endpoint = f"/api/posts/{created_posts[1]['postId']}"
+        self.assertEqual(
+            self.client.delete(announcement_endpoint, headers=self.auth("member-token")).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.delete(announcement_endpoint, headers=self.auth("chairman-token")).status_code,
+            204,
+        )
+        remaining_posts = self.client.get("/api/clubs/robotics").get_json()["posts"]
+        self.assertNotIn(3, {post["type"] for post in remaining_posts})
 
     def test_only_admin_can_delete_a_club(self) -> None:
         with backend_app.SessionLocal() as session:

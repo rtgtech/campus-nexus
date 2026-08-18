@@ -150,12 +150,12 @@
   --spacing-margin-mobile: 16px;
   --spacing-unit: 8px;
 
-  --font-headline-md: "Space Grotesk", sans-serif;
-  --font-display-lg: "Space Grotesk", sans-serif;
-  --font-headline-lg: "Space Grotesk", sans-serif;
-  --font-body-lg: "Inter", sans-serif;
-  --font-body-md: "Inter", sans-serif;
-  --font-label-md: "Space Grotesk", sans-serif;
+  --font-headline-md: Arial, "Helvetica Neue", sans-serif;
+  --font-display-lg: Arial, "Helvetica Neue", sans-serif;
+  --font-headline-lg: Arial, "Helvetica Neue", sans-serif;
+  --font-body-lg: Arial, "Helvetica Neue", sans-serif;
+  --font-body-md: Arial, "Helvetica Neue", sans-serif;
+  --font-label-md: Arial, "Helvetica Neue", sans-serif;
 
   --text-display-lg: 2.875rem;
   --text-display-lg--line-height: 1.1;
@@ -176,8 +176,8 @@
   --text-label-md: 0.825rem;
   --text-label-md--line-height: 1.4;
   --text-label-md--font-weight: 600;
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
+  --font-heading: Arial, "Helvetica Neue", sans-serif;
+  --font-sans: Arial, "Helvetica Neue", sans-serif;
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -219,7 +219,7 @@
     min-height: 100vh;
     background: var(--background);
     color: var(--foreground);
-    font-family: "Inter", sans-serif;
+    font-family: Arial, "Helvetica Neue", sans-serif;
     @apply bg-background text-foreground;
   }
 

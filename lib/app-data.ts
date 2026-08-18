@@ -54,6 +54,29 @@ export type SignalBarData = {
   total: number;
 };
 
+export type CampusEventType = "Competition" | "Workshop" | "Alumni Talk";
+
+export type CampusEvent = {
+  id: string;
+  title: string;
+  link: string;
+  type: CampusEventType;
+  date: string;
+  place: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CampusEventsData = {
+  items: CampusEvent[];
+  total: number;
+};
+
+export const fallbackCampusEventsData: CampusEventsData = {
+  items: [],
+  total: 0,
+};
+
 export const fallbackSignalBarItems: SignalBarItem[] = [
   {
     id: "robotics-demo",

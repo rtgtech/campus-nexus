@@ -5,9 +5,11 @@ import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
+  fallbackCampusEventsData,
   fallbackFeed,
   fallbackSignalBarData,
   getInitials,
+  type CampusEventsData,
   type FeedData,
   type SignalBarData,
 } from "@/lib/app-data";
@@ -18,67 +20,33 @@ type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const radarEvents = [
-  {
-    day: "14",
-    month: "AUG",
-    title: "HackCX Finals — registration closes tonight",
-    source: "OFFICIAL",
-    meta: "CS Dept · 217 registered",
-    note: "closes in 8h",
-    action: "Register",
-    urgent: true,
-  },
-  {
-    day: "15",
-    month: "AUG",
-    title: "UI/UX Bootcamp — Session 2",
-    source: "CLUB",
-    meta: "Design Club · 34 going",
-    action: "Interested",
-  },
-  {
-    day: "16",
-    month: "AUG",
-    title: "Battle of Bands — Amphitheatre",
-    source: "STUDENT",
-    meta: "Music Society · 217 going",
-    action: "Interested",
-  },
-  {
-    day: "19",
-    month: "AUG",
-    title: "Career Fair — 40+ companies",
-    source: "OFFICIAL",
-    meta: "Placement Cell",
-    action: "Remind me",
-  },
-  {
-    day: "21",
-    month: "AUG",
-    title: "Summer PM Internship — applications open",
-    source: "EXTERNAL",
-    meta: "via Unstop",
-    action: "Apply",
-  },
-];
-
 const fallbackPeople = [
   { name: "Riya Kapoor", subtitle: "ECE · Year 2 · 4 mutual" },
   { name: "Sam Verghese", subtitle: "Design Club · 2 mutual" },
 ];
 
+const monthLabels = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+function radarDate(value: string) {
+  const [, month, day] = value.split("-").map(Number);
+  return {
+    day: Number.isInteger(day) ? String(day).padStart(2, "0") : "--",
+    month: monthLabels[month - 1] ?? "",
+  };
+}
+
 export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const feedView = resolvedSearchParams.view === "discover" ? "discover" : "home";
   const token = (await cookies()).get("campusNexusToken")?.value;
-  const [feedData, signalBarData] = await Promise.all([
+  const [feedData, signalBarData, eventsData] = await Promise.all([
     getCampusData<FeedData>(
       "/api/feed",
       fallbackFeed,
       token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
     ),
     getCampusData<SignalBarData>("/api/signal-bar", fallbackSignalBarData),
+    getCampusData<CampusEventsData>("/api/events", fallbackCampusEventsData),
   ]);
   const suggestedPeople = feedData.suggestedPeople.length > 0 ? feedData.suggestedPeople : fallbackPeople;
 
@@ -126,7 +94,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     Hey there
                   </h1>
                   <p className="mt-1 text-[13px] text-on-surface-variant">
-                    Six things are happening today, pulled from four sources so you don&apos;t miss them.
+                    {eventsData.total === 1 ? "One event" : `${eventsData.total} events`} on Campus Radar, so you don&apos;t miss what&apos;s next.
                   </p>
                 </div>
               </div>
@@ -138,7 +106,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       Campus Radar
                     </h2>
                     <p className="mt-0.5 text-xs text-on-surface-variant">
-                      Every hackathon, workshop and fest — official, club, or student-posted — in one feed
+                      Competitions, workshops and alumni talks from across campus in one feed
                     </p>
                   </div>
                   <Link className="shrink-0 border-b border-on-surface-variant text-xs text-on-surface-variant transition hover:text-on-surface" href="/?view=discover">
@@ -146,8 +114,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   </Link>
                 </div>
 
-                <div aria-label="Campus Radar sources" className="mb-3.5 flex flex-wrap gap-2">
-                  {["ALL", "OFFICIAL", "DEPT", "CLUB", "STUDENT", "EXTERNAL"].map((source, index) => (
+                <div aria-label="Campus Radar event types" className="mb-3.5 flex flex-wrap gap-2">
+                  {["ALL", "COMPETITION", "WORKSHOP", "ALUMNI TALK"].map((source, index) => (
                     <span
                       key={source}
                       className={cn(
@@ -163,42 +131,42 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 </div>
 
                 <div className="space-y-2.5">
-                  {radarEvents.map((event) => (
-                    <article
-                      key={`${event.day}-${event.title}`}
-                      className={cn(
-                        "grid grid-cols-[48px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-[10px] border bg-white px-4 py-3 sm:grid-cols-[48px_minmax(0,1fr)_auto]",
-                        event.urgent ? "border-on-surface" : "border-outline-variant/70",
-                      )}
-                    >
-                      <time className="text-center font-mono" dateTime={`2026-08-${event.day}`}>
-                        <span className="block text-xl font-bold leading-none text-on-surface">{event.day}</span>
-                        <span className="mt-1 block text-[9px] font-bold tracking-widest text-on-surface-variant">{event.month}</span>
-                      </time>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-on-surface">{event.title}</h3>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-on-surface-variant">
-                          <span className="rounded-[5px] border border-outline-variant/80 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wide">
-                            {event.source}
-                          </span>
-                          <span>{event.meta}</span>
+                  {eventsData.items.length === 0 ? (
+                    <div className="rounded-[10px] border border-outline-variant/70 bg-white px-4 py-8 text-center text-sm text-on-surface-variant">
+                      No events scheduled yet.
+                    </div>
+                  ) : eventsData.items.map((event) => {
+                    const displayDate = radarDate(event.date);
+                    return (
+                      <article
+                        key={event.id}
+                        className="grid grid-cols-[48px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-[10px] border border-outline-variant/70 bg-white px-4 py-3 sm:grid-cols-[48px_minmax(0,1fr)_auto]"
+                      >
+                        <time className="text-center font-mono" dateTime={event.date}>
+                          <span className="block text-xl font-bold leading-none text-on-surface">{displayDate.day}</span>
+                          <span className="mt-1 block text-[9px] font-bold tracking-widest text-on-surface-variant">{displayDate.month}</span>
+                        </time>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-bold text-on-surface">{event.title}</h3>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-on-surface-variant">
+                            <span className="rounded-[5px] border border-outline-variant/80 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide">
+                              {event.type}
+                            </span>
+                            <span>{event.place}</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
-                        {event.note ? <span className="text-[11px] text-on-surface-variant">{event.note}</span> : null}
-                        <span
-                          className={cn(
-                            "rounded-[8px] border px-3 py-1.5 text-xs font-bold",
-                            event.urgent
-                              ? "border-on-surface bg-on-surface text-white"
-                              : "border-outline-variant bg-white text-on-surface",
-                          )}
-                        >
-                          {event.action}
-                        </span>
-                      </div>
-                    </article>
-                  ))}
+                        <div className="col-span-2 flex items-center justify-end sm:col-span-1">
+                          <a
+                            aria-label={`Apply for ${event.title}`}
+                            className="rounded-[8px] border border-outline-variant bg-white px-3 py-1.5 text-xs font-bold text-on-surface transition hover:border-on-surface"
+                            href={event.link}
+                          >
+                            Apply
+                          </a>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
 

@@ -426,6 +426,15 @@ class FrontendApiRequirementsTest(unittest.TestCase):
             ).status_code,
             200,
         )
+        self.assertEqual(
+            self.client.delete(f"/api/posts/{post_id}", headers=self.auth(other_token)).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/posts/{post_id}", headers=self.auth(owner_token)).status_code,
+            204,
+        )
+        self.assertEqual(self.client.get(f"/api/posts/{post_id}").status_code, 404)
 
         self.assertEqual(self.client.post("/api/games/items", json={"title": "Blocked"}).status_code, 401)
         self.assertEqual(
