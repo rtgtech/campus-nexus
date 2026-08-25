@@ -41,12 +41,12 @@ export function SectionTitle({
     <div className="flex items-end justify-between gap-4">
       <div className="space-y-2">
         {eyebrow ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-black">
             {eyebrow}
           </p>
         ) : null}
         <div>
-          <h2 className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-on-background md:text-3xl">
+          <h2 className="font-sans text-2xl font-bold tracking-tight text-on-background md:text-3xl">
             {title}
           </h2>
           {description ? <p className="mt-1 text-sm text-on-surface-variant md:text-base">{description}</p> : null}
@@ -68,7 +68,7 @@ export function CampusShell({ active, children, feedView = "home", headerSearchP
         <main>{children}</main>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/60 bg-white/90 px-2 pb-3 pt-2 backdrop-blur-xl md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-primary/10 bg-white/92 px-2 pb-3 pt-2 shadow-[0_-10px_30px_rgba(35,30,93,0.08)] backdrop-blur-xl md:hidden">
         <div className="mx-auto flex max-w-lg items-center justify-around">
           {navItems.map((item) => {
             const selected = item.key === active;
@@ -78,8 +78,8 @@ export function CampusShell({ active, children, feedView = "home", headerSearchP
               isCreatePost
                 ? "bg-secondary px-4 text-white"
                 : selected
-                  ? "bg-primary-fixed text-primary"
-                  : "text-on-surface-variant",
+                  ? "bg-primary-fixed text-black"
+                  : "text-black",
             ].join(" ");
             const label = isCreatePost ? "Create" : item.label;
 

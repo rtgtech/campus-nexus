@@ -123,7 +123,7 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
             return (
               <Button
                 key={post.postId ?? `${post.authorId}-${title}`}
-                className="group relative h-auto aspect-[4/3] w-full justify-start overflow-hidden rounded-[12px] border border-[#deded8] bg-white p-0 text-left shadow-none hover:-translate-y-0.5 hover:border-[#aaa] hover:shadow-sm"
+                className="group relative h-auto aspect-[4/3] w-full justify-start overflow-hidden rounded-[12px] border border-primary/12 bg-white p-0 text-left shadow-[0_10px_28px_rgba(35,30,93,0.04)] hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_16px_36px_rgba(35,30,93,0.08)]"
                 type="button"
                 variant="ghost"
                 onClick={() => openPost(post)}
@@ -135,8 +135,8 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
                     <img alt={title} className="h-full w-full object-cover transition duration-200 group-hover:scale-105" src={mediaUrl} />
                   )
                 ) : (
-                  <div className="flex h-full flex-col justify-between bg-[#f5f5f1] p-4">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-[9px] border border-[#deded8] bg-white text-xs font-bold text-[#353532]">
+                  <div className="flex h-full flex-col justify-between bg-primary-fixed/55 p-4">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-[9px] border border-primary/15 bg-white text-xs font-bold text-black">
                       {getInitials(post.author)}
                     </span>
                     <p className="line-clamp-4 text-sm font-semibold leading-6 text-[#242422] md:text-base">{title}</p>

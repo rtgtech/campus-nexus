@@ -114,8 +114,8 @@ export function ClubFollowButton({
     <Button
       className={cn(
         compact ? "h-9 rounded-[8px] border-[#d6d6d0] px-4 text-xs font-bold" : "h-11 w-full rounded-full px-4",
-        compact && !isFollowing && "border-[#171717] bg-[#171717] text-white hover:bg-[#353532]",
-        compact && isFollowing && "bg-white text-[#5f5f59] hover:bg-[#f1f1ed] hover:text-[#171717]",
+        compact && !isFollowing && "border-primary bg-primary text-white hover:bg-primary/90",
+        compact && isFollowing && "bg-white text-black hover:bg-primary-fixed",
         !compact && !isFollowing && "bg-secondary text-white hover:bg-secondary/90",
       )}
       disabled={status === "loading" || status === "saving"}
@@ -131,7 +131,7 @@ export function ClubFollowButton({
       className={cn(
         buttonVariants(),
         compact
-          ? "h-9 rounded-[8px] bg-[#171717] px-4 text-xs font-bold text-white hover:bg-[#353532]"
+          ? "h-9 rounded-[8px] bg-primary px-4 text-xs font-bold text-white hover:bg-primary/90"
           : "h-11 w-full rounded-full bg-secondary px-4 text-white hover:bg-secondary/90",
       )}
     >

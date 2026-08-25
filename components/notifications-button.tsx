@@ -151,7 +151,7 @@ export function NotificationsButton() {
       <DialogContent className="inset-0 flex h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0 md:inset-auto md:left-auto md:right-4 md:top-16 md:h-auto md:max-h-[calc(100vh-5rem)] md:w-[390px] md:translate-x-0 md:translate-y-0 md:rounded-[10px]">
         <DialogHeader className="border-b border-outline-variant/60 px-4 py-4 pr-14 text-left md:px-5">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-secondary">Updates</p>
-          <DialogTitle className="font-['Space_Grotesk'] text-xl font-bold tracking-tight text-on-background">
+          <DialogTitle className="font-sans text-xl font-bold tracking-tight text-on-background">
             Notifications
           </DialogTitle>
           <DialogDescription className="sr-only">Recent friend and club updates</DialogDescription>

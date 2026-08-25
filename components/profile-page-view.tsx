@@ -96,7 +96,7 @@ function listingTime(value: string, now: number) {
 function FriendPreview({ friend }: { friend: FriendshipUser }) {
   return (
     <Link className="min-w-0 text-center" href={profileHref(friend)}>
-      <span className="mx-auto flex aspect-square w-full items-center justify-center rounded-[10px] border border-[#deded8] bg-[#f3f3ef] text-xs font-bold text-[#454541] transition hover:border-[#aaa]">
+      <span className="mx-auto flex aspect-square w-full items-center justify-center rounded-[10px] border border-primary/15 bg-primary-fixed text-xs font-bold text-black transition hover:border-primary/40">
         {friend.initials || friend.acronym || getInitials(friend.name)}
       </span>
       <span className="mt-1.5 block truncate text-[10px] text-[#6f6f69]">{friend.name.split(" ")[0]}</span>
@@ -108,7 +108,7 @@ function ClubRow({ summary }: { summary: ProfileClubSummary }) {
   const { club, membership } = summary;
   return (
     <Link className="flex items-center gap-3 border-b border-[#e8e8e2] py-3 last:border-0" href={`/clubs/${encodeURIComponent(club.slug)}`}>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[9px] border border-[#deded8] bg-[#f3f3ef] text-[10px] font-bold">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[9px] border border-primary/15 bg-primary-fixed text-[10px] font-bold text-black">
         {club.bannerImage ? <img alt="" className="h-full w-full object-cover" src={club.bannerImage} /> : getInitials(club.title)}
       </span>
       <span className="min-w-0 flex-1">
@@ -127,7 +127,7 @@ function ClubRow({ summary }: { summary: ProfileClubSummary }) {
 function FollowedClubRow({ club }: { club: ClubCard }) {
   return (
     <Link className="flex items-center gap-3 py-2" href={`/clubs/${encodeURIComponent(club.slug)}`}>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[8px] border border-[#deded8] bg-[#f3f3ef] text-[9px] font-bold">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[8px] border border-secondary/15 bg-secondary-fixed text-[9px] font-bold text-black">
         {club.bannerImage ? <img alt="" className="h-full w-full object-cover" src={club.bannerImage} /> : getInitials(club.title)}
       </span>
       <span className="min-w-0 flex-1">
@@ -363,9 +363,9 @@ export function ProfilePageView({
 
   return (
     <div className="mx-auto max-w-[1100px] pb-12 md:pl-16">
-      <section className="rounded-[14px] border border-[#deded8] bg-white p-5 md:p-6">
+      <section className="rounded-[14px] border border-primary/12 bg-white p-5 shadow-[0_14px_36px_rgba(35,30,93,0.06)] md:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          <div className="flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-[#deded8] bg-[#f1f1ed] text-xl font-bold text-[#353532]">
+          <div className="flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-primary/15 bg-primary-fixed text-xl font-bold text-black">
             {profile.avatar ? (
               <img alt={`${user.name} profile`} className="h-full w-full object-cover" src={profile.avatar} />
             ) : (
@@ -377,7 +377,7 @@ export function ProfilePageView({
             <div className="flex flex-col items-start justify-between gap-4 md:flex-row">
               <div>
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-2xl font-bold tracking-[-0.03em] text-[#171717]">{user.name}</h1>
+                  <h1 className="text-2xl font-bold tracking-[-0.03em] text-black">{user.name}</h1>
                   {leaderboardEntry !== undefined && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d8d8d2] px-2.5 py-1 font-mono text-[10px] font-bold text-[#454541]">
                     <span className="material-symbols-outlined text-[12px]">leaderboard</span>
@@ -410,7 +410,7 @@ export function ProfilePageView({
                   Share profile
                 </Button>
                 {isSelf ? (
-                  <Button className="h-9 rounded-[8px] bg-[#171717] px-4 text-xs text-white hover:bg-[#353532]" type="button" onClick={() => setEditOpen(true)}>
+                  <Button className="h-9 rounded-[8px] bg-primary px-4 text-xs text-white hover:bg-primary/90" type="button" onClick={() => setEditOpen(true)}>
                     Edit profile
                   </Button>
                 ) : (
@@ -418,8 +418,8 @@ export function ProfilePageView({
                     className={cn(
                       "h-9 rounded-[8px] px-4 text-xs",
                       friendship?.isFriend
-                        ? "border-[#d8d8d2] bg-white text-[#5f5f59] hover:bg-[#f3f3ef] hover:text-[#171717]"
-                        : "bg-[#171717] text-white hover:bg-[#353532]",
+                        ? "border-primary/15 bg-white text-black hover:bg-primary-fixed"
+                        : "bg-secondary text-white hover:bg-secondary/90",
                     )}
                     disabled={friendStatus === "loading" || friendStatus === "saving"}
                     type="button"
@@ -437,7 +437,7 @@ export function ProfilePageView({
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {profile.interests.length > 0 ? profile.interests.map((interest) => (
-                <span key={interest} className="rounded-full border border-[#d3d3cd] px-2.5 py-1 font-mono text-[9px] uppercase text-[#686862]">
+                <span key={interest} className="rounded-full border border-primary/15 bg-primary-fixed/65 px-2.5 py-1 font-mono text-[9px] uppercase text-black">
                   {interest}
                 </span>
               )) : (
@@ -471,14 +471,14 @@ export function ProfilePageView({
         </div>
       </section>
 
-      <div className="mt-5 flex gap-1 overflow-x-auto border-b border-[#deded8]" role="tablist" aria-label="Profile sections">
+      <div className="mt-5 flex gap-1 overflow-x-auto border-b border-primary/15" role="tablist" aria-label="Profile sections">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             aria-selected={activeTab === tab.id}
             className={cn(
               "border-b-2 border-transparent px-4 py-3 text-xs font-semibold text-[#777770] transition hover:text-[#171717]",
-              activeTab === tab.id && "border-[#171717] text-[#171717]",
+              activeTab === tab.id && "border-secondary text-black",
             )}
             role="tab"
             type="button"
@@ -610,7 +610,7 @@ export function ProfilePageView({
                       aria-pressed={enabled}
                       className={cn(
                         "rounded-[6px] border px-3 py-2 font-mono text-[9px] uppercase",
-                        enabled ? "border-[#171717] bg-[#171717] text-white" : "border-[#d8d8d2] text-[#686862]",
+                        enabled ? "border-primary bg-primary text-white" : "border-primary/15 text-black",
                       )}
                       type="button"
                       onClick={() => setPreferences((current) => current ? {
@@ -655,7 +655,7 @@ export function ProfilePageView({
               <p className={cn("mt-3 text-[10px]", preferencesStatus === "error" ? "text-destructive" : "text-[#5f5f59]")}>{preferencesMessage}</p>
             ) : null}
             <Button
-              className="mt-4 w-full rounded-[7px] bg-[#171717] text-white hover:bg-[#353532]"
+              className="mt-4 w-full rounded-[7px] bg-primary text-white hover:bg-primary/90"
               disabled={!preferences || preferencesStatus === "saving"}
               size="sm"
               type="button"
@@ -752,7 +752,7 @@ export function ProfilePageView({
             {editMessage ? <p className="text-xs font-semibold text-destructive">{editMessage}</p> : null}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
-              <Button className="bg-[#171717] text-white hover:bg-[#353532]" disabled={editStatus === "saving"} type="submit">
+              <Button className="bg-primary text-white hover:bg-primary/90" disabled={editStatus === "saving"} type="submit">
                 {editStatus === "saving" ? "Saving…" : "Save profile"}
               </Button>
             </div>

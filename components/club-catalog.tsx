@@ -26,12 +26,12 @@ function latestPostText(club: ClubCard) {
 function statusDotClass(status: string) {
   const normalizedStatus = status.trim().toLowerCase();
   if (normalizedStatus.includes("recruit")) {
-    return "animate-pulse bg-[#202020]";
+    return "animate-pulse bg-secondary";
   }
   if (["active", "open"].some((label) => normalizedStatus.includes(label))) {
-    return "bg-[#202020]";
+    return "bg-primary";
   }
-  return "bg-[#8a8a83]";
+  return "bg-outline";
 }
 
 export function ClubCatalog({ clubs }: ClubCatalogProps) {
@@ -76,9 +76,9 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
   }, [clubs, filter, query, sort]);
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-[1240px] px-5 pb-16 pt-8 text-[#171717] md:px-8 md:pl-24">
+    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-[1240px] px-5 pb-16 pt-8 text-black md:px-8 md:pl-24">
       <section aria-labelledby="clubs-heading">
-        <div className="flex flex-col items-start justify-between gap-5 border-b border-[#e2e2dc] pb-5 sm:flex-row sm:items-end">
+        <div className="flex flex-col items-start justify-between gap-5 border-b border-primary/15 pb-5 sm:flex-row sm:items-end">
           <div>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-[#72726c]">Campus directory</p>
             <h1 id="clubs-heading" className="text-[28px] font-bold tracking-[-0.03em]">Clubs</h1>
@@ -93,7 +93,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
               search
             </span>
             <input
-              className="h-11 w-full rounded-[10px] border border-[#d9d9d3] bg-white py-2 pl-10 pr-3 text-[13px] text-[#171717] outline-none placeholder:text-[#92928b] focus:border-[#85857e] focus:ring-0"
+              className="h-11 w-full rounded-[10px] border border-primary/15 bg-white py-2 pl-10 pr-3 text-[13px] text-black outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
               placeholder="Search clubs…"
               type="search"
               value={query}
@@ -112,9 +112,9 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                 className={cn(
                   "rounded-full border px-4 py-2 text-xs font-semibold transition",
                   selected
-                    ? "border-[#171717] bg-[#171717] text-white"
-                    : "border-[#d9d9d3] bg-white text-[#686862] hover:border-[#9c9c95] hover:text-[#171717]",
-                  unavailable && "cursor-not-allowed opacity-45 hover:border-[#d9d9d3] hover:text-[#686862]",
+                    ? "border-primary bg-primary text-white shadow-[0_7px_18px_rgba(35,30,93,0.18)]"
+                    : "border-primary/15 bg-primary-fixed/70 text-black hover:border-primary/40",
+                  unavailable && "cursor-not-allowed opacity-45 hover:border-primary/15",
                 )}
                 disabled={unavailable}
                 title={unavailable ? `${label} filtering will be available when the API provides club categories.` : undefined}
@@ -132,7 +132,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
             <span>Sort</span>
             <select
               aria-label="Sort clubs"
-              className="rounded-[8px] border border-[#d9d9d3] bg-white px-3 py-2 text-xs text-[#555550] focus:border-[#85857e] focus:ring-0"
+              className="rounded-[8px] border border-primary/15 bg-white px-3 py-2 text-xs text-black focus:border-primary focus:ring-2 focus:ring-primary/15"
               value={sort}
               onChange={(event) => setSort(event.target.value as SortMode)}
             >
@@ -152,7 +152,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
           </div>
           {query || filter !== "All" ? (
             <button
-              className="border-b border-[#9a9a93] text-xs text-[#686862] hover:text-[#171717]"
+              className="border-b border-primary/25 text-xs text-black hover:border-primary"
               type="button"
               onClick={() => {
                 setQuery("");
@@ -165,7 +165,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
         </div>
 
         {visibleClubs.length === 0 ? (
-          <div className="rounded-[12px] border border-[#deded8] bg-white px-6 py-14 text-center">
+          <div className="rounded-[12px] border border-primary/15 bg-white px-6 py-14 text-center shadow-[0_12px_34px_rgba(35,30,93,0.05)]">
             <span className="material-symbols-outlined text-3xl text-[#8a8a83]">groups</span>
             <h3 className="mt-3 text-sm font-semibold">No clubs found</h3>
             <p className="mt-1 text-xs text-[#72726c]">Try a different search or filter.</p>
@@ -181,12 +181,12 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
               return (
                 <article
                   key={club.slug}
-                  className="flex min-h-[330px] flex-col rounded-[12px] border border-[#deded8] bg-white p-4 transition-colors hover:border-[#a6a69f]"
+                  className="flex min-h-[330px] flex-col rounded-[12px] border border-primary/12 bg-white p-4 shadow-[0_10px_28px_rgba(35,30,93,0.04)] transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_16px_36px_rgba(35,30,93,0.08)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <Link
                       aria-label={`Open ${club.title}`}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-[#deded8] bg-[#f1f1ed] text-xs font-bold text-[#4f4f4a] outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/60"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-primary/15 bg-primary-fixed text-xs font-bold text-black outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                       href={`/clubs/${encodeURIComponent(club.slug)}`}
                     >
                       {club.bannerImage ? (
@@ -217,7 +217,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                     {club.description || "Description not available yet."}
                   </p>
 
-                  <div className="mt-3 rounded-[8px] border border-[#e2e2dc] bg-[#f5f5f1] px-3 py-2.5">
+                  <div className="mt-3 rounded-[8px] border border-primary/10 bg-primary-fixed/55 px-3 py-2.5">
                     <p className="font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-[#72726c]">
                       Latest post · {latestPostTime}
                     </p>

@@ -59,7 +59,7 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
       </div>
 
       <div
-        className={`hidden h-14 w-14 shrink-0 items-center justify-center rounded-full font-['Space_Grotesk'] text-lg font-black tracking-normal sm:flex ${style.avatar}`}
+        className={`hidden h-14 w-14 shrink-0 items-center justify-center rounded-full font-sans text-lg font-black tracking-normal sm:flex ${style.avatar}`}
       >
         {entry.acronym}
       </div>
@@ -67,7 +67,7 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
       <div className="min-w-0">
         <div className="flex items-center gap-3">
           <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-['Space_Grotesk'] text-sm font-black tracking-normal sm:hidden ${style.avatar}`}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-sans text-sm font-black tracking-normal sm:hidden ${style.avatar}`}
           >
             {entry.acronym}
           </div>
@@ -82,7 +82,7 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
       </div>
 
       <div className="text-right">
-        <p className={`font-['Space_Grotesk'] text-xl font-black leading-tight tracking-normal sm:text-2xl ${style.score}`}>
+        <p className={`font-sans text-xl font-black leading-tight tracking-normal sm:text-2xl ${style.score}`}>
           {formatXp(entry.totalXp)}
         </p>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">XP</p>

@@ -64,10 +64,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           {signalBarData.items.length > 0 ? (
             <section
               aria-label="Live campus updates"
-              className="mb-6 flex h-11 overflow-hidden rounded-full border border-outline-variant/70 bg-white"
+              className="mb-6 flex h-11 overflow-hidden rounded-full border border-primary/15 bg-white shadow-[0_10px_28px_rgba(35,30,93,0.07)]"
             >
-              <div className="z-10 flex shrink-0 items-center gap-2 bg-on-surface px-4 font-mono text-[11px] font-bold tracking-[0.08em] text-white">
-                <span className="size-2 animate-pulse rounded-full bg-white" />
+              <div className="z-10 flex shrink-0 items-center gap-2 bg-primary px-4 font-mono text-[11px] font-bold tracking-[0.08em] text-white">
+                <span className="size-2 animate-pulse rounded-full bg-secondary shadow-[0_0_0_4px_rgba(237,32,36,0.18)]" />
                 LIVE
               </div>
               <div className="min-w-0 flex-1 overflow-hidden">
@@ -90,7 +90,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className="min-w-0">
               <div className="mb-5 flex items-end justify-between gap-4">
                 <div>
-                  <h1 className="font-['Space_Grotesk'] text-[28px] font-bold tracking-tight text-on-background">
+                  <h1 className="font-sans text-[28px] font-bold tracking-tight text-on-background">
                     Hey there
                   </h1>
                   <p className="mt-1 text-[13px] text-on-surface-variant">
@@ -102,7 +102,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <section aria-labelledby="campus-radar-heading">
                 <div className="mb-3 flex items-end justify-between gap-4">
                   <div>
-                    <h2 id="campus-radar-heading" className="font-['Space_Grotesk'] text-base font-semibold text-on-background">
+                    <h2 id="campus-radar-heading" className="font-sans text-base font-semibold text-on-background">
                       Campus Radar
                     </h2>
                     <p className="mt-0.5 text-xs text-on-surface-variant">
@@ -121,8 +121,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                       className={cn(
                         "rounded-[7px] border px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.04em]",
                         index === 0
-                          ? "border-on-surface bg-on-surface text-white"
-                          : "border-outline-variant/80 bg-white text-on-surface-variant",
+                          ? "border-primary bg-primary text-white shadow-[0_6px_16px_rgba(35,30,93,0.18)]"
+                          : "border-primary/15 bg-primary-fixed/70 text-black",
                       )}
                     >
                       {source}
@@ -140,7 +140,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     return (
                       <article
                         key={event.id}
-                        className="grid grid-cols-[48px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-[10px] border border-outline-variant/70 bg-white px-4 py-3 sm:grid-cols-[48px_minmax(0,1fr)_auto]"
+                        className="grid grid-cols-[48px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-[10px] border border-primary/12 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(35,30,93,0.05)] transition hover:border-primary/30 hover:shadow-[0_12px_30px_rgba(35,30,93,0.09)] sm:grid-cols-[48px_minmax(0,1fr)_auto]"
                       >
                         <time className="text-center font-mono" dateTime={event.date}>
                           <span className="block text-xl font-bold leading-none text-on-surface">{displayDate.day}</span>
@@ -158,7 +158,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                         <div className="col-span-2 flex items-center justify-end sm:col-span-1">
                           <a
                             aria-label={`Apply for ${event.title}`}
-                            className="rounded-[8px] border border-outline-variant bg-white px-3 py-1.5 text-xs font-bold text-on-surface transition hover:border-on-surface"
+                            className="rounded-[8px] border border-secondary/20 bg-secondary-fixed px-3 py-1.5 text-xs font-bold text-black transition hover:border-secondary/45 hover:bg-secondary-fixed-dim"
                             href={event.link}
                           >
                             Apply
@@ -172,7 +172,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
               <section aria-labelledby="your-network-heading" className="mt-7">
                 <div className="mb-3 flex items-center justify-between">
-                  <h2 id="your-network-heading" className="font-['Space_Grotesk'] text-base font-semibold text-on-background">
+                  <h2 id="your-network-heading" className="font-sans text-base font-semibold text-on-background">
                     Your Network
                   </h2>
                   <Link className="border-b border-on-surface-variant text-xs text-on-surface-variant transition hover:text-on-surface" href="/my_activity">
@@ -215,7 +215,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </Link>
 
               <section className="rounded-[10px] border border-outline-variant/70 bg-white p-4" aria-labelledby="people-heading">
-                <h2 id="people-heading" className="mb-2 font-['Space_Grotesk'] text-[13px] font-semibold">People you may know</h2>
+                <h2 id="people-heading" className="mb-2 font-sans text-[13px] font-semibold">People you may know</h2>
                 {suggestedPeople.slice(0, 2).map(({ name, subtitle }) => (
                   <div key={name} className="flex items-center gap-2.5 py-2">
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-surface-container-low text-[10px] font-bold text-on-surface">

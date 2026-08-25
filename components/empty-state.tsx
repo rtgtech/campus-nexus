@@ -30,7 +30,7 @@ export function EmptyState({
           <InboxIcon className="size-5" />
         </EmptyMedia>
 
-        <EmptyTitle className="w-full max-w-none font-['Space_Grotesk'] text-xl font-bold tracking-tight text-on-background sm:text-2xl">
+        <EmptyTitle className="w-full max-w-none font-sans text-xl font-bold tracking-tight text-on-background sm:text-2xl">
           {title}
         </EmptyTitle>
 

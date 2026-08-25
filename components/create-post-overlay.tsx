@@ -133,7 +133,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
         <DialogHeader className="pr-10">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Create Post</p>
-            <DialogTitle className="mt-2 font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-on-background">
+            <DialogTitle className="mt-2 font-sans text-2xl font-bold tracking-tight text-on-background">
               {step === "media" ? "Choose your media." : "Write your post."}
             </DialogTitle>
             <DialogDescription className="sr-only">Create a campus post</DialogDescription>

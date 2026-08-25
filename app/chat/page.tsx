@@ -40,7 +40,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
             <div className="border-b border-outline-variant/50 p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="font-['Space_Grotesk'] text-2xl font-bold text-on-background">Chat</h1>
+                  <h1 className="font-sans text-2xl font-bold text-on-background">Chat</h1>
                   <p className="mt-1 text-sm text-on-surface-variant">{messagesData.conversations.length} conversations</p>
                 </div>
                 <Button aria-label="New chat" className="rounded-2xl" size="icon">
@@ -124,7 +124,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
                   src={activeConversation?.avatar ?? profileAvatar}
                 />
                 <div className="min-w-0">
-                  <h2 className="truncate font-['Space_Grotesk'] text-xl font-bold text-on-background">
+                  <h2 className="truncate font-sans text-xl font-bold text-on-background">
                     {activeConversation?.name ?? "Campus Chat"}
                   </h2>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">

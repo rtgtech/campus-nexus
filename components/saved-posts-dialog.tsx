@@ -69,7 +69,7 @@ export function SavedPostsDialog({ returnHref }: SavedPostsDialogProps) {
         showCloseButton={false}
       >
         <DialogHeader className="shrink-0 border-b border-outline-variant/60 bg-white/90 px-6 py-5 pr-20 md:px-8">
-          <DialogTitle className="font-['Space_Grotesk'] text-2xl font-bold tracking-tight text-on-background">
+          <DialogTitle className="font-sans text-2xl font-bold tracking-tight text-on-background">
             Saved posts
           </DialogTitle>
           <DialogDescription>

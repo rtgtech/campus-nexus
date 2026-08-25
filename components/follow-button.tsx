@@ -240,7 +240,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
         <DialogContent className="max-w-2xl rounded-[10px] p-5">
           <DialogHeader>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Profile</p>
-            <DialogTitle className="font-['Space_Grotesk'] text-2xl font-bold text-primary">Friends</DialogTitle>
+            <DialogTitle className="font-sans text-2xl font-bold text-on-background">Friends</DialogTitle>
             <DialogDescription className="sr-only">Friends and mutual friends for {targetName}</DialogDescription>
           </DialogHeader>
             {listStatus === "loading" ? (

@@ -48,7 +48,7 @@ export default async function MyActivityPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">My Activity</p>
           <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="font-['Space_Grotesk'] text-4xl font-bold tracking-tight text-primary">
+              <h1 className="font-sans text-4xl font-bold tracking-tight text-on-background">
                 {currentUser ? `${currentUser.name}'s activity` : "Your activity"}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-on-surface-variant">

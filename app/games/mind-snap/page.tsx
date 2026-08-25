@@ -271,7 +271,7 @@ export default function MindSnapPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-secondary">Memory Grid</p>
-                <h1 className="mt-1 font-['Space_Grotesk'] text-2xl font-black tracking-normal text-primary sm:text-3xl">
+                <h1 className="mt-1 font-sans text-2xl font-black tracking-normal text-on-background sm:text-3xl">
                   Mind Snap
                 </h1>
               </div>
@@ -335,15 +335,15 @@ export default function MindSnapPage() {
           <aside className="space-y-3">
             <section className="rounded-[10px] border border-surface-container-highest bg-white p-4 shadow-xs">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-secondary">Status</p>
-              <h2 className="mt-1 font-['Space_Grotesk'] text-xl font-black tracking-normal text-primary">{statusText}</h2>
+              <h2 className="mt-1 font-sans text-xl font-black tracking-normal text-on-background">{statusText}</h2>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="rounded-xl bg-surface-container-low p-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Level</p>
-                  <p className="mt-1 font-['Space_Grotesk'] text-2xl font-black tracking-normal text-primary">{level}</p>
+                  <p className="mt-1 font-sans text-2xl font-black tracking-normal text-on-background">{level}</p>
                 </div>
                 <div className="rounded-xl bg-surface-container-low p-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">XP</p>
-                  <p className="mt-1 font-['Space_Grotesk'] text-2xl font-black tracking-normal text-secondary">{score}</p>
+                  <p className="mt-1 font-sans text-2xl font-black tracking-normal text-on-background">{score}</p>
                 </div>
               </div>
               <div className="mt-3 rounded-xl bg-surface-container-low p-3 text-xs text-on-surface-variant">
@@ -352,7 +352,7 @@ export default function MindSnapPage() {
               {phase === "finished" && finalXp !== null ? (
                 <div className="mt-3 rounded-xl border border-secondary/20 bg-secondary-fixed p-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary">XP earned</p>
-                  <p className="mt-1 font-['Space_Grotesk'] text-3xl font-black tracking-normal text-secondary">{finalXp}</p>
+                  <p className="mt-1 font-sans text-3xl font-black tracking-normal text-on-background">{finalXp}</p>
                 </div>
               ) : null}
               {xpSaveMessage ? (
@@ -377,7 +377,7 @@ export default function MindSnapPage() {
                 <div className="mt-2 flex items-end justify-between gap-3">
                   <div>
                     <p className="text-xs text-on-surface-variant">Correct squares</p>
-                    <p className="font-['Space_Grotesk'] text-2xl font-black tracking-normal text-primary">
+                    <p className="font-sans text-2xl font-black tracking-normal text-on-background">
                       {result.correct}/{result.total}
                     </p>
                   </div>

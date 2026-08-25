@@ -183,7 +183,7 @@ export function ViewPostBox({ postId, returnHref }: ViewPostBoxProps) {
                 </div>
               ) : (
                 <div className="grid h-full place-items-center rounded-[10px] bg-surface-container-low p-8 text-center">
-                  <p className="max-w-2xl font-['Space_Grotesk'] text-2xl font-bold leading-relaxed text-primary md:text-4xl">
+                  <p className="max-w-2xl font-sans text-2xl font-bold leading-relaxed text-on-background md:text-4xl">
                     {caption}
                   </p>
                 </div>

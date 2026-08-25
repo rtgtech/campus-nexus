@@ -127,7 +127,7 @@ export default function AuthPage() {
               
 
               <div className="">
-                <h1 className="font-['Space_Grotesk'] text-5xl font-bold leading-tight tracking-tight">
+                <h1 className="font-sans text-5xl font-bold leading-tight tracking-tight">
                   Your campus circle starts here.
                 </h1>
                 <p className="mt-4 text-base leading-7 text-white/82">
@@ -173,7 +173,7 @@ export default function AuthPage() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">
                 {mode === "login" ? "Welcome back" : "Create account"}
               </p>
-              <h2 className="mt-2 font-['Space_Grotesk'] text-3xl font-bold tracking-tight text-on-background">
+              <h2 className="mt-2 font-sans text-3xl font-bold tracking-tight text-on-background">
                 {mode === "login" ? "Log in to Campus Nexus." : "Join Campus Nexus."}
               </h2>
             </div>

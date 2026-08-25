@@ -38,10 +38,10 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
       "h-14 rounded-2xl px-3",
       isHovered ? "w-full justify-start gap-3" : "w-14 justify-center",
       isCreatePost
-        ? "bg-secondary text-white shadow-[0_18px_40px_rgba(236,32,36,0.18)] hover:bg-secondary-container"
+        ? "bg-secondary text-white shadow-[0_18px_40px_rgba(237,32,36,0.2)] hover:bg-secondary-container"
         : selected
-          ? "bg-primary text-on-primary shadow-[0_18px_40px_rgba(34,29,92,0.18)]"
-          : "text-on-surface-variant hover:bg-surface-container hover:text-primary",
+          ? "bg-primary text-on-primary shadow-[0_18px_40px_rgba(35,30,93,0.2)]"
+          : "text-black hover:bg-primary-fixed hover:text-black",
     );
   }
 
@@ -61,7 +61,7 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
     >
       <nav
         aria-label="Primary"
-        className="h-full overflow-hidden border-r border-outline-variant/60 bg-white/92 p-2 shadow-[12px_0_34px_rgba(27,27,35,0.08)] backdrop-blur-xl"
+        className="h-full overflow-hidden border-r border-primary/10 bg-white/92 p-2 shadow-[12px_0_34px_rgba(35,30,93,0.08)] backdrop-blur-xl"
       >
         <div className="h-12" />
         <div className="space-y-2">

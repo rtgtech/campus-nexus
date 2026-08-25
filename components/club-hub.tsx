@@ -140,10 +140,10 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
   }
 
   return (
-    <article className="flex gap-3 rounded-[12px] border border-[#deded8] bg-white p-4 sm:p-[18px]">
+    <article className="flex gap-3 rounded-[12px] border border-primary/12 bg-white p-4 shadow-[0_10px_28px_rgba(35,30,93,0.05)] sm:p-[18px]">
       <Link
         aria-label={`View ${post.author}'s profile`}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-[#deded8] bg-[#f1f1ed] text-[11px] font-bold text-[#353532]"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-primary/15 bg-primary-fixed text-[11px] font-bold text-black"
         href={`/${encodeURIComponent(post.authorId || post.author)}`}
       >
         {getInitials(post.author)}
@@ -175,7 +175,7 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
         ) : null}
 
         {tag ? (
-          <span className="mt-3 inline-flex rounded-[5px] border border-[#d7d7d1] px-2.5 py-1 font-mono text-[10px] font-bold uppercase text-[#6f6f69]">
+          <span className="mt-3 inline-flex rounded-[5px] border border-secondary/15 bg-secondary-fixed px-2.5 py-1 font-mono text-[10px] font-bold uppercase text-black">
             {tag}
           </span>
         ) : null}
@@ -218,7 +218,7 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
 function EventRow({ event }: { event: ClubEvent }) {
   const date = eventDate(event);
   return (
-    <div className="grid grid-cols-[44px_1fr] items-center gap-3 rounded-[9px] border border-[#e2e2dc] bg-[#f5f5f1] px-3 py-2.5">
+    <div className="grid grid-cols-[44px_1fr] items-center gap-3 rounded-[9px] border border-primary/10 bg-primary-fixed/55 px-3 py-2.5">
       <div className="text-center font-mono">
         <div className="text-base font-bold leading-none">{date.day}</div>
         <div className="mt-1 text-[9px] tracking-[0.08em] text-[#72726c]">{date.month}</div>
@@ -235,7 +235,7 @@ function MemberRow({ member }: { member: ClubMember }) {
   const isLeader = member.title && member.title.toLowerCase() !== "member";
   return (
     <Link className="flex items-center gap-2.5 py-2 hover:text-[#171717]" href={memberProfileHref(member)}>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-[#deded8] bg-[#f1f1ed] text-[10px] font-bold">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-primary/15 bg-primary-fixed text-[10px] font-bold text-black">
         {member.initials || getInitials(member.name)}
       </span>
       <span className="min-w-0 flex-1">
@@ -268,14 +268,14 @@ export function ClubHub({ detail }: ClubHubProps) {
   }, []);
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-[1240px] px-5 pb-16 pt-7 text-[#171717] md:px-8 md:pl-24">
+    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-[1240px] px-5 pb-16 pt-7 text-black md:px-8 md:pl-24">
       <Link className="inline-flex items-center gap-2 text-xs text-[#686862] hover:text-[#171717]" href="/clubs">
         <span aria-hidden="true">←</span>
         All clubs
       </Link>
 
-      <section className="mt-4 flex flex-col items-start gap-5 rounded-[14px] border border-[#deded8] bg-white p-5 sm:p-6 md:flex-row">
-        <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-[#deded8] bg-[#f1f1ed] text-lg font-bold text-[#353532]">
+      <section className="mt-4 flex flex-col items-start gap-5 rounded-[14px] border border-primary/12 bg-white p-5 shadow-[0_14px_36px_rgba(35,30,93,0.06)] sm:p-6 md:flex-row">
+        <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-primary/15 bg-primary-fixed text-lg font-bold text-black">
           {club.bannerImage ? (
             <img alt="" className="h-full w-full object-cover" src={club.bannerImage} />
           ) : (
@@ -335,15 +335,15 @@ export function ClubHub({ detail }: ClubHubProps) {
             </div>
           </dl>
 
-          <div className="mt-4 flex w-fit items-center gap-2 rounded-full border border-[#d6d6d0] bg-[#fafaf8] px-3.5 py-1.5 font-mono text-[10px] uppercase text-[#5f5f59]">
-            <span className={cn("h-[7px] w-[7px] rounded-full", recruiting ? "animate-pulse bg-[#202020]" : "bg-[#8a8a83]")} />
+          <div className="mt-4 flex w-fit items-center gap-2 rounded-full border border-secondary/15 bg-secondary-fixed px-3.5 py-1.5 font-mono text-[10px] uppercase text-black">
+            <span className={cn("h-[7px] w-[7px] rounded-full", recruiting ? "animate-pulse bg-secondary" : "bg-outline")} />
             {club.status || "Status —"}
             {recruiting ? ` · ${club.recruitingDeadline || "deadline unavailable"}` : null}
           </div>
         </div>
       </section>
 
-      <div className="mt-4 flex gap-1 overflow-x-auto border-b border-[#deded8]" role="tablist" aria-label="Club sections">
+      <div className="mt-4 flex gap-1 overflow-x-auto border-b border-primary/15" role="tablist" aria-label="Club sections">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -351,7 +351,7 @@ export function ClubHub({ detail }: ClubHubProps) {
             aria-selected={activeTab === tab.id}
             className={cn(
               "border-b-2 border-transparent px-4 py-3 text-[13px] font-semibold text-[#72726c] transition hover:text-[#171717]",
-              activeTab === tab.id && "border-[#171717] text-[#171717]",
+              activeTab === tab.id && "border-secondary text-black",
             )}
             id={`club-tab-${tab.id}`}
             role="tab"
@@ -374,7 +374,7 @@ export function ClubHub({ detail }: ClubHubProps) {
               <ClubPostComposer
                 clubSlug={club.slug}
                 members={members}
-                triggerClassName="h-9 rounded-[8px] border border-[#171717] bg-[#171717] px-3 text-xs font-bold text-white hover:bg-[#353532]"
+                triggerClassName="h-9 rounded-[8px] border border-primary bg-primary px-3 text-xs font-bold text-white shadow-[0_7px_18px_rgba(35,30,93,0.18)] hover:bg-primary/90"
               />
             </div>
 
@@ -405,7 +405,7 @@ export function ClubHub({ detail }: ClubHubProps) {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-[9px] border border-[#e2e2dc] bg-[#f5f5f1] px-3 py-4 text-[11px] leading-5 text-[#72726c]">
+                <div className="rounded-[9px] border border-primary/10 bg-primary-fixed/55 px-3 py-4 text-[11px] leading-5 text-black">
                   Event schedule not available yet.
                 </div>
               )}
@@ -428,7 +428,7 @@ export function ClubHub({ detail }: ClubHubProps) {
             <section className="rounded-[12px] border border-[#deded8] bg-white p-4">
               <h2 className="text-[13px] font-semibold">Activity</h2>
               <p className="mt-3 flex items-center gap-2 font-mono text-[10px] uppercase text-[#70706a]">
-                <span className="h-[7px] w-[7px] rounded-full bg-[#202020]" />
+                <span className="h-[7px] w-[7px] rounded-full bg-secondary" />
                 Latest post · {latestPostTime}
               </p>
               <p className="mt-2 text-[11px] leading-5 text-[#72726c]">

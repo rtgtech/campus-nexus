@@ -149,7 +149,7 @@ export function HeaderSearch({
           render={
             <InputGroup
               aria-expanded={expanded}
-              className="h-10 overflow-hidden rounded-full border-outline-variant bg-muted px-2"
+              className="h-10 overflow-hidden rounded-full border-primary/15 bg-primary-fixed/70 px-2 text-black shadow-inner"
             />
           }
         >
@@ -190,7 +190,7 @@ export function HeaderSearch({
 
       <PopoverContent
         align={expandable ? "end" : "start"}
-        className="w-(--anchor-width) min-w-80 overflow-hidden rounded-[10px] border-outline-variant/70 p-0 shadow-[0_24px_70px_rgba(15,18,33,0.2)]"
+        className="w-(--anchor-width) min-w-80 overflow-hidden rounded-[10px] border-primary/15 p-0 shadow-[0_24px_70px_rgba(35,30,93,0.16)]"
         initialFocus={false}
         sideOffset={8}
       >
@@ -207,7 +207,7 @@ export function HeaderSearch({
             <div className="p-2">
               {groups.map((group) => (
                 <div key={group.label} className="py-1">
-                  <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-secondary">
+                  <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-black">
                     {group.label}
                   </p>
                   {group.items.map((item) => (
@@ -224,7 +224,7 @@ export function HeaderSearch({
                       className="flex min-w-0 items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-surface-container-low"
                       avatarClassName="rounded-full bg-primary-fixed text-primary"
                       trailing={
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-secondary">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black">
                           {typeMeta[item.type].label}
                         </span>
                       }
