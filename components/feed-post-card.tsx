@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PostDeleteButton } from "@/components/post-delete-button";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
-import { getInitials, type FeedCard } from "@/lib/app-data";
+import { getInitials, type FeedCard, type PostLikeData, type PostSaveData } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { formatPostTime } from "@/lib/post-time";
 
 type FeedPostCardProps = {
@@ -140,9 +141,9 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true }: F
       if (!response.ok) {
         throw new Error("Like request failed");
       }
-
-      setLiked(Boolean(data?.liked ?? data?.likedByCurrentUser ?? nextLiked));
-      setLikeCount(readMetricCount(data?.likes));
+      const payload = parseApiResponse<PostLikeData>(`/api/posts/${post.postId}/like`, data);
+      setLiked(payload.liked);
+      setLikeCount(readMetricCount(payload.likes));
     } catch {
       setLiked(previousLiked);
       setLikeCount(previousLikeCount);
@@ -181,9 +182,8 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true }: F
       if (!response.ok) {
         throw new Error("Save request failed");
       }
-      const confirmedSaved = Boolean(
-        data?.saved ?? data?.savedByCurrentUser ?? data?.bookmarkedByCurrentUser ?? nextSaved,
-      );
+      const payload = parseApiResponse<PostSaveData>(`/api/posts/${post.postId}/save`, data);
+      const confirmedSaved = payload.saved;
       setSaved(confirmedSaved);
       window.dispatchEvent(
         new CustomEvent<PostSaveEventDetail>(POST_SAVE_EVENT, {
@@ -254,7 +254,14 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true }: F
           {showDeleteButton ? (
             <PostDeleteButton authorId={post.authorId} postId={post.postId} onDeleted={handleDeleted} />
           ) : null}
-          <Button aria-label="Post options" className="rounded-full text-on-surface-variant" size="icon" type="button" variant="ghost">
+          <Button
+            aria-label="View post"
+            className="rounded-full text-on-surface-variant"
+            size="icon"
+            type="button"
+            variant="ghost"
+            onClick={openPost}
+          >
             <span className="material-symbols-outlined">more_horiz</span>
           </Button>
         </div>

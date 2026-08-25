@@ -4,7 +4,7 @@ import { CampusShell, SectionTitle } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { buttonVariants } from "@/components/ui/button";
-import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
+import { getCampusData } from "@/lib/campus-api";
 import { fallbackFeed, type CampusUser, type FeedCard, type FeedData } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 
@@ -13,21 +13,12 @@ async function getCurrentUser(token: string | undefined): Promise<CampusUser | n
     return null;
   }
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = (await response.json()) as { user?: CampusUser };
-    return payload.user ?? null;
-  } catch {
-    return null;
-  }
+  const payload = await getCampusData<{ user?: CampusUser }>(
+    "/api/auth/me",
+    {},
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  return payload.user ?? null;
 }
 
 function belongsToUser(post: FeedCard, user: CampusUser) {

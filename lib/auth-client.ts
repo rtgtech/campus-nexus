@@ -1,12 +1,15 @@
 export type CampusAuthUser = {
   userId: string;
   email: string;
-  username?: string | null;
+  username: string;
   name: string;
   dateOfBirth: string;
   department: string;
   yearOfStudy: number;
   initials: string;
+  batchYear?: number | null;
+  lastActiveAt?: string | null;
+  isOnline?: boolean;
 };
 
 export type CampusAuthSession = {

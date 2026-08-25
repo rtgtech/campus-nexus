@@ -8,7 +8,8 @@ import { ClubPostComposer } from "@/components/club-post-composer";
 import { PostDeleteButton } from "@/components/post-delete-button";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
-import { getInitials, type ClubDetailData, type ClubEvent, type ClubMember, type FeedCard } from "@/lib/app-data";
+import { getInitials, type ClubDetailData, type ClubEvent, type ClubMember, type FeedCard, type PostLikeData } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { formatPostTime } from "@/lib/post-time";
 import { cn } from "@/lib/utils";
 
@@ -109,8 +110,9 @@ function ClubHubPostCard({ post, now }: { post: FeedCard; now: number }) {
       if (!response.ok) {
         throw new Error("Like request failed");
       }
-      setLiked(Boolean(data.liked ?? data.likedByCurrentUser ?? nextLiked));
-      setLikes(readMetric(data.likes));
+      const payload = parseApiResponse<PostLikeData>(`/api/posts/${post.postId}/like`, data);
+      setLiked(payload.liked);
+      setLikes(readMetric(payload.likes));
     } catch {
       setLiked(previousLiked);
       setLikes(previousLikes);

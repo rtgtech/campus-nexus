@@ -9,7 +9,7 @@ export default async function ClubsPage() {
 
   return (
     <div className="min-h-screen bg-[#f6f6f3] font-sans">
-      <CampusHeader active="clubs" searchProps={{ placeholder: "Search campus clubs...", types: ["club"] }} />
+      <CampusHeader active="clubs" showSearchBar={false} />
       <CollapsibleSidebar active="clubs" />
       <ClubCatalog clubs={clubsData.clubCards} />
     </div>

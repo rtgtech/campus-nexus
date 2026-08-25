@@ -8,27 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
+import type { NotificationItem, NotificationsData } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { cn } from "@/lib/utils";
-
-type NotificationItem = {
-  id: string;
-  source: "friend" | "club";
-  type: string;
-  title: string;
-  body: string;
-  time: string;
-  href: string;
-  actionLabel: string;
-  iconText: string;
-  iconName: string;
-  unread?: boolean;
-};
-
-type NotificationsResponse = {
-  items: NotificationItem[];
-  total: number;
-  unreadCount: number;
-};
 
 type LoadStatus = "idle" | "loading" | "error";
 
@@ -103,7 +85,7 @@ export function NotificationsButton() {
           throw new Error(typeof data.error === "string" ? data.error : "Notification request failed");
         }
 
-        const payload = data as NotificationsResponse;
+        const payload = parseApiResponse<NotificationsData>("/api/notifications", data);
         setItems(Array.isArray(payload.items) ? payload.items : []);
         setUnreadCount(Number(payload.unreadCount ?? payload.total ?? 0));
         setStatus("idle");

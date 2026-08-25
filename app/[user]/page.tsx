@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { CampusShell } from "@/components/campus-shell";
 import { ProfilePageView, type ProfileClubSummary } from "@/components/profile-page-view";
-import { API_BASE_URL } from "@/lib/campus-api";
+import { getCampusData } from "@/lib/campus-api";
 import {
   getInitials,
   type CampusUser,
@@ -18,36 +18,17 @@ type ProfilePageProps = {
 };
 
 async function fetchApi<T>(path: string, fallback: T, token?: string): Promise<T> {
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      cache: "no-store",
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    if (!response.ok) {
-      return fallback;
-    }
-    return (await response.json()) as T;
-  } catch {
-    return fallback;
-  }
+  return getCampusData(path, fallback, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
 }
 
 async function getProfileOverview(identifier: string, token?: string) {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/users/${encodeURIComponent(identifier)}/profile-overview`,
-      {
-        cache: "no-store",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      },
-    );
-    if (!response.ok) {
-      return null;
-    }
-    return (await response.json()) as ProfileOverviewData;
-  } catch {
-    return null;
-  }
+  return getCampusData<ProfileOverviewData | null>(
+    `/api/users/${encodeURIComponent(identifier)}/profile-overview`,
+    null,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
 }
 
 async function getCurrentUser(token: string | undefined) {

@@ -1,0 +1,82 @@
+{
+  "CampusUser": {
+    "required": ["userId", "name", "username", "email", "dateOfBirth", "yearOfStudy", "department", "initials"],
+    "optional": ["batchYear", "lastActiveAt", "isOnline"]
+  },
+  "FeedCard": {
+    "required": ["postId", "id", "authorId", "author", "clubId", "clubSlug", "type", "postType", "mediaUrl", "mediaUrls", "caption", "likes", "shares", "hashtags", "mentions", "price", "description", "registrationLink", "createdAt", "meta", "title", "body", "image", "tag", "comments", "engagementScore", "likedByCurrentUser", "viewerHasLiked", "savedByCurrentUser", "bookmarkedByCurrentUser", "viewerHasSaved"],
+    "optional": ["feedScore", "rankingSignals"]
+  },
+  "SignalBarItem": {
+    "required": ["id", "title", "link", "position", "createdAt", "updatedAt"],
+    "optional": []
+  },
+  "CampusEvent": {
+    "required": ["id", "title", "link", "type", "date", "place", "createdAt", "updatedAt"],
+    "optional": []
+  },
+  "ClubCard": {
+    "required": ["id", "title", "slug", "description", "status", "icon", "iconBg", "bannerBg", "bannerImage", "extraMembers", "extraMembersClass", "avatars", "statusClass"],
+    "optional": ["followers", "postsCount"]
+  },
+  "ClubMember": {
+    "required": ["id", "clubId", "userId", "title", "createdAt", "user", "name", "username", "email", "initials", "canPost", "canCreateAnnouncement"],
+    "optional": []
+  },
+  "GameCard": {
+    "required": ["id", "title", "image", "online", "rating"],
+    "optional": []
+  },
+  "LeaderboardEntry": {
+    "required": ["rank", "userId", "id", "name", "username", "acronym", "initials", "totalXp"],
+    "optional": []
+  },
+  "MarketplaceItem": {
+    "required": ["id", "postId", "sellerId", "title", "owner", "mode", "category", "condition", "price", "location", "description", "image", "tags", "contact", "preferredExchange", "status", "createdAt"],
+    "optional": []
+  },
+  "MarketplaceSellerSummary": {
+    "required": ["sellerId", "sellerRating", "sellerRatingCount", "successfulTrades"],
+    "optional": []
+  },
+  "Conversation": {
+    "required": ["id", "threadId", "name", "preview", "time", "active", "href", "participants"],
+    "optional": []
+  },
+  "Message": {
+    "required": ["id", "threadId", "side", "text", "time", "status"],
+    "optional": []
+  },
+  "ProfileData": {
+    "required": ["user", "userId", "avatar", "major", "bio", "batchYear", "lastActiveAt", "isOnline", "interests"],
+    "optional": []
+  },
+  "ProfileBadge": {
+    "required": ["id", "name", "icon", "description", "earned", "earnedAt"],
+    "optional": []
+  },
+  "ProfileFriend": {
+    "required": ["userId", "id", "name", "username", "acronym", "initials", "friendshipId", "createdAt"],
+    "optional": []
+  },
+  "NotificationItem": {
+    "required": ["id", "notificationId", "type", "source", "title", "body", "time", "createdAt", "href", "actionLabel", "iconText", "iconName", "isRead", "unread"],
+    "optional": []
+  },
+  "SearchItem": {
+    "required": ["id", "type", "title", "subtitle", "href", "icon"],
+    "optional": ["initials", "userId", "username", "slug", "postId"]
+  },
+  "FriendshipUser": {
+    "required": ["userId", "id", "name", "username", "acronym", "initials", "friendshipId", "createdAt"],
+    "optional": []
+  },
+  "FriendshipRecord": {
+    "required": ["id", "friendshipId", "userAId", "userBId", "weight", "createdAt"],
+    "optional": []
+  },
+  "ClubFollowStatus": {
+    "required": ["clubId", "clubSlug", "userId", "isFollowing", "followers", "postsCount", "follow"],
+    "optional": []
+  }
+}

@@ -150,25 +150,11 @@ After configuring Neo4j, initialize the relationship graph once with `backend\ve
 | `POST` | `/api/auth/login` | Verifies credentials and returns a session token. |
 | `GET` | `/api/auth/me` | Returns the current authenticated user from a bearer token. |
 | `POST` | `/api/auth/logout` | Invalidates the current bearer token. |
-| `GET` | `/api/profile/<user>` | Stored profile data for a user slug, or an empty default profile. |
+| `GET` | `/api/profile/<user>` | Stored profile data for a user identifier, or `404` when unknown. |
 
-CRUD collections support `GET` and `POST`; item endpoints support `GET`, `PATCH`, `PUT`, and `DELETE`.
+Persisted CRUD resources are users, posts, club items and members, game items, marketplace items, message items, and profiles. Direct conversations support create/read/delete; events support create/read/update/delete through their collection and item routes; Signal Bar currently supports create/read/update. See `backend/README.md` for the exact method matrix and authorization rules.
 
-| Collection | Item |
-| --- | --- |
-| `/api/posts` | `/api/posts/<id>` |
-| `/api/feed/trending` | `/api/feed/trending/<id>` |
-| `/api/feed/suggested-people` | `/api/feed/suggested-people/<id>` |
-| `/api/clubs/items` | `/api/clubs/items/<id>` |
-| `/api/clubs/spotlight` | `/api/clubs/spotlight/<id>` |
-| `/api/clubs/stats` | `/api/clubs/stats/<id>` |
-| `/api/games/items` | `/api/games/items/<id>` |
-| `/api/games/top-rated` | `/api/games/top-rated/<id>` |
-| `/api/games/recent-activity` | `/api/games/recent-activity/<id>` |
-| `/api/marketplace/items` | `/api/marketplace/items/<id>` |
-| `/api/messages/conversations` | `/api/messages/conversations/<id>` |
-| `/api/messages/items` | `/api/messages/items/<id>` |
-| `/api/profiles` | `/api/profiles/<user>` |
+The old denormalized trending, suggested-people, spotlight, club-stats, top-rated, and recent-activity routes are compatibility endpoints rather than CRUD resources: collection reads are empty and mutations/item routes return `410`.
 
 ## Onboarding Notes
 

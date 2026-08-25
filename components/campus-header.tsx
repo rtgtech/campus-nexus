@@ -13,9 +13,10 @@ type CampusHeaderProps = {
   contextAction?: ReactNode;
   feedView?: "home" | "discover";
   searchProps?: Pick<HeaderSearchProps, "placeholder" | "types">;
+  showSearchBar?: boolean;
 };
 
-export function CampusHeader({ active, contextAction, feedView = "home", searchProps }: CampusHeaderProps) {
+export function CampusHeader({ active, contextAction, feedView = "home", searchProps, showSearchBar }: CampusHeaderProps) {
   const homeSelected = active === "feed" && feedView === "home";
   const discoverSelected = active === "feed" && feedView === "discover";
 
@@ -57,7 +58,7 @@ export function CampusHeader({ active, contextAction, feedView = "home", searchP
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
-          <HeaderSearch className="hidden md:block" expandable {...searchProps} />
+          {showSearchBar && <HeaderSearch className="hidden md:block" expandable {...searchProps} />}
           {contextAction}
           <Link
             aria-label="Games"

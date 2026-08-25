@@ -18,6 +18,7 @@ import {
   readAuthSession,
   saveAuthSession,
 } from "@/lib/auth-client";
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 type AuthMode = "login" | "signup";
 type AuthStatus = "idle" | "saving" | "success" | "error";
@@ -48,7 +49,7 @@ export default function AuthPage() {
           throw new Error("Stored session expired");
         }
         if (!cancelled) {
-          const data = (await response.json()) as CampusAuthSession;
+          const data = parseApiResponse<CampusAuthSession>("/api/auth/me", await response.json());
           saveAuthSession(data);
           router.replace("/");
         }
@@ -102,12 +103,13 @@ export default function AuthPage() {
         throw new Error(typeof data.error === "string" ? data.error : "Authentication failed");
       }
 
-      saveAuthSession(data as CampusAuthSession);
+      const session = parseApiResponse<CampusAuthSession>(endpoint, data);
+      saveAuthSession(session);
       setStatus("success");
       setMessage(mode === "signup" ? "Account created." : "Signed in.");
       const nextPath = new URLSearchParams(window.location.search).get("next") || "/";
       const safeNextPath = nextPath.startsWith("/") && !nextPath.startsWith("/auth") ? nextPath : "/";
-      window.setTimeout(() => window.location.assign(isAdminUser((data as CampusAuthSession).user) ? "/admin" : safeNextPath), 150);
+      window.setTimeout(() => window.location.assign(isAdminUser(session.user) ? "/admin" : safeNextPath), 150);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Authentication failed");

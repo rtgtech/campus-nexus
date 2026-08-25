@@ -7,6 +7,8 @@ import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
+import type { GameXpData } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { cn } from "@/lib/utils";
 
 type Cell = {
@@ -232,10 +234,11 @@ export default function SudokuPage() {
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "XP save failed");
       }
+      const payload = parseApiResponse<GameXpData>("/api/games/xp", data);
 
       awardedPuzzleIdsRef.current.add(puzzle.id);
       setXpSaveStatus("saved");
-      setXpSaveMessage(`100 XP saved. Total XP: ${data.totalXp ?? XP_PER_PUZZLE}`);
+      setXpSaveMessage(`${payload.awardedXp} XP saved. Total XP: ${payload.totalXp}`);
     } catch (error) {
       setXpSaveStatus("error");
       setXpSaveMessage(error instanceof Error ? error.message : "XP save failed");

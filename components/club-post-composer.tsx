@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
-import { type ClubMember } from "@/lib/app-data";
+import { type ClubMember, type FeedCard } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { isValidExternalHttpUrl } from "@/lib/external-link";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +77,7 @@ export function ClubPostComposer({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Publishing failed");
+      parseApiResponse<FeedCard>("/api/posts", data);
 
       setContent("");
       setAnnouncementLink("");

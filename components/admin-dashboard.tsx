@@ -33,6 +33,7 @@ import {
   type SignalBarItem,
 } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 type AdminTab = "profiles" | "clubs" | "events" | "signals";
 
@@ -117,7 +118,7 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
         if (!response.ok) {
           throw new Error(typeof data.error === "string" ? data.error : "Loading profiles failed");
         }
-        setUsers(Array.isArray(data) ? data : []);
+        setUsers(parseApiResponse<CampusUser[]>("/api/users", data));
         setUsersMessage("");
       })
       .catch((error) => {
@@ -184,6 +185,10 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Role update failed");
       }
+      parseApiResponse<ClubMember>(
+        `/api/clubs/${selectedClub.club.slug}/members/${member.id}`,
+        data,
+      );
 
       setMemberMessage(`${member.name} is now ${title}.`);
       router.refresh();
@@ -271,7 +276,8 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Signal Bar update failed");
       }
-      const saved = data as SignalBarItem;
+      const signalPath = editingSignalId ? `/api/signal-bar/${editingSignalId}` : "/api/signal-bar";
+      const saved = parseApiResponse<SignalBarItem>(signalPath, data);
       if (editingSignalId) {
         setSignalItems((items) => items.map((item) => (item.id === editingSignalId ? saved : item)));
         setSignalMessage("Title updated.");

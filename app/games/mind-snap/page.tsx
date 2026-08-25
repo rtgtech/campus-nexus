@@ -7,6 +7,8 @@ import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
+import type { GameXpData } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { evaluateSelection, type RoundResult } from "@/lib/mind-snap";
 import { cn } from "@/lib/utils";
 
@@ -169,9 +171,10 @@ export default function MindSnapPage() {
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "XP save failed");
       }
+      const payload = parseApiResponse<GameXpData>("/api/games/xp", data);
 
       setXpSaveStatus("saved");
-      setXpSaveMessage(`${earnedXp} XP saved. Total XP: ${data.totalXp ?? earnedXp}`);
+      setXpSaveMessage(`${payload.awardedXp} XP saved. Total XP: ${payload.totalXp}`);
     } catch (error) {
       hasSubmittedXpRef.current = false;
       setXpSaveStatus("error");

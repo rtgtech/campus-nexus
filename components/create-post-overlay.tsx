@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { authFetch } from "@/lib/auth-client";
+import type { FeedCard } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://localhost:5000";
@@ -106,9 +108,11 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
         }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error("Create post failed");
+        throw new Error(typeof data.error === "string" ? data.error : "Create post failed");
       }
+      parseApiResponse<FeedCard>("/api/posts", data);
 
       setStatus("success");
       router.push(returnHref);

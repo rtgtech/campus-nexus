@@ -1,3 +1,5 @@
+import { validateApiResponse } from "@/lib/api-response-contract";
+
 export const API_BASE_URL =
   process.env.CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:5000";
 
@@ -16,7 +18,9 @@ export async function getCampusData<T>(path: string, fallback: T, options: Campu
       throw new Error(`API returned ${response.status}`);
     }
 
-    return (await response.json()) as T;
+    const data: unknown = await response.json();
+    validateApiResponse(path, data);
+    return data as T;
   } catch {
     return fallback;
   }

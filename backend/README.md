@@ -129,24 +129,23 @@ Club creation and club management mutations require this admin account's bearer 
 
 ## CRUD Endpoints
 
-Each collection supports `GET` and `POST`; each item endpoint supports `GET`, `PATCH`, `PUT`, and `DELETE`.
+Persisted resource endpoints expose the following lifecycles:
 
-| Collection | Item |
-| --- | --- |
-| `/api/posts` | `/api/posts/<id>` |
-| `/api/feed/trending` | `/api/feed/trending/<id>` |
-| `/api/feed/suggested-people` | `/api/feed/suggested-people/<id>` |
-| `/api/clubs/items` | `/api/clubs/items/<id>` |
-| `/api/clubs/<slug>/members` | `/api/clubs/<slug>/members/<id>` |
-| `/api/clubs/spotlight` | `/api/clubs/spotlight/<id>` |
-| `/api/clubs/stats` | `/api/clubs/stats/<id>` |
-| `/api/games/items` | `/api/games/items/<id>` |
-| `/api/games/top-rated` | `/api/games/top-rated/<id>` |
-| `/api/games/recent-activity` | `/api/games/recent-activity/<id>` |
-| `/api/marketplace/items` | `/api/marketplace/items/<id>` |
-| `/api/messages/conversations` | `/api/messages/conversations/<id>` |
-| `/api/messages/items` | `/api/messages/items/<id>` |
-| `/api/profiles` | `/api/profiles/<user>` |
+| Resource | Collection methods | Item methods |
+| --- | --- | --- |
+| `/api/users` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
+| `/api/posts` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
+| `/api/clubs/items` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
+| `/api/clubs/<slug>/members` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
+| `/api/games/items` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
+| `/api/marketplace/items` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
+| `/api/messages/conversations` | `GET`, `POST` | `GET`, `DELETE` |
+| `/api/messages/items` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
+| `/api/profiles` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` (resets profile fields) |
+| `/api/events` | `GET`, `POST` | `PATCH`, `DELETE` |
+| `/api/signal-bar` | `GET`, `POST` | `PATCH` |
+
+The former denormalized collections under `/api/feed/trending`, `/api/feed/suggested-people`, `/api/clubs/spotlight`, `/api/clubs/stats`, `/api/games/top-rated`, and `/api/games/recent-activity` are not CRUD resources. Their collection reads return an empty compatibility array and mutations/item routes return `410`.
 
 Compatibility aliases are preserved:
 
@@ -154,7 +153,7 @@ Compatibility aliases are preserved:
 - `POST /api/marketplace` creates a marketplace item.
 - `POST /api/marketplace/items` also creates a marketplace item.
 
-`POST`, `PATCH`, `PUT`, and `DELETE` requests for `/api/clubs`, `/api/clubs/items`, `/api/clubs/spotlight`, and `/api/clubs/stats` require admin access.
+`POST`, `PATCH`, `PUT`, and `DELETE` requests for `/api/clubs` and `/api/clubs/items` require admin access.
 Club member create, update, and delete requests under `/api/clubs/<slug>/members` also require admin access.
 Club posts and announcements use `/api/posts` with `type: 1` or `type: 3` plus `clubSlug` or `clubId`; club leaders can publish both, and admins can grant or revoke a member's post access with `PATCH /api/clubs/<slug>/members/<id>` and `{"canPost": true|false}`.
 Regular posts accept mixed image/MP4 arrays in `mediaUrls`; announcements require exactly one image in `mediaUrls` as their poster.

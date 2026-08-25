@@ -1,5 +1,6 @@
 export type FeedCard = {
   postId?: string;
+  id?: string;
   authorId?: string;
   clubId?: number | null;
   clubSlug?: string | null;
@@ -11,6 +12,7 @@ export type FeedCard = {
   tag: string;
   caption?: string;
   type?: 0 | 1 | 2 | 3;
+  postType?: "normal" | "club_post" | "announcement";
   mediaUrl?: string;
   mediaUrls?: string[];
   likes: string | number;
@@ -22,6 +24,14 @@ export type FeedCard = {
   description?: string | null;
   registrationLink?: string | null;
   createdAt?: string;
+  engagementScore?: number;
+  feedScore?: number;
+  rankingSignals?: {
+    pagerank: number;
+    engagement: number;
+    recency: number;
+    social: number;
+  };
   likedByCurrentUser?: boolean;
   viewerHasLiked?: boolean;
   savedByCurrentUser?: boolean;
@@ -130,6 +140,23 @@ export type FeedData = {
   suggestedPeople: SuggestedPerson[];
 };
 
+export type PostLikeData = {
+  post: FeedCard;
+  postId: string;
+  likes: number;
+  liked: boolean;
+  likedByCurrentUser: boolean;
+};
+
+export type PostSaveData = {
+  post: FeedCard;
+  postId: string;
+  bookmarks: number;
+  saved: boolean;
+  savedByCurrentUser: boolean;
+  bookmarkedByCurrentUser: boolean;
+};
+
 export type SpotlightClub = {
   badge: string;
   badgeFill: boolean;
@@ -178,6 +205,7 @@ export type ClubMember = {
   userId: string;
   title: string;
   createdAt: string;
+  user: CampusUser | null;
   name: string;
   username: string;
   email: string;
@@ -248,8 +276,11 @@ export type GamesData = {
 
 export type LeaderboardEntry = {
   rank: number;
+  id?: string;
   acronym: string;
+  initials?: string;
   name: string;
+  username?: string;
   userId: string;
   totalXp: number;
 };
@@ -258,6 +289,12 @@ export type LeaderboardData = {
   entries: LeaderboardEntry[];
   totalPlayers?: number;
   generatedAt?: string;
+};
+
+export type GameXpData = {
+  userId: string;
+  awardedXp: number;
+  totalXp: number;
 };
 
 export type Conversation = {
@@ -272,13 +309,16 @@ export type Conversation = {
   role?: string;
   unread?: number;
   typing?: boolean;
+  participants: CampusUser[];
 };
 
 export type Message = {
+  id: number;
+  threadId: number;
   side: "left" | "right";
   text: string;
-  time?: string;
-  status?: string;
+  time: string;
+  status: string | null;
 };
 
 export type MessagesData = {
@@ -348,13 +388,106 @@ export type ProfilePreferences = {
 
 export type ProfileFriend = {
   userId: string;
-  id?: string;
+  id: string;
   name: string;
-  username?: string;
+  username: string;
+  initials: string;
+  acronym: string;
+  friendshipId: string;
+  createdAt: string;
+};
+
+export type NotificationItem = {
+  id: string;
+  notificationId: string;
+  type: string;
+  source: "friend" | "club";
+  title: string;
+  body: string;
+  time: string;
+  createdAt: string;
+  href: string;
+  actionLabel: string;
+  iconText: string;
+  iconName: string;
+  isRead: boolean;
+  unread: boolean;
+};
+
+export type NotificationsData = {
+  items: NotificationItem[];
+  total: number;
+  unreadCount: number;
+};
+
+export type SearchKind = "user" | "club" | "post" | "product";
+
+export type SearchItem = {
+  id: string | number;
+  type: SearchKind;
+  title: string;
+  subtitle: string;
+  href: string;
+  icon: string;
   initials?: string;
-  acronym?: string;
-  friendshipId?: string;
-  createdAt?: string;
+  userId?: string;
+  username?: string;
+  slug?: string;
+  postId?: string;
+};
+
+export type SearchData = {
+  query: string;
+  users: SearchItem[];
+  clubs: SearchItem[];
+  posts: SearchItem[];
+  products: SearchItem[];
+};
+
+export type FriendshipUser = {
+  userId: string;
+  id: string;
+  name: string;
+  username: string;
+  acronym: string;
+  initials: string;
+  friendshipId: string;
+  createdAt: string;
+};
+
+export type FriendshipRecord = {
+  id: string;
+  friendshipId: string;
+  userAId: string;
+  userBId: string;
+  weight: number;
+  createdAt: string;
+};
+
+export type FriendshipStatus = {
+  isFriend: boolean;
+  isSelf: boolean;
+  friends: number;
+  friendship: FriendshipRecord | null;
+  friendsList?: FriendshipUser[];
+  mutualsList?: FriendshipUser[];
+};
+
+export type ClubFollowRecord = {
+  id: string;
+  clubId: number;
+  userId: string;
+  createdAt: string;
+};
+
+export type ClubFollowStatus = {
+  clubId: number;
+  clubSlug: string;
+  userId: string;
+  isFollowing: boolean;
+  followers: number;
+  postsCount: number;
+  follow: ClubFollowRecord | null;
 };
 
 export type ProfileData = {

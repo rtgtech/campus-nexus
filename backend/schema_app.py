@@ -1349,9 +1349,11 @@ def make_post(data: dict[str, Any]) -> Post:
     caption = post_caption_from_data(data)
     explicit_hashtags = read_hashtags(get_first(data, "hashtags", "tag"))
     explicit_mentions = read_mentions(get_first(data, "mentions", "taggedPeople"))
-    tags = unique_preserving_order([*explicit_hashtags, *extract_hashtags(caption)])
-    mentions = unique_preserving_order([*explicit_mentions, *extract_mentions(caption)])
-    decorated_caption = " ".join([caption, *tags, *mentions]).strip()
+    caption_hashtags = extract_hashtags(caption)
+    caption_mentions = extract_mentions(caption)
+    appended_hashtags = [tag for tag in explicit_hashtags if tag not in caption_hashtags]
+    appended_mentions = [mention for mention in explicit_mentions if mention not in caption_mentions]
+    decorated_caption = " ".join([caption, *appended_hashtags, *appended_mentions]).strip()
     mediaUrls = read_media_urls(data)
     mediaUrl = mediaUrls[0] if mediaUrls else ""
     code = post_type_code(get_first(data, "type", "postType"), default=0) or 0
@@ -1450,7 +1452,10 @@ def update_post_from_payload(post: Post, data: dict[str, Any]):
         post.mediaUrl = mediaUrls[0] if mediaUrls else None
         post.mediaType = media_kind(post.mediaUrl or "")
     if any(key in data for key in ("caption", "body", "title", "hashtags", "tag", "mentions", "taggedPeople")):
-        post.content = make_post({**post.to_dict(), **data, "authorId": post.authorId}).content
+        caption_data = dict(data)
+        if not any(key in data for key in ("caption", "body", "title")):
+            caption_data["caption"] = post.caption
+        post.content = make_post({**caption_data, "authorId": post.authorId}).content
     if "likes" in data:
         post.likeCount = max(optional_int(data.get("likes")) or 0, 0)
     if "shares" in data:
@@ -1646,7 +1651,20 @@ def create_club_member_resource(club: Club, actor: Optional[AuthUser]):
     db().scalar(select(Club).where(Club.clubId == club.clubId).with_for_update())
     existing = db().scalar(select(ClubMember).where((ClubMember.clubId == club.clubId) & (ClubMember.userId == user.userId)))
     if existing is not None:
-        return jsonify({"error": "user is already a club member"}), 409
+        if existing.status == "active":
+            return jsonify({"error": "user is already a club member"}), 409
+        role_error = club_member_role_error(club, role, existing.clubMemberId)
+        if role_error is not None:
+            return jsonify({"error": role_error}), 409
+        existing.role = role
+        existing.status = "active"
+        existing.canPost = role in CLUB_PUBLISHER_ROLES
+        existing.canCreateAnnouncement = role in CLUB_PUBLISHER_ROLES
+        existing.addedByService = "admin"
+        existing.joinedAt = utcnow()
+        db().commit()
+        db().refresh(existing)
+        return jsonify(serialize_club_member(existing)), 201
     role_error = club_member_role_error(club, role)
     if role_error is not None:
         return jsonify({"error": role_error}), 409
@@ -3246,7 +3264,7 @@ def club_items_collection():
 @app.route("/api/clubs/items/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def club_item(itemId: int):
     club = db().get(Club, itemId)
-    if club is None:
+    if club is None or not club.isActive:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(club.to_dict())
@@ -3323,7 +3341,7 @@ def club_member_item(slug: str, member_id: int):
     if club is None:
         return jsonify({"error": "not found"}), 404
     member = db().get(ClubMember, member_id)
-    if member is None or member.clubId != club.clubId:
+    if member is None or member.clubId != club.clubId or member.status != "active":
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(serialize_club_member(member))
@@ -3401,13 +3419,20 @@ def game_items_collection():
         db().commit()
         db().refresh(item)
         return jsonify(item.to_dict()), 201
-    return jsonify([game.to_dict() for game in db().scalars(select(Game).order_by(Game.createdAt.desc(), Game.gameId.asc())).all()])
+    return jsonify([
+        game.to_dict()
+        for game in db().scalars(
+            select(Game)
+            .where(Game.isActive.is_(True))
+            .order_by(Game.createdAt.desc(), Game.gameId.asc())
+        ).all()
+    ])
 
 
 @app.route("/api/games/items/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
 def game_item(itemId: int):
     item = db().get(Game, itemId)
-    if item is None:
+    if item is None or not item.isActive:
         return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         return jsonify(item.to_dict())
@@ -3549,7 +3574,7 @@ def conversations_collection():
     return jsonify(serialize_conversations(user))
 
 
-@app.route("/api/messages/conversations/<int:itemId>", methods=["GET", "PATCH", "PUT", "DELETE"])
+@app.route("/api/messages/conversations/<int:itemId>", methods=["GET", "DELETE"])
 def conversation_item(itemId: int):
     user = current_auth_user()
     if not isinstance(user, User):
@@ -3583,7 +3608,14 @@ def messages_collection():
         db().add(item)
         db().commit()
         db().refresh(item)
-        return jsonify({"id": item.messageId, "side": "right", "text": item.content or "", "time": utc_isoformat(item.createdAt)}), 201
+        return jsonify({
+            "id": item.messageId,
+            "threadId": item.threadId,
+            "side": "right",
+            "text": item.content or "",
+            "time": utc_isoformat(item.createdAt),
+            "status": None,
+        }), 201
     return jsonify(serialize_messages(user, optional_int(request.args.get("threadId"))))
 
 
@@ -3593,7 +3625,7 @@ def message_item(itemId: int):
     if not isinstance(user, User):
         return jsonify({"error": "unauthorized"}), 401
     item = db().get(ChatMessage, itemId)
-    if item is None or not is_chat_participant(item.threadId, user.userId):
+    if item is None or item.isDeleted or not is_chat_participant(item.threadId, user.userId):
         return jsonify({"error": "not found"}), 404
     if request.method in {"PATCH", "PUT", "DELETE"} and item.senderId != user.userId:
         return jsonify({"error": "only the sender can modify this message"}), 403
@@ -3605,7 +3637,14 @@ def message_item(itemId: int):
         item.content = text_value(get_first(read_json(), "text", "content"), item.content or "")
         db().commit()
         db().refresh(item)
-    return jsonify({"id": item.messageId, "threadId": item.threadId, "side": "right" if item.senderId == user.userId else "left", "text": item.content or "", "time": utc_isoformat(item.createdAt)})
+    return jsonify({
+        "id": item.messageId,
+        "threadId": item.threadId,
+        "side": "right" if item.senderId == user.userId else "left",
+        "text": item.content or "",
+        "time": utc_isoformat(item.createdAt),
+        "status": None,
+    })
 
 
 @app.route("/api/auth/signup", methods=["POST"])

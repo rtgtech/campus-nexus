@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { CampusAuthSession, authFetch, isAdminUser, readAuthSession } from "@/lib/auth-client";
+import type { ClubCard } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://localhost:5000";
@@ -132,10 +134,11 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
         }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
         throw new Error(typeof data.error === "string" ? data.error : "Create club failed");
       }
+      parseApiResponse<ClubCard>("/api/clubs/items", data);
 
       setStatus("success");
       router.push(returnHref);

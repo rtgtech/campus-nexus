@@ -14,12 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { API_BASE_URL, authFetch } from "@/lib/auth-client";
 import type { FeedCard } from "@/lib/app-data";
-
-type SavedPostsResponse = {
-  items?: FeedCard[];
-  total?: number;
-  error?: string;
-};
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 type SavedPostsDialogProps = {
   returnHref?: string;
@@ -34,11 +29,15 @@ export function SavedPostsDialog({ returnHref }: SavedPostsDialogProps) {
     setStatus("loading");
     try {
       const response = await authFetch(`${API_BASE_URL}/api/saved-posts`);
-      const data = (await response.json().catch(() => ({}))) as SavedPostsResponse;
+      const data: unknown = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.error || "Saved posts could not be loaded");
+        const error = typeof data === "object" && data !== null && "error" in data
+          ? String(data.error)
+          : "Saved posts could not be loaded";
+        throw new Error(error);
       }
-      setPosts(Array.isArray(data.items) ? data.items : []);
+      const payload = parseApiResponse<{ items: FeedCard[]; total: number }>("/api/saved-posts", data);
+      setPosts(payload.items);
       setStatus("ready");
     } catch {
       setStatus("error");

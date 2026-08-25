@@ -1,6 +1,6 @@
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { CreateClubOverlay } from "@/components/create-club-overlay";
-import { API_BASE_URL, getCampusData } from "@/lib/campus-api";
+import { getCampusData } from "@/lib/campus-api";
 import {
   fallbackClubs,
   fallbackCampusEventsData,
@@ -20,19 +20,7 @@ function getSearchValue(value: string | string[] | undefined) {
 }
 
 async function getClubDetail(slug: string): Promise<ClubDetailData | null> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/clubs/${encodeURIComponent(slug)}`, {
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    return (await response.json()) as ClubDetailData;
-  } catch {
-    return null;
-  }
+  return getCampusData<ClubDetailData | null>(`/api/clubs/${encodeURIComponent(slug)}`, null);
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {

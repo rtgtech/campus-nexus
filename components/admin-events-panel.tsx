@@ -21,6 +21,7 @@ import { API_BASE_URL, authFetch } from "@/lib/auth-client";
 import { type CampusEvent, type CampusEventType } from "@/lib/app-data";
 import { isValidExternalHttpUrl } from "@/lib/external-link";
 import { cn } from "@/lib/utils";
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 type AdminEventsPanelProps = {
   initialEvents: CampusEvent[];
@@ -116,7 +117,10 @@ export function AdminEventsPanel({ initialEvents }: AdminEventsPanelProps) {
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Event could not be saved");
       }
-      const saved = data as CampusEvent;
+      const saved = parseApiResponse<CampusEvent>(
+        editingId ? `/api/events/${editingId}` : "/api/events",
+        data,
+      );
       setEvents((current) => sortEvents(editingId
         ? current.map((item) => (item.id === editingId ? saved : item))
         : [...current, saved]));

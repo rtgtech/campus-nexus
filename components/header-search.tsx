@@ -9,26 +9,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { API_BASE_URL } from "@/lib/auth-client";
+import type { SearchData, SearchKind } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { cn } from "@/lib/utils";
 
-export type SearchKind = "user" | "club" | "post" | "product";
-
-type SearchItem = {
-  id: string | number;
-  type: SearchKind;
-  title: string;
-  subtitle: string;
-  href: string;
-  icon: string;
-  initials?: string;
-};
-
-type SearchResponse = {
-  users: SearchItem[];
-  clubs: SearchItem[];
-  posts: SearchItem[];
-  products: SearchItem[];
-};
+export type { SearchKind } from "@/lib/app-data";
 
 export type HeaderSearchProps = {
   className?: string;
@@ -37,7 +22,8 @@ export type HeaderSearchProps = {
   types?: SearchKind[];
 };
 
-const emptyResults: SearchResponse = {
+const emptyResults: SearchData = {
+  query: "",
   users: [],
   clubs: [],
   posts: [],
@@ -46,7 +32,11 @@ const emptyResults: SearchResponse = {
 
 const defaultTypes: SearchKind[] = ["user", "club", "post"];
 
-const searchGroupConfig: Array<{ key: keyof SearchResponse; label: string; type: SearchKind }> = [
+const searchGroupConfig: Array<{
+  key: "users" | "clubs" | "posts" | "products";
+  label: string;
+  type: SearchKind;
+}> = [
   { key: "users", label: "People", type: "user" },
   { key: "clubs", label: "Clubs", type: "club" },
   { key: "products", label: "Products", type: "product" },
@@ -60,7 +50,7 @@ const typeMeta: Record<SearchKind, { badge: string; label: string }> = {
   post: { badge: "article", label: "Post" },
 };
 
-function resultGroups(results: SearchResponse, enabledTypes: SearchKind[]) {
+function resultGroups(results: SearchData, enabledTypes: SearchKind[]) {
   return [
     ...searchGroupConfig
       .filter((group) => enabledTypes.includes(group.type))
@@ -76,7 +66,7 @@ export function HeaderSearch({
 }: HeaderSearchProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResponse>(emptyResults);
+  const [results, setResults] = useState<SearchData>(emptyResults);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(!expandable);
@@ -110,13 +100,7 @@ export function HeaderSearch({
         if (!response.ok) {
           throw new Error("Search failed");
         }
-
-        setResults({
-          users: Array.isArray(data.users) ? data.users : [],
-          clubs: Array.isArray(data.clubs) ? data.clubs : [],
-          posts: Array.isArray(data.posts) ? data.posts : [],
-          products: Array.isArray(data.products) ? data.products : [],
-        });
+        setResults(parseApiResponse<SearchData>(`/api/search?${params.toString()}`, data));
         setStatus("idle");
       } catch {
         if (!controller.signal.aborted) {

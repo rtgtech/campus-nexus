@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { API_BASE_URL, authFetch, readAuthSession, type CampusAuthSession } from "@/lib/auth-client";
+import type { ClubFollowStatus } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { cn } from "@/lib/utils";
 
 type ClubFollowButtonProps = {
@@ -13,11 +15,6 @@ type ClubFollowButtonProps = {
   initialFollowers?: number;
   layout?: "card" | "button" | "inline";
   onFollowersChange?: (followers: number) => void;
-};
-
-type ClubFollowStatus = {
-  isFollowing: boolean;
-  followers: number;
 };
 
 function formatCount(value: number | null) {
@@ -65,7 +62,7 @@ export function ClubFollowButton({
           throw new Error(typeof data.error === "string" ? data.error : "Club follow status failed");
         }
 
-        const payload = data as ClubFollowStatus;
+        const payload = parseApiResponse<ClubFollowStatus>(`/api/clubs/${clubSlug}/follow`, data);
         setIsFollowing(Boolean(payload.isFollowing));
         commitFollowers(Number(payload.followers ?? initialFollowers ?? 0));
         setStatus("idle");
@@ -102,7 +99,7 @@ export function ClubFollowButton({
         throw new Error(typeof data.error === "string" ? data.error : "Club follow failed");
       }
 
-      const payload = data as ClubFollowStatus;
+      const payload = parseApiResponse<ClubFollowStatus>(`/api/clubs/${clubSlug}/follow`, data);
       setIsFollowing(Boolean(payload.isFollowing));
       commitFollowers(Number(payload.followers ?? followers ?? 0));
       setStatus("idle");

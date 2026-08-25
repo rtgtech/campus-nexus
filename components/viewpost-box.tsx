@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { PostDeleteButton } from "@/components/post-delete-button";
 import { API_BASE_URL, authFetch } from "@/lib/auth-client";
-import { getInitials, type FeedCard } from "@/lib/app-data";
+import { getInitials, type FeedCard, type PostLikeData } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 type ViewPostBoxProps = {
   postId: string;
@@ -44,7 +45,7 @@ export function ViewPostBox({ postId, returnHref }: ViewPostBoxProps) {
     authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(postId)}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Post not found");
-        return (await response.json()) as FeedCard;
+        return parseApiResponse<FeedCard>(`/api/posts/${postId}`, await response.json());
       })
       .then((data) => {
         if (!active) return;
@@ -79,7 +80,13 @@ export function ViewPostBox({ postId, returnHref }: ViewPostBoxProps) {
       const response = await authFetch(`${API_BASE_URL}/api/posts/${encodeURIComponent(postId)}/like`, {
         method: nextLiked ? "POST" : "DELETE",
       });
-      if (response.ok) return;
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error("Like request failed");
+      const payload = parseApiResponse<PostLikeData>(`/api/posts/${postId}/like`, data);
+      setPost(payload.post);
+      setLiked(payload.liked);
+      setLikeCount(payload.likes);
+      return;
     } catch {
       // Restore the optimistic state below.
     }

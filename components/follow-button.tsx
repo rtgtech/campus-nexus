@@ -9,23 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_BASE_URL, authFetch, type CampusAuthSession, readAuthSession } from "@/lib/auth-client";
+import type { FriendshipStatus, FriendshipUser } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { cn } from "@/lib/utils";
-
-type FriendshipUser = {
-  userId: string;
-  name: string;
-  username?: string | null;
-  acronym?: string;
-  initials?: string;
-};
-
-type FriendshipStatus = {
-  isFriend: boolean;
-  isSelf: boolean;
-  friends: number;
-  friendsList?: FriendshipUser[];
-  mutualsList?: FriendshipUser[];
-};
 
 type FriendButtonProps = {
   targetUserId: string;
@@ -98,7 +84,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Friendship status failed");
       }
-      setFriendship(data as FriendshipStatus);
+      setFriendship(parseApiResponse<FriendshipStatus>(`/api/users/${targetUserId}/friends`, data));
       setStatus("idle");
     } catch (error) {
       if (!signal?.aborted) {
@@ -121,7 +107,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Friends list failed");
       }
-      const payload = data as FriendshipStatus;
+      const payload = parseApiResponse<FriendshipStatus>(`/api/users/${targetUserId}/friends?includeLists=true`, data);
       setFriendship(payload);
       setFriendsList(Array.isArray(payload.friendsList) ? payload.friendsList : []);
       setMutualsList(Array.isArray(payload.mutualsList) ? payload.mutualsList : []);
@@ -172,7 +158,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Friendship action failed");
       }
-      setFriendship(data as FriendshipStatus);
+      setFriendship(parseApiResponse<FriendshipStatus>(`/api/users/${targetUserId}/friends`, data));
       setStatus("idle");
     } catch (error) {
       setStatus("error");
@@ -193,6 +179,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Unfriend failed");
       }
+      parseApiResponse<FriendshipStatus>(`/api/users/${userId}/friends`, data);
       await Promise.all([loadFriendship(), loadFriendLists()]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unfriend failed");

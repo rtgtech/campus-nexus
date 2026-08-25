@@ -16,7 +16,10 @@ import {
   type CampusUser,
   type ClubCard,
   type ClubMember,
+  type Conversation,
   type FeedCard,
+  type FriendshipStatus,
+  type FriendshipUser,
   type LeaderboardEntry,
   type MarketplaceItem,
   type MarketplaceSellerSummary,
@@ -27,28 +30,13 @@ import {
   type ProfilePreferences,
 } from "@/lib/app-data";
 import { formatPostTime } from "@/lib/post-time";
+import { parseApiResponse } from "@/lib/api-response-contract";
 import { cn } from "@/lib/utils";
 
 export type ProfileClubSummary = {
   club: ClubCard;
   membership: ClubMember;
   followers?: number;
-};
-
-type FriendshipUser = {
-  userId: string;
-  name: string;
-  username?: string | null;
-  initials?: string;
-  acronym?: string;
-};
-
-type FriendshipStatus = {
-  isFriend: boolean;
-  isSelf: boolean;
-  friends: number;
-  friendsList?: FriendshipUser[];
-  mutualsList?: FriendshipUser[];
 };
 
 type ProfilePageViewProps = {
@@ -70,6 +58,7 @@ type ProfilePageViewProps = {
 
 type ProfileTab = "posts" | "clubs" | "marketplace" | "settings";
 type RequestStatus = "idle" | "loading" | "saving" | "error";
+type FriendsDialogView = "friends" | "mutuals";
 
 const baseTabs: Array<{ id: ProfileTab; label: string }> = [
   { id: "posts", label: "Posts" },
@@ -182,7 +171,7 @@ export function ProfilePageView({
   const [friendship, setFriendship] = useState<FriendshipStatus | null>(null);
   const [friendStatus, setFriendStatus] = useState<RequestStatus>("loading");
   const [friendMessage, setFriendMessage] = useState("");
-  const [friendsOpen, setFriendsOpen] = useState(false);
+  const [friendsDialogView, setFriendsDialogView] = useState<FriendsDialogView | null>(null);
   const [profile, setProfile] = useState(initialProfile);
   const [editOpen, setEditOpen] = useState(false);
   const [editMajor, setEditMajor] = useState(initialProfile.major);
@@ -218,7 +207,7 @@ export function ProfilePageView({
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Friends could not be loaded");
       }
-      setFriendship(data as FriendshipStatus);
+      setFriendship(parseApiResponse<FriendshipStatus>(`/api/users/${user.userId}/friends?includeLists=true`, data));
       setFriendStatus("idle");
     } catch (error) {
       setFriendStatus("error");
@@ -245,6 +234,7 @@ export function ProfilePageView({
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Friendship action failed");
       }
+      parseApiResponse<FriendshipStatus>(`/api/users/${user.userId}/friends`, data);
       await loadFriendship();
     } catch (error) {
       setFriendStatus("error");
@@ -257,9 +247,11 @@ export function ProfilePageView({
       const response = await authFetch(`${API_BASE_URL}/api/users/${encodeURIComponent(friendId)}/friends`, {
         method: "DELETE",
       });
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error("Unfriend failed");
+        throw new Error(typeof data.error === "string" ? data.error : "Unfriend failed");
       }
+      parseApiResponse<FriendshipStatus>(`/api/users/${friendId}/friends`, data);
       await loadFriendship();
     } catch (error) {
       setFriendMessage(error instanceof Error ? error.message : "Unfriend failed");
@@ -291,8 +283,8 @@ export function ProfilePageView({
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Conversation could not be created");
       }
-      const href = typeof data.href === "string" ? data.href : `/chat?thread=${encodeURIComponent(String(data.threadId ?? data.id))}`;
-      router.push(href);
+      const conversation = parseApiResponse<Conversation>("/api/messages/conversations", data);
+      router.push(conversation.href || `/chat?thread=${encodeURIComponent(String(conversation.threadId ?? conversation.id))}`);
     } catch (error) {
       setMessageStatus("error");
       setMessageError(error instanceof Error ? error.message : "Conversation could not be created");
@@ -321,13 +313,7 @@ export function ProfilePageView({
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Profile update failed");
       }
-      setProfile((current) => ({
-        ...current,
-        major: typeof data.major === "string" ? data.major : editMajor.trim(),
-        bio: typeof data.bio === "string" ? data.bio : editBio.trim(),
-        batchYear: typeof data.batchYear === "number" ? data.batchYear : null,
-        interests: Array.isArray(data.interests) ? data.interests : current.interests,
-      }));
+      setProfile(parseApiResponse<ProfileData>(`/api/profiles/${user.username || user.userId}`, data));
       setEditStatus("idle");
       setEditOpen(false);
     } catch (error) {
@@ -352,7 +338,7 @@ export function ProfilePageView({
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Preferences could not be saved");
       }
-      setPreferences(data as ProfilePreferences);
+      setPreferences(parseApiResponse<ProfilePreferences>(`/api/users/${user.userId}/preferences`, data));
       setPreferencesStatus("idle");
       setPreferencesMessage("Preferences saved.");
       router.refresh();
@@ -365,9 +351,10 @@ export function ProfilePageView({
   const friends = friendship?.friendsList ?? friendsPreview;
   const mutuals = friendship?.mutualsList ?? mutualFriendsPreview;
   const visibleFriendPreview = isSelf ? friends.slice(0, 3) : mutuals.slice(0, 3);
+  const dialogFriends = friendsDialogView === "mutuals" ? mutuals : friends;
   const friendCount = friendship?.friends ?? profileStats.friends;
   const yearLabel = user.yearOfStudy ? `Year ${user.yearOfStudy}` : "Year —";
-  const rankLabel = leaderboardEntry ? `Rank #${leaderboardEntry.rank}` : "Rank —";
+  const rankLabel = leaderboardEntry ? `Rank #${leaderboardEntry.rank}` : "";
   const activityLabel = profile.isOnline
     ? "Active now"
     : profile.lastActiveAt
@@ -391,13 +378,15 @@ export function ProfilePageView({
               <div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h1 className="text-2xl font-bold tracking-[-0.03em] text-[#171717]">{user.name}</h1>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d8d8d2] px-2.5 py-1 font-mono text-[10px] font-bold text-[#454541]">
+                  {leaderboardEntry !== undefined && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d8d8d2] px-2.5 py-1 font-mono text-[10px] font-bold text-[#454541]">
                     <span className="material-symbols-outlined text-[12px]">leaderboard</span>
                     {rankLabel}
                   </span>
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-[#6d6d67]">
-                  {profile.major || user.department || "Department —"} · {yearLabel} · {profile.batchYear ? `Batch ${profile.batchYear}` : "Batch —"}
+                  {profile.major || user.department || "Department —"} · {yearLabel}
                 </p>
                 <p className="mt-2 flex items-center gap-1.5 font-mono text-[10px] uppercase text-[#85857e]">
                   <span className={cn("h-[7px] w-[7px] rounded-full", profile.isOnline ? "bg-emerald-500" : "bg-[#92928b]")} />
@@ -458,13 +447,13 @@ export function ProfilePageView({
 
             {messageError ? <p className="mt-2 text-xs font-semibold text-destructive">{messageError}</p> : null}
 
-            <button className="mt-4 text-left" type="button" onClick={() => setFriendsOpen(true)}>
+            <button className="mt-4 text-left" type="button" onClick={() => setFriendsDialogView("friends")}>
               <strong className="block text-base">{friendCount === undefined ? "—" : friendCount}</strong>
               <span className="text-[10px] text-[#777770]">Friends</span>
             </button>
 
             {!isSelf && mutuals.length > 0 ? (
-              <button className="mt-3 flex items-center gap-2 text-left" type="button" onClick={() => setFriendsOpen(true)}>
+              <button className="mt-3 flex items-center gap-2 text-left" type="button" onClick={() => setFriendsDialogView("mutuals")}>
                 <span className="flex -space-x-1.5">
                   {mutuals.slice(0, 3).map((friend) => (
                     <span key={friend.userId} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[#ededE8] text-[7px] font-bold">
@@ -550,7 +539,11 @@ export function ProfilePageView({
                   {friendStatus === "loading" ? "Loading friends…" : isSelf ? "No friends yet." : "No mutual friends yet."}
                 </p>
               )}
-              <button className="mt-3 text-[10px] font-semibold text-[#5f5f59] underline underline-offset-4" type="button" onClick={() => setFriendsOpen(true)}>
+              <button
+                className="mt-3 text-[10px] font-semibold text-[#5f5f59] underline underline-offset-4"
+                type="button"
+                onClick={() => setFriendsDialogView(isSelf ? "friends" : "mutuals")}
+              >
                 See all
               </button>
             </PlaceholderCard>
@@ -674,15 +667,28 @@ export function ProfilePageView({
         </section>
       ) : null}
 
-      <Dialog open={friendsOpen} onOpenChange={setFriendsOpen}>
-        <DialogContent className="max-w-xl rounded-[12px] p-0">
+      <Dialog
+        open={friendsDialogView !== null}
+        onOpenChange={(open) => {
+          if (!open) setFriendsDialogView(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl rounded-[12px] p-0">
           <DialogHeader className="border-b border-[#e5e5df] p-5 pr-14">
-            <DialogTitle className="text-xl font-bold">{isSelf ? "Friends" : `Friends of ${user.name}`}</DialogTitle>
-            <DialogDescription className="text-xs">{isSelf ? "Your campus connections." : "Friends and mutual connections."}</DialogDescription>
+            <DialogTitle className="text-xl font-bold">
+              {friendsDialogView === "mutuals" ? `Mutual friends with ${user.name}` : isSelf ? "Friends" : `Friends of ${user.name}`}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {friendsDialogView === "mutuals"
+                ? `People you and ${user.name} both know.`
+                : isSelf
+                  ? "Your campus connections."
+                  : `${user.name}'s campus connections.`}
+            </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="p-4">
-              {(isSelf ? friends : mutuals).length > 0 ? (isSelf ? friends : mutuals).map((friend) => (
+              {dialogFriends.length > 0 ? dialogFriends.map((friend) => (
                 <div key={friend.userId} className="flex items-center gap-3 border-b border-[#e8e8e2] py-3 last:border-0">
                   <Link className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[#deded8] bg-[#f3f3ef] text-[10px] font-bold" href={profileHref(friend)}>
                     {friend.initials || friend.acronym || getInitials(friend.name)}
@@ -691,14 +697,16 @@ export function ProfilePageView({
                     <span className="block truncate text-xs font-semibold">{friend.name}</span>
                     <span className="block truncate text-[10px] text-[#777770]">@{friend.username || friend.userId}</span>
                   </Link>
-                  {isSelf ? (
+                  {isSelf && friendsDialogView === "friends" ? (
                     <Button className="rounded-[7px] text-xs" size="sm" type="button" variant="outline" onClick={() => removeFriend(friend.userId)}>
                       Unfriend
                     </Button>
                   ) : null}
                 </div>
               )) : (
-                <p className="rounded-[9px] bg-[#f5f5f1] p-4 text-xs text-[#777770]">No connections to show.</p>
+                <p className="rounded-[9px] bg-[#f5f5f1] p-4 text-xs text-[#777770]">
+                  {friendsDialogView === "mutuals" ? "No mutual friends to show." : "No friends to show."}
+                </p>
               )}
             </div>
           </ScrollArea>
@@ -706,7 +714,7 @@ export function ProfilePageView({
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg rounded-[12px] p-5">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl rounded-[12px] p-5 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Edit profile</DialogTitle>
             <DialogDescription>Update the profile fields currently supported by the API.</DialogDescription>

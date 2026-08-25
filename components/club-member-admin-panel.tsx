@@ -11,6 +11,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Spinner } from "@/components/ui/spinner";
 import { API_BASE_URL, authFetch, isAdminUser, readAuthSession } from "@/lib/auth-client";
 import { type CampusUser } from "@/lib/app-data";
+import { parseApiResponse } from "@/lib/api-response-contract";
 
 type ClubMemberAdminPanelProps = {
   clubSlug: string;
@@ -75,7 +76,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
           throw new Error("User search failed");
         }
 
-        const users = (await response.json()) as CampusUser[];
+        const users = parseApiResponse<CampusUser[]>("/api/users", await response.json());
         setResults(users.filter((user) => !existingUserIds.includes(user.userId)));
         setStatus("idle");
       } catch (error) {
@@ -120,6 +121,7 @@ export function ClubMemberAdminPanel({ clubSlug, existingUserIds, existingTitles
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Add member failed");
       }
+      parseApiResponse(`/api/clubs/${clubSlug}/members`, data);
 
       setStatus("success");
       setMessage(`${selectedUser.name} added.`);
