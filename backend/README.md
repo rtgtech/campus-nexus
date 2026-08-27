@@ -48,28 +48,6 @@ npm run dev:backend
 | `JWT_COOKIE_SECURE` | `0` | Set to `1` when serving the frontend and backend over HTTPS. |
 | `ALLOWED_EMAIL_DOMAINS` | required | Comma-separated signup email domains; entries may optionally include `@` or a sample address. |
 
-## Existing database migration
-
-Apply the camelCase column migration once before deploying this version:
-
-```powershell
-$psqlUrl = $env:DATABASE_URL -replace '^postgresql\+psycopg://', 'postgresql://'
-psql $psqlUrl -v ON_ERROR_STOP=1 -f backend/migrations/001_camel_case_columns.sql
-```
-
-Apply the matching Neo4j property migration with Neo4j Browser or `cypher-shell`:
-
-```powershell
-cypher-shell -f backend/migrations/002_neo4j_camel_case.cypher
-```
-
-Apply the saved-posts migration before deploying the bookmark API:
-
-```powershell
-$psqlUrl = $env:DATABASE_URL -replace '^postgresql\+psycopg://', 'postgresql://'
-psql $psqlUrl -v ON_ERROR_STOP=1 -f backend/migrations/002_saved_posts.postgresql
-```
-
 ## Feed graph maintenance
 
 Neo4j is the friendship source of truth. Bootstrap the graph once to import existing accepted PostgreSQL friendships:
@@ -154,6 +132,7 @@ Compatibility aliases are preserved:
 - `POST /api/marketplace/items` also creates a marketplace item.
 
 `POST`, `PATCH`, `PUT`, and `DELETE` requests for `/api/clubs` and `/api/clubs/items` require admin access.
+Deleting a club permanently removes its club row, memberships, and follows so its name and slug can be reused. Its posts are soft-deleted and existing club chat threads are retained without the deleted club association.
 Club member create, update, and delete requests under `/api/clubs/<slug>/members` also require admin access.
 Club posts and announcements use `/api/posts` with `type: 1` or `type: 3` plus `clubSlug` or `clubId`; club leaders can publish both, and admins can grant or revoke a member's post access with `PATCH /api/clubs/<slug>/members/<id>` and `{"canPost": true|false}`.
 Regular posts accept mixed image/MP4 arrays in `mediaUrls`; announcements require exactly one image in `mediaUrls` as their poster.
@@ -173,20 +152,6 @@ Content-Type: application/json
 
 Only thread participants can read a conversation or create messages in it.
 
-## Schema migration
+## Database schema
 
-New databases can use the root `campus_nexus_schema.sql`. Existing PostgreSQL databases must apply `backend/migrations/001_frontend_api_requirements.postgresql` before starting the updated backend. Startup now validates the required tables, columns, time-zone-aware timestamps, and migration marker instead of attempting to upgrade an existing database with `create_all()`.
-
-The migration is transactional and idempotent. It also repairs databases where SQLAlchemy already created the new tables with naive timestamps, missing server defaults, or missing cascade actions. Apply it with PostgreSQL's client after taking a database backup:
-
-```powershell
-$psqlUrl = $env:DATABASE_URL -replace '^postgresql\+psycopg://', 'postgresql://'
-psql $psqlUrl -v ON_ERROR_STOP=1 -f backend/migrations/001_frontend_api_requirements.postgresql
-```
-
-An opt-in PostgreSQL integration test creates and removes an isolated schema and runs the migration twice. Point it only at a disposable test database:
-
-```powershell
-$env:TEST_POSTGRES_DATABASE_URL="postgresql://user:password@localhost:5432/campus_nexus_test"
-backend\venv\Scripts\python.exe -m unittest backend.tests.test_postgresql_migration -v
-```
+PostgreSQL startup validates the current schema and the `004_department_options` schema marker instead of changing production tables automatically. The historical migration files were retired after the final migration was applied. Provision new databases from a schema-complete backup or an equivalent current-schema export.

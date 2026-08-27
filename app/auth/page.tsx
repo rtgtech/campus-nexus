@@ -19,6 +19,7 @@ import {
   saveAuthSession,
 } from "@/lib/auth-client";
 import { parseApiResponse } from "@/lib/api-response-contract";
+import { CAMPUS_DEPARTMENTS } from "@/lib/departments";
 
 type AuthMode = "login" | "signup";
 type AuthStatus = "idle" | "saving" | "success" | "error";
@@ -269,7 +270,7 @@ export default function AuthPage() {
                     <NativeSelectOption value="" disabled>
                       Select department
                     </NativeSelectOption>
-                    {["CS", "Mech", "ECE", "Electrical"].map((department) => (
+                    {CAMPUS_DEPARTMENTS.map((department) => (
                       <NativeSelectOption key={department} value={department}>
                         {department}
                       </NativeSelectOption>

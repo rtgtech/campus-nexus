@@ -12,11 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { CampusAuthSession, authFetch, isAdminUser, readAuthSession } from "@/lib/auth-client";
 import type { ClubCard } from "@/lib/app-data";
 import { parseApiResponse } from "@/lib/api-response-contract";
+import { shouldCreateClub, type ClubCreationStep } from "@/lib/club-form-intent";
+import { CAMPUS_DEPARTMENTS } from "@/lib/departments";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_CAMPUS_NEXUS_API_URL?.replace(/\/$/, "") ?? "http://localhost:5000";
-
-const departmentOptions = ["CS", "Mech", "ECE", "Electrical"];
 
 function fileToDataUrl(file: File | null) {
   if (!file) {
@@ -34,9 +34,10 @@ function fileToDataUrl(file: File | null) {
 export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: string }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [step, setStep] = useState<"details" | "banner">("details");
+  const createRequestInFlightRef = useRef(false);
+  const [step, setStep] = useState<ClubCreationStep>("details");
   const [clubName, setClubName] = useState("");
-  const [associatedDepartment, setAssociatedDepartment] = useState(departmentOptions[0]);
+  const [associatedDepartment, setAssociatedDepartment] = useState<string>(CAMPUS_DEPARTMENTS[0]);
   const [relatedDepartments, setRelatedDepartments] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -91,16 +92,24 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
     return Boolean(clubName.trim() && associatedDepartment && description.trim());
   }
 
-  const availableRelatedDepartments = departmentOptions.filter(
+  const availableRelatedDepartments = CAMPUS_DEPARTMENTS.filter(
     (department) => department !== associatedDepartment && !relatedDepartments.includes(department),
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!detailStepComplete() || !bannerFile) {
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const submitIntent = submitter instanceof HTMLButtonElement ? submitter.value : "";
+    if (
+      !shouldCreateClub(step, submitIntent) ||
+      createRequestInFlightRef.current ||
+      !detailStepComplete() ||
+      !bannerFile
+    ) {
       return;
     }
 
+    createRequestInFlightRef.current = true;
     setStatus("saving");
     setMessage("");
 
@@ -146,6 +155,8 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Create club failed");
+    } finally {
+      createRequestInFlightRef.current = false;
     }
   }
 
@@ -226,7 +237,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
                         setStatus("idle");
                       }}
                     >
-                      {departmentOptions.map((department) => (
+                      {CAMPUS_DEPARTMENTS.map((department) => (
                         <NativeSelectOption key={department} value={department}>
                           {department}
                         </NativeSelectOption>
@@ -368,7 +379,9 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
                 <Button
                   disabled={status === "saving" || !bannerFile}
                   className="rounded-[3px] px-5"
+                  name="intent"
                   type="submit"
+                  value="create-club"
                 >
                   Create Club
                 </Button>

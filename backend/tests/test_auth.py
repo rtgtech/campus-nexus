@@ -124,6 +124,25 @@ class AuthTest(unittest.TestCase):
         for department in ("Architecture", "Design", "Business", "Civil"):
             self.assertEqual(self.client.post("/api/auth/signup", json={**payload, "department": department}).status_code, 400)
 
+    def test_signup_accepts_aiml_and_information_science_departments(self) -> None:
+        for index, department in enumerate(("AIML", "Information Science"), start=1):
+            response = self.client.post(
+                "/api/auth/signup",
+                headers={"Origin": backend_app.CORS_ORIGIN},
+                json={
+                    "name": f"Department User {index}",
+                    "username": f"department-user-{index}",
+                    "email": f"department-user-{index}@example.edu",
+                    "dateOfBirth": "2000-01-01",
+                    "yearOfStudy": 2,
+                    "department": department,
+                    "password": "secret123",
+                },
+            )
+
+            self.assertEqual(response.status_code, 201, response.get_data(as_text=True))
+            self.assertEqual(response.get_json()["user"]["department"], department)
+
     def test_signup_only_allows_configured_email_domains(self) -> None:
         payload = {
             "name": "Test User",

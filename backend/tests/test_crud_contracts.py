@@ -225,12 +225,53 @@ class CrudContractsTest(unittest.TestCase):
         self.assertEqual(restored.status_code, 201, restored.get_data(as_text=True))
         self.assertEqual(restored.get_json()["id"], member_id)
 
+        duplicate = self.client.post(
+            "/api/clubs/items",
+            json={"title": "CRUD Club", "slug": "another-slug"},
+            headers=self.admin_auth(),
+        )
+        self.assertEqual(duplicate.status_code, 409)
+        self.assertEqual(duplicate.get_json()["error"], "a club with this name already exists")
+
+        with backend_app.SessionLocal() as session:
+            session.add(backend_app.ClubFollower(clubId=club_id, userId=user_id))
+            post = backend_app.Post(
+                authorId=user_id,
+                clubId=club_id,
+                postType="club_post",
+                content="Club update",
+            )
+            thread = backend_app.ChatThread(threadType="club", clubId=club_id)
+            session.add_all([post, thread])
+            session.commit()
+            post_id = post.postId
+            thread_id = thread.threadId
+
         self.assertEqual(
             self.client.delete(f"/api/clubs/items/{club_id}", headers=self.admin_auth()).status_code,
             204,
         )
         self.assertEqual(self.client.get(f"/api/clubs/items/{club_id}").status_code, 404)
         self.assertNotIn(club_id, [item["id"] for item in self.client.get("/api/clubs/items").get_json()])
+
+        with backend_app.SessionLocal() as session:
+            self.assertIsNone(session.get(backend_app.Club, club_id))
+            self.assertEqual(session.query(backend_app.ClubMember).filter_by(clubId=club_id).count(), 0)
+            self.assertEqual(session.query(backend_app.ClubFollower).filter_by(clubId=club_id).count(), 0)
+            deleted_post = session.get(backend_app.Post, post_id)
+            self.assertIsNotNone(deleted_post)
+            self.assertIsNone(deleted_post.clubId)
+            self.assertTrue(deleted_post.isDeleted)
+            self.assertIsNone(session.get(backend_app.ChatThread, thread_id).clubId)
+
+        recreated = self.client.post(
+            "/api/clubs/items",
+            json={"title": "CRUD Club", "slug": "crud-club", "description": "Recreated"},
+            headers=self.admin_auth(),
+        )
+        self.assertEqual(recreated.status_code, 201, recreated.get_data(as_text=True))
+        self.assertEqual(recreated.get_json()["title"], "CRUD Club")
+        self.assertEqual(recreated.get_json()["slug"], "crud-club")
 
     def test_games_complete_create_read_update_and_soft_delete(self) -> None:
         created = self.client.post(

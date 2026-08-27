@@ -1,220 +1,281 @@
 # Campus Nexus
 
-Campus Nexus is a student-focused campus social hub built with a Next.js frontend and a Flask backend backed by PostgreSQL through SQLAlchemy ORM models. It includes a campus feed, club discovery, student marketplace listings, games discovery, chat views, and profile pages.
+Campus Nexus is a campus social platform for student profiles, posts, clubs, events, marketplace listings, games, notifications, and direct messages.
 
-## Quick Start
+The application has three runtime parts:
 
-### Prerequisites
+- Next.js 15 and React 19 frontend at `http://localhost:3000`
+- Flask and SQLAlchemy API at `http://127.0.0.1:5000`
+- PostgreSQL for persistent application data, with Neo4j used for friendships and feed-graph signals
 
-- Node.js 20 or newer
-- npm
-- Python 3.9 or newer
+## Prerequisites
+
+Install these tools before cloning the repository:
+
+- [Git](https://git-scm.com/)
+- Node.js 20 or newer with npm
+- Python 3.10 or newer
 - PostgreSQL 14 or newer
+- Neo4j or AuraDB if friendship and graph-ranking features are required
+- Windows PowerShell for the automated backend startup script
 
-### 1. Install frontend dependencies
+The PostgreSQL database must already contain the current Campus Nexus schema and the `004_department_options` entry in `schema_migrations`. The backend validates this schema but does not create or migrate a blank PostgreSQL database. Obtain a current schema-only dump or database backup from the project maintainer before setting up a new machine.
+
+## Clone and run on Windows
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/rtgtech/campus-nexus.git
+cd campus-nexus
+```
+
+If the repository is private, authenticate with GitHub before cloning or use the configured SSH remote.
+
+### 2. Install frontend dependencies
 
 ```powershell
 npm install
 ```
 
-### 2. Install backend dependencies
+### 3. Prepare PostgreSQL
 
-```powershell
-python -m venv backend\venv
-backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-```
-
-### 3. Run the backend
-
-Create a local database, then edit `backend/.env` if your local database password differs from the default URL.
+Create the database if it does not exist:
 
 ```powershell
 createdb campus_nexus
+```
+
+Restore the current schema or backup supplied by the project maintainer. For a schema SQL file, the command is:
+
+```powershell
+psql -d campus_nexus -v ON_ERROR_STOP=1 -f C:\path\to\campus_nexus_schema.sql
+```
+
+Confirm that the final schema marker exists:
+
+```powershell
+psql -d campus_nexus -c 'SELECT version FROM schema_migrations ORDER BY version;'
+```
+
+The result must include `004_department_options`.
+
+### 4. Configure the backend
+
+Create the local environment file:
+
+```powershell
+Copy-Item backend\.env.example backend\.env
 notepad backend\.env
 ```
+
+At minimum, replace these values:
+
+```dotenv
+DATABASE_URL=postgresql+psycopg://postgres:your-password@localhost:5432/campus_nexus
+JWT_SECRET=replace-with-a-unique-random-secret-of-at-least-32-characters
+ALLOWED_EMAIL_DOMAINS=your-college.edu
+```
+
+If Neo4j is available, also configure:
+
+```dotenv
+NEO4J_URI=neo4j://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your-neo4j-password
+NEO4J_DATABASE=neo4j
+```
+
+Keep `backend/.env` private. It is ignored by Git and must never be committed.
+
+### 5. Start the backend
 
 ```powershell
 npm run dev:backend
 ```
 
-The backend starts on `http://127.0.0.1:5000` by default.
+On its first run, this command:
 
-### 4. Run the frontend
+1. Creates `backend/venv`.
+2. Copies `backend/.env.example` if `backend/.env` is still missing.
+3. Installs the Python packages from `backend/requirements.txt` when required.
+4. Starts Flask at `http://127.0.0.1:5000`.
 
-Open a second terminal:
+Verify the backend from another terminal:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5000/health
+```
+
+A healthy database returns an HTTP `200` response.
+
+### 6. Initialize Neo4j
+
+Skip this step if only the PostgreSQL-backed parts of the app are needed. Without Neo4j, feed requests degrade gracefully, while friendship operations and graph-specific behavior may be unavailable.
+
+For an empty Neo4j database, bootstrap the graph once:
+
+```powershell
+backend\venv\Scripts\python.exe backend\update_feed_graph.py --bootstrap
+```
+
+For later synchronization runs:
+
+```powershell
+backend\venv\Scripts\python.exe backend\update_feed_graph.py
+```
+
+### 7. Start the frontend
+
+Keep the backend running and open a second terminal in the repository root:
 
 ```powershell
 npm run dev
 ```
 
-The frontend starts on `http://localhost:3000` by default.
+Open `http://localhost:3000` in a browser. The authentication page is available at `http://localhost:3000/auth`.
 
-## Common Commands
-
-```powershell
-npm run dev          # Start the Next.js development server
-npm run dev:backend  # Start the Flask backend through backend/run.ps1
-npm run build        # Build the Next.js app
-npm run start        # Start the production Next.js server after a build
-npm run lint         # Run linting if the local Next.js lint command is available
-```
-
-## Environment Variables
-
-The app works with defaults for local development.
-
-| Variable | Used by | Default | Purpose |
-| --- | --- | --- | --- |
-| `CAMPUS_NEXUS_API_URL` | Next.js server components | `http://127.0.0.1:5000` | Backend base URL for server-side data fetches. |
-| `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` | Browser/client components | `http://localhost:5000` | Backend base URL for form submissions from the browser. |
-| `DATABASE_URL` | Flask backend, from `backend/.env` | `postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus` | SQLAlchemy database URL for persisted API data. |
-| `NEO4J_URI` | Flask backend, from `backend/.env` | required | Neo4j or Aura Bolt URI for friendships and feed graph signals. |
-| `NEO4J_USERNAME` | Flask backend, from `backend/.env` | required | Neo4j username. |
-| `NEO4J_PASSWORD` | Flask backend, from `backend/.env` | required | Neo4j password. |
-| `NEO4J_DATABASE` | Flask backend, from `backend/.env` | `neo4j` | Neo4j database name. |
-| `ALLOWED_EMAIL_DOMAINS` | Flask backend, from `backend/.env` | required | Comma-separated email domains accepted at signup. |
-| `PORT` | Flask backend | `5000` | Backend port. |
-| `FLASK_DEBUG` | Flask backend | unset | Set to `1` to enable Flask debug mode. |
-| `CORS_ORIGIN` | Flask backend | `*` | Allowed CORS origin returned by the API. |
-
-Example:
-
-```powershell
-$env:CAMPUS_NEXUS_API_URL="http://127.0.0.1:5000"
-$env:NEXT_PUBLIC_CAMPUS_NEXUS_API_URL="http://localhost:5000"
-```
-
-## Project Structure
-
-```text
-app/                         Next.js App Router pages and global layout
-components/                  Shared UI and overlay components
-lib/                         Frontend helpers, shared types, and empty fallback data
-backend/                     Flask API
-backend/app.py               Flask and SQLAlchemy API implementation
-backend/requirements.txt     Python dependencies
-package.json                 Frontend scripts and dependencies
-```
-
-## Frontend Overview
-
-The frontend uses the Next.js App Router.
-
-| Route | Purpose |
-| --- | --- |
-| `/` | Campus feed and post creation entry point. |
-| `/clubs` | Club discovery and club creation entry point. |
-| `/marketplace` | Student item listings. |
-| `/games` | Game discovery page. |
-| `/chat` | Chat view. |
-| `/messages` | Messages page. |
-| `/club` | Redirects to `/clubs`. |
-| `/auth` | Login and student sign-up page. |
-| `/[user]` | Dynamic profile page. |
-
-Server-rendered pages fetch persisted data through `lib/campus-api.ts`. If the backend is unavailable, pages fall back to empty local data from `lib/app-data.ts` so the app shell still renders without sample content.
-
-Client-side overlays submit directly to the Flask backend:
-
-- `components/create-post-overlay.tsx` posts to `/api/posts`
-- `components/create-club-overlay.tsx` posts to `/api/clubs`
-
-Protected routes are enforced by `middleware.ts`. All app pages except `/auth` require a valid `campusNexusToken` cookie. The login and sign-up page stores the backend token in both `localStorage` and that cookie, and header logout controls clear both stores.
-
-The backend seeds a common development account on startup:
+The local administrator account is:
 
 ```text
 username: admin
 password: 12345678
 ```
 
-## Backend Overview
+These credentials are for local development only and must be changed before any real deployment.
 
-The backend is a Flask app in `backend/app.py`. It exposes JSON endpoints for the frontend, creates missing PostgreSQL tables on startup, and starts content tables empty. The only startup seed is the common `admin` account.
+## macOS and Linux backend setup
 
-After configuring Neo4j, initialize the relationship graph once with `backend\venv\Scripts\python.exe backend\update_feed_graph.py --bootstrap`. Run the same command without `--bootstrap` whenever PostgreSQL-backed graph data and PageRank should be refreshed.
+The provided `npm run dev:backend` command uses the Windows-specific `backend/run.ps1`. On macOS or Linux, prepare and run the backend manually:
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/health` | Backend health check. |
-| `GET` | `/api/feed` | Feed cards, trending topics, and suggested people. |
-| `POST` | `/api/posts` | Creates a persisted feed post. |
-| `GET` | `/api/clubs` | Spotlight clubs, club cards, and club stats. |
-| `POST` | `/api/clubs` | Compatibility alias that creates a persisted club card. |
-| `GET` | `/api/games` | Game cards, top-rated games, and recent activity. |
-| `GET` | `/api/marketplace` | Marketplace listings. |
-| `POST` | `/api/marketplace` | Compatibility alias that creates a persisted marketplace item. |
-| `POST` | `/api/marketplace/items` | Alias for creating a marketplace item. |
-| `GET` | `/api/messages` | Conversations and chat messages. |
-| `POST` | `/api/auth/signup` | Creates a student account and returns a session token. |
-| `POST` | `/api/auth/login` | Verifies credentials and returns a session token. |
-| `GET` | `/api/auth/me` | Returns the current authenticated user from a bearer token. |
-| `POST` | `/api/auth/logout` | Invalidates the current bearer token. |
-| `GET` | `/api/profile/<user>` | Stored profile data for a user identifier, or `404` when unknown. |
+```bash
+python3 -m venv backend/venv
+source backend/venv/bin/activate
+python -m pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env
+python backend/app.py
+```
 
-Persisted CRUD resources are users, posts, club items and members, game items, marketplace items, message items, and profiles. Direct conversations support create/read/delete; events support create/read/update/delete through their collection and item routes; Signal Bar currently supports create/read/update. See `backend/README.md` for the exact method matrix and authorization rules.
+Edit `backend/.env` before the final command. The frontend commands remain the same:
 
-The old denormalized trending, suggested-people, spotlight, club-stats, top-rated, and recent-activity routes are compatibility endpoints rather than CRUD resources: collection reads are empty and mutations/item routes return `410`.
+```bash
+npm install
+npm run dev
+```
 
-## Onboarding Notes
+## Frontend API configuration
 
-Start with these files:
+No frontend environment file is required when the services use their default ports. If the backend is hosted elsewhere, create `.env.local` in the repository root:
 
-1. `app/layout.tsx` for global fonts and app metadata.
-2. `app/page.tsx` for the main feed page pattern.
-3. `lib/campus-api.ts` for server-side backend calls and fallback behavior.
-4. `lib/app-data.ts` for shared frontend payload types and empty fallback data.
-5. `backend/app.py` for API payload shapes, route handlers, and database lifecycle code.
+```dotenv
+CAMPUS_NEXUS_API_URL=http://127.0.0.1:5000
+NEXT_PUBLIC_CAMPUS_NEXUS_API_URL=http://localhost:5000
+```
 
-Important implementation details:
+- `CAMPUS_NEXUS_API_URL` is used by server-rendered Next.js code and middleware.
+- `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` is used by browser-side forms and API clients.
+- `CORS_ORIGIN` in `backend/.env` must match the browser-visible frontend origin exactly.
 
-- Tailwind is compiled locally through `tailwind.config.js`, `postcss.config.js`, and `app/globals.css`.
-- The backend uses SQLAlchemy directly rather than Flask-SQLAlchemy.
-- Route protection validates the browser cookie token against `GET /api/auth/me`.
-- The backend CORS policy defaults to `*` for local development convenience.
-- Fallback frontend data is intentionally empty; real content should come from PostgreSQL through the API.
-- Authentication exists, but no role or permission model has been added yet.
+Restart the frontend after changing `.env.local`.
 
-## Development Workflow
+## Environment variables
 
-For UI work:
+### Backend: `backend/.env`
 
-1. Run the backend and frontend together.
-2. Update or add route files under `app/`.
-3. Keep shared UI behavior in `components/`.
-4. Add or adjust shared payload types and empty fallback shapes in `lib/app-data.ts` when a page should still render without the backend.
-5. Mirror any new API payload shape in `backend/app.py`.
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Yes | Local PostgreSQL URL | SQLAlchemy connection string. |
+| `JWT_SECRET` | Yes | None | JWT signing secret; must contain at least 32 characters. |
+| `ALLOWED_EMAIL_DOMAINS` | Yes | Empty | Comma-separated signup email domains. |
+| `NEO4J_URI` | For graph features | None | Neo4j Bolt URI. |
+| `NEO4J_USERNAME` | For graph features | None | Neo4j username. |
+| `NEO4J_PASSWORD` | For graph features | None | Neo4j password. |
+| `NEO4J_DATABASE` | No | `neo4j` | Neo4j database name. |
+| `PORT` | No | `5000` | Flask API port. |
+| `FLASK_DEBUG` | No | Disabled | Set to `1` for Flask debug mode. |
+| `CORS_ORIGIN` | No | `http://localhost:3000` | Comma-separated frontend origins allowed by the API. |
+| `JWT_EXPIRES_HOURS` | No | `24` | Authentication token lifetime. |
+| `JWT_COOKIE_SECURE` | No | `0` | Set to `1` when using HTTPS. |
 
-For API work:
+### Frontend: `.env.local`
 
-1. Add or update the Flask route in `backend/app.py`.
-2. Keep request parsing defensive; client forms may send empty values.
-3. Return JSON responses with stable property names that match frontend types.
-4. Update this README if a new endpoint, command, or environment variable is added.
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `CAMPUS_NEXUS_API_URL` | No | `http://127.0.0.1:5000` | Server-side API URL. |
+| `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` | No | `http://localhost:5000` | Browser-side API URL. |
 
-## Current Limitations
+## Common commands
 
-- No role or permission model
-- No real-time chat transport
-- No marketplace payment or transaction handling
-- No automated test suite currently defined in `package.json`
+Run these commands from the repository root:
+
+```powershell
+npm run dev
+npm run dev:backend
+npm run build
+npm run start
+node --test lib/post-time.test.mjs
+backend\venv\Scripts\python.exe -m unittest discover -s backend\tests -p "test_*.py"
+```
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Next.js development server. |
+| `npm run dev:backend` | Prepare and start the Flask backend on Windows. |
+| `npm run build` | Create and validate a production frontend build. |
+| `npm run start` | Run the production frontend after a successful build. |
+| `node --test lib/post-time.test.mjs` | Run the focused frontend utility test documented by the project. |
+| `backend\venv\Scripts\python.exe -m unittest discover -s backend\tests -p "test_*.py"` | Run all backend tests. |
+
+## Project structure
+
+```text
+app/                    Next.js App Router pages, layouts, and global CSS
+components/             Reusable React components and UI primitives
+lib/                    Frontend API clients, shared types, and utilities
+backend/                Flask API, SQLAlchemy models, graph integration, and tests
+backend/schema_app.py   Current relational models and API implementation
+backend/graph_store.py  Neo4j persistence operations
+backend/tests/          Python unittest suite
+DATABASE_ERD.md         Mermaid diagrams of the relational schema
+```
+
+See [backend/README.md](backend/README.md) for API endpoints and backend behavior. See [DATABASE_ERD.md](DATABASE_ERD.md) for the current database relationships.
 
 ## Troubleshooting
 
-### Frontend renders fallback data
+### Backend reports that the database schema is not ready
 
-Confirm the backend is running:
+The configured PostgreSQL database is blank, incomplete, or does not record `004_department_options`. Restore a current schema-complete backup and verify that `DATABASE_URL` selects the expected database.
+
+### PostgreSQL authentication fails
+
+Confirm that PostgreSQL is running and that the username, password, host, port, and database in `DATABASE_URL` are correct. Special characters in credentials must be URL-encoded.
+
+### Frontend shows fallback or empty data
+
+Check the backend health endpoint and confirm both frontend API URLs point to Flask. Restart Next.js after changing `.env.local`.
+
+### Browser mutations return a CORS or origin error
+
+Set `CORS_ORIGIN` to the exact frontend origin, normally `http://localhost:3000`, and restart Flask.
+
+### Friendship operations return `503`
+
+Confirm Neo4j is running, verify all `NEO4J_*` values, and bootstrap or synchronize the graph.
+
+### PowerShell blocks the backend script
+
+Run the script directly with the same execution-policy override used by npm:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5000/health
+powershell -NoProfile -ExecutionPolicy Bypass -File backend\run.ps1
 ```
 
-If the backend runs on another port, set `CAMPUS_NEXUS_API_URL` and `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL`.
+## Production notes
 
-### Browser form submissions fail
-
-Check that `NEXT_PUBLIC_CAMPUS_NEXUS_API_URL` points to the Flask backend and that the backend terminal is still running.
-
-### Backend cannot connect to PostgreSQL
-
-Confirm PostgreSQL is running, the `campus_nexus` database exists, and `DATABASE_URL` matches your local username, password, host, port, and database name.
+- Replace the development administrator password before deployment.
+- Use a unique, randomly generated `JWT_SECRET` containing at least 32 characters.
+- Set `JWT_COOKIE_SECURE=1` behind HTTPS.
+- Restrict `CORS_ORIGIN` to trusted frontend origins.
+- Keep PostgreSQL, Neo4j, `.env`, backups, and credentials outside version control.
+- Run `npm run build` and the backend test suite before deploying.

@@ -29,6 +29,7 @@ from sqlalchemy import (
     inspect,
     select,
     text as sql_text,
+    update,
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
@@ -102,7 +103,7 @@ CLUB_MEMBER_ROLES = {"president", "vice_president", "chairman", "vice_chairman",
 SINGLE_CLUB_MEMBER_ROLES = CLUB_MEMBER_ROLES - {"member"}
 CLUB_PUBLISHER_ROLES = {"president", "chairman", "secretary"}
 CLUB_POST_TYPES = {"club_post", "announcement"}
-DEPARTMENTS = {"CS", "Mech", "ECE", "Electrical"}
+DEPARTMENTS = {"CS", "Mech", "ECE", "Electrical", "AIML", "Information Science"}
 PROFILE_VISIBILITY_VALUES = {"private", "friends", "campus"}
 SIGNAL_TITLE_MAX_LENGTH = 160
 SIGNAL_LINK_MAX_LENGTH = 2048
@@ -112,7 +113,7 @@ EVENT_PLACE_MAX_LENGTH = 200
 EVENT_TYPES = {"Competition", "Workshop", "Alumni Talk"}
 LAST_ACTIVE_WRITE_INTERVAL = timedelta(minutes=5)
 ONLINE_WINDOW = timedelta(minutes=5)
-REQUIRED_SCHEMA_VERSION = "003_campus_events"
+REQUIRED_SCHEMA_VERSION = "004_department_options"
 REQUIRED_SCHEMA_COLUMNS = {
     "users": {"lastActiveAt"},
     "user_interests": {"userId", "interest", "createdAt"},
@@ -205,7 +206,10 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("semester IS NULL OR semester BETWEEN 1 AND 4", name="ck_users_year"),
-        CheckConstraint("department IS NULL OR department IN ('CS', 'Mech', 'ECE', 'Electrical')", name="ck_users_department"),
+        CheckConstraint(
+            "department IS NULL OR department IN ('CS', 'Mech', 'ECE', 'Electrical', 'AIML', 'Information Science')",
+            name="ck_users_department",
+        ),
     )
 
     userId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -409,7 +413,7 @@ class ClubMember(Base):
     __table_args__ = (UniqueConstraint("clubId", "userId", name="uq_club_members_club_user"),)
 
     clubMemberId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    clubId: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.clubId"), index=True, nullable=False)
+    clubId: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.clubId", ondelete="CASCADE"), index=True, nullable=False)
     userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
     role: Mapped[str] = mapped_column(Text, default="member", nullable=False)
     canPost: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -440,7 +444,7 @@ class ClubMember(Base):
 class ClubFollower(Base):
     __tablename__ = "club_followers"
 
-    clubId: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.clubId"), primary_key=True)
+    clubId: Mapped[int] = mapped_column(Integer, ForeignKey("clubs.clubId", ondelete="CASCADE"), primary_key=True)
     userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), primary_key=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
@@ -462,7 +466,7 @@ class Post(Base):
 
     postId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     authorId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
-    clubId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.clubId"), index=True, nullable=True)
+    clubId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("clubs.clubId", ondelete="SET NULL"), index=True, nullable=True)
     postType: Mapped[str] = mapped_column(Text, default="normal", nullable=False)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     mediaUrl: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -840,9 +844,7 @@ def ensure_database_initialized() -> None:
                 detail = "; ".join(issues)
                 raise DatabaseSchemaError(
                     f"Database schema is not ready: {detail}. "
-                    "Apply backend/migrations/001_frontend_api_requirements.postgresql and "
-                    "backend/migrations/002_saved_posts.postgresql and "
-                    "backend/migrations/003_campus_events.postgresql."
+                    "Provision a database containing the current schema before starting the backend."
                 )
         _database_initialized = True
 
@@ -3250,8 +3252,17 @@ def create_club_alias():
     if admin_error is not None:
         return admin_error
     item = make_club_card(read_json())
+    if not item.name:
+        return jsonify({"error": "club name is required"}), 400
+    existing = db().scalar(select(Club).where(func.lower(Club.name) == item.name.lower()))
+    if existing is not None:
+        return jsonify({"error": "a club with this name already exists"}), 409
     db().add(item)
-    db().commit()
+    try:
+        db().commit()
+    except IntegrityError:
+        db().rollback()
+        return jsonify({"error": "a club with this name or slug already exists"}), 409
     db().refresh(item)
     return jsonify(item.to_dict()), 201
 
@@ -3272,7 +3283,13 @@ def club_item(itemId: int):
     if admin_error is not None:
         return admin_error
     if request.method == "DELETE":
-        club.isActive = False
+        db().execute(
+            update(Post)
+            .where(Post.clubId == club.clubId)
+            .values(clubId=None, isDeleted=True, updatedAt=utcnow())
+        )
+        db().execute(update(ChatThread).where(ChatThread.clubId == club.clubId).values(clubId=None))
+        db().delete(club)
         db().commit()
         return ("", 204)
     data = read_json()
