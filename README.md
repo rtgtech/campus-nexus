@@ -19,7 +19,7 @@ Install these tools before cloning the repository:
 - Neo4j or AuraDB if friendship and graph-ranking features are required
 - Windows PowerShell for the automated backend startup script
 
-The PostgreSQL database must already contain the current Campus Nexus schema and the `004_department_options` entry in `schema_migrations`. The backend validates this schema but does not create or migrate a blank PostgreSQL database. Obtain a current schema-only dump or database backup from the project maintainer before setting up a new machine.
+The repository includes the complete current PostgreSQL baseline in `campus_nexus_schema.sql`. The backend validates this schema but does not create or migrate a blank PostgreSQL database automatically.
 
 ## Clone and run on Windows
 
@@ -46,11 +46,13 @@ Create the database if it does not exist:
 createdb campus_nexus
 ```
 
-Restore the current schema or backup supplied by the project maintainer. For a schema SQL file, the command is:
+Load the authoritative schema included with the repository:
 
 ```powershell
-psql -d campus_nexus -v ON_ERROR_STOP=1 -f C:\path\to\campus_nexus_schema.sql
+psql -d campus_nexus -v ON_ERROR_STOP=1 -f .\campus_nexus_schema.sql
 ```
+
+The baseline creates all application tables, relationships, indexes, constraints, sequences, and the required final schema marker. It contains no users, passwords, credentials, or application data. Apply it only to a new empty database.
 
 Confirm that the final schema marker exists:
 
@@ -236,6 +238,7 @@ backend/                Flask API, SQLAlchemy models, graph integration, and tes
 backend/schema_app.py   Current relational models and API implementation
 backend/graph_store.py  Neo4j persistence operations
 backend/tests/          Python unittest suite
+campus_nexus_schema.sql Authoritative PostgreSQL schema for a fresh database
 DATABASE_ERD.md         Mermaid diagrams of the relational schema
 ```
 
@@ -245,7 +248,7 @@ See [backend/README.md](backend/README.md) for API endpoints and backend behavio
 
 ### Backend reports that the database schema is not ready
 
-The configured PostgreSQL database is blank, incomplete, or does not record `004_department_options`. Restore a current schema-complete backup and verify that `DATABASE_URL` selects the expected database.
+The configured PostgreSQL database is blank, incomplete, or does not record `004_department_options`. For a new empty database, apply `campus_nexus_schema.sql`. For a populated database, restore a compatible backup instead of applying the baseline over existing tables. Verify that `DATABASE_URL` selects the expected database.
 
 ### PostgreSQL authentication fails
 

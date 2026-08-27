@@ -154,4 +154,4 @@ Only thread participants can read a conversation or create messages in it.
 
 ## Database schema
 
-PostgreSQL startup validates the current schema and the `004_department_options` schema marker instead of changing production tables automatically. The historical migration files were retired after the final migration was applied. Provision new databases from a schema-complete backup or an equivalent current-schema export.
+PostgreSQL startup validates the current schema and the `004_department_options` schema marker instead of changing production tables automatically. Historical migrations have been consolidated into the root `campus_nexus_schema.sql` baseline. Apply that file once to a new empty database; use a compatible backup for databases that already contain data.

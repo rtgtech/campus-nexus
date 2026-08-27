@@ -43,4 +43,8 @@ Thumbs.db
 backend/__pycache__
 backend/venv
 
+# Keep the consolidated database baseline versioned even when a developer's
+# global or repository-local excludes ignore SQL files.
+!campus_nexus_schema.sql
+
 **/__pycache__
