@@ -1,6 +1,6 @@
 # Campus Nexus Backend
 
-Flask API for the local Campus Nexus app, backed by SQLAlchemy ORM models and PostgreSQL. The aggregate endpoints keep the response shapes used by the Next.js frontend, while collection endpoints expose CRUD access to the persisted rows.
+Flask API for the local Campus Nexus app, backed by SQLAlchemy ORM models and SQLite. The aggregate endpoints keep the response shapes used by the Next.js frontend, while collection endpoints expose CRUD access to the persisted rows.
 
 ## Setup
 
@@ -9,19 +9,13 @@ python -m venv backend\venv
 backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
-Create a local PostgreSQL database:
-
-```powershell
-createdb campus_nexus
-```
-
-The repo includes `backend/.env` for local development. Edit it if your local database password differs from the default URL:
+The repo includes `backend/.env` for local development. Edit it to configure authentication, allowed email domains, or an optional custom SQLite path:
 
 ```powershell
 notepad backend\.env
 ```
 
-The backend explicitly loads `backend/.env`, creates missing tables on startup, and leaves content tables empty. The only startup seed is the common development account.
+The backend explicitly loads `backend/.env`, creates `backend/campus_nexus.db` and any missing tables on startup, and leaves content tables empty. The development administrator identity is handled by the application and is not a persisted seed row.
 
 ## Run
 
@@ -35,7 +29,7 @@ npm run dev:backend
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | `postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus` | SQLAlchemy database URL loaded from `backend/.env`. |
+| `DATABASE_URL` | `backend/campus_nexus.db` | Optional SQLite SQLAlchemy URL loaded from `backend/.env`. |
 | `NEO4J_URI` | required | Neo4j or Aura Bolt URI. |
 | `NEO4J_USERNAME` | required | Neo4j username. |
 | `NEO4J_PASSWORD` | required | Neo4j password. |
@@ -50,13 +44,13 @@ npm run dev:backend
 
 ## Feed graph maintenance
 
-Neo4j is the friendship source of truth. Bootstrap the graph once to import existing accepted PostgreSQL friendships:
+Neo4j is the friendship source of truth. Bootstrap the graph once to import existing accepted SQLite friendships:
 
 ```powershell
 backend\venv\Scripts\python.exe backend\update_feed_graph.py --bootstrap
 ```
 
-Run the normal update whenever PostgreSQL-backed users, clubs, memberships, followers, relationship weights, and PageRank should be reconciled:
+Run the normal update whenever SQLite-backed users, clubs, memberships, followers, relationship weights, and PageRank should be reconciled:
 
 ```powershell
 backend\venv\Scripts\python.exe backend\update_feed_graph.py
@@ -81,6 +75,7 @@ Friend and unfriend requests update Neo4j immediately. Other graph topology chan
 | `GET` | `/api/signal-bar` | Ordered Signal Bar titles and links. |
 | `POST` | `/api/signal-bar` | Create a Signal Bar item (admin only). |
 | `PATCH` | `/api/signal-bar/<id>` | Update a Signal Bar item (admin only). |
+| `DELETE` | `/api/signal-bar/<id>` | Delete a Signal Bar item (admin only). |
 | `GET` | `/api/users/<identifier>/profile-overview` | Consolidated profile, stats, badges, clubs, marketplace trust, and owner preferences. |
 | `GET` | `/api/users/<identifier>/clubs` | Club memberships and owner-only followed clubs. |
 | `GET` | `/api/users/<identifier>/badges` | Earned and locked badge definitions. |
@@ -121,7 +116,7 @@ Persisted resource endpoints expose the following lifecycles:
 | `/api/messages/items` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` |
 | `/api/profiles` | `GET`, `POST` | `GET`, `PATCH`, `PUT`, `DELETE` (resets profile fields) |
 | `/api/events` | `GET`, `POST` | `PATCH`, `DELETE` |
-| `/api/signal-bar` | `GET`, `POST` | `PATCH` |
+| `/api/signal-bar` | `GET`, `POST` | `PATCH`, `DELETE` |
 
 The former denormalized collections under `/api/feed/trending`, `/api/feed/suggested-people`, `/api/clubs/spotlight`, `/api/clubs/stats`, `/api/games/top-rated`, and `/api/games/recent-activity` are not CRUD resources. Their collection reads return an empty compatibility array and mutations/item routes return `410`.
 
@@ -154,4 +149,4 @@ Only thread participants can read a conversation or create messages in it.
 
 ## Database schema
 
-PostgreSQL startup validates the current schema and the `004_department_options` schema marker instead of changing production tables automatically. Historical migrations have been consolidated into the root `campus_nexus_schema.sql` baseline. Apply that file once to a new empty database; use a compatible backup for databases that already contain data.
+SQLite startup creates any missing tables directly from the SQLAlchemy metadata. The root `campus_nexus_schema.sql` file is a structure-only SQLite reference baseline; it contains no application data or migration marker.

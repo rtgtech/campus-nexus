@@ -6,7 +6,7 @@ The application has three runtime parts:
 
 - Next.js 15 and React 19 frontend at `http://localhost:3000`
 - Flask and SQLAlchemy API at `http://127.0.0.1:5000`
-- PostgreSQL for persistent application data, with Neo4j used for friendships and feed-graph signals
+- SQLite for persistent application data, with Neo4j used for friendships and feed-graph signals
 
 ## Prerequisites
 
@@ -15,11 +15,10 @@ Install these tools before cloning the repository:
 - [Git](https://git-scm.com/)
 - Node.js 20 or newer with npm
 - Python 3.10 or newer
-- PostgreSQL 14 or newer
 - Neo4j or AuraDB if friendship and graph-ranking features are required
 - Windows PowerShell for the automated backend startup script
 
-The repository includes the complete current PostgreSQL baseline in `campus_nexus_schema.sql`. The backend validates this schema but does not create or migrate a blank PostgreSQL database automatically.
+The backend creates `backend/campus_nexus.db` and any missing tables automatically. The repository also includes the structure-only SQLite baseline in `campus_nexus_schema.sql` for reference.
 
 ## Clone and run on Windows
 
@@ -38,29 +37,9 @@ If the repository is private, authenticate with GitHub before cloning or use the
 npm install
 ```
 
-### 3. Prepare PostgreSQL
+### 3. Prepare SQLite
 
-Create the database if it does not exist:
-
-```powershell
-createdb campus_nexus
-```
-
-Load the authoritative schema included with the repository:
-
-```powershell
-psql -d campus_nexus -v ON_ERROR_STOP=1 -f .\campus_nexus_schema.sql
-```
-
-The baseline creates all application tables, relationships, indexes, constraints, sequences, and the required final schema marker. It contains no users, passwords, credentials, or application data. Apply it only to a new empty database.
-
-Confirm that the final schema marker exists:
-
-```powershell
-psql -d campus_nexus -c 'SELECT version FROM schema_migrations ORDER BY version;'
-```
-
-The result must include `004_department_options`.
+No database service or manual schema command is required. On first backend startup, Campus Nexus creates `backend/campus_nexus.db` from the SQLAlchemy models. The database and its journal files are ignored by Git.
 
 ### 4. Configure the backend
 
@@ -74,10 +53,11 @@ notepad backend\.env
 At minimum, replace these values:
 
 ```dotenv
-DATABASE_URL=postgresql+psycopg://postgres:your-password@localhost:5432/campus_nexus
 JWT_SECRET=replace-with-a-unique-random-secret-of-at-least-32-characters
 ALLOWED_EMAIL_DOMAINS=your-college.edu
 ```
+
+`DATABASE_URL` is optional. To keep the SQLite file elsewhere, set an SQLite URL such as `sqlite:///D:/data/campus_nexus.db`. PostgreSQL URLs are rejected.
 
 If Neo4j is available, also configure:
 
@@ -101,7 +81,8 @@ On its first run, this command:
 1. Creates `backend/venv`.
 2. Copies `backend/.env.example` if `backend/.env` is still missing.
 3. Installs the Python packages from `backend/requirements.txt` when required.
-4. Starts Flask at `http://127.0.0.1:5000`.
+4. Creates or opens `backend/campus_nexus.db` and ensures its tables exist.
+5. Starts Flask at `http://127.0.0.1:5000`.
 
 Verify the backend from another terminal:
 
@@ -113,7 +94,7 @@ A healthy database returns an HTTP `200` response.
 
 ### 6. Initialize Neo4j
 
-Skip this step if only the PostgreSQL-backed parts of the app are needed. Without Neo4j, feed requests degrade gracefully, while friendship operations and graph-specific behavior may be unavailable.
+Skip this step if only the SQLite-backed parts of the app are needed. Without Neo4j, feed requests degrade gracefully, while friendship operations and graph-specific behavior may be unavailable.
 
 For an empty Neo4j database, bootstrap the graph once:
 
@@ -186,7 +167,7 @@ Restart the frontend after changing `.env.local`.
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | Yes | Local PostgreSQL URL | SQLAlchemy connection string. |
+| `DATABASE_URL` | No | `backend/campus_nexus.db` | Optional SQLite SQLAlchemy URL. |
 | `JWT_SECRET` | Yes | None | JWT signing secret; must contain at least 32 characters. |
 | `ALLOWED_EMAIL_DOMAINS` | Yes | Empty | Comma-separated signup email domains. |
 | `NEO4J_URI` | For graph features | None | Neo4j Bolt URI. |
@@ -238,7 +219,7 @@ backend/                Flask API, SQLAlchemy models, graph integration, and tes
 backend/schema_app.py   Current relational models and API implementation
 backend/graph_store.py  Neo4j persistence operations
 backend/tests/          Python unittest suite
-campus_nexus_schema.sql Authoritative PostgreSQL schema for a fresh database
+campus_nexus_schema.sql Structure-only SQLite schema reference
 DATABASE_ERD.md         Mermaid diagrams of the relational schema
 ```
 
@@ -246,13 +227,13 @@ See [backend/README.md](backend/README.md) for API endpoints and backend behavio
 
 ## Troubleshooting
 
-### Backend reports that the database schema is not ready
+### Backend rejects `DATABASE_URL`
 
-The configured PostgreSQL database is blank, incomplete, or does not record `004_department_options`. For a new empty database, apply `campus_nexus_schema.sql`. For a populated database, restore a compatible backup instead of applying the baseline over existing tables. Verify that `DATABASE_URL` selects the expected database.
+Remove an old PostgreSQL URL from `backend/.env`, or replace it with an SQLite URL. When the variable is unset, the backend uses `backend/campus_nexus.db`.
 
-### PostgreSQL authentication fails
+### SQLite reports that the database is locked
 
-Confirm that PostgreSQL is running and that the username, password, host, port, and database in `DATABASE_URL` are correct. Special characters in credentials must be URL-encoded.
+Stop duplicate backend processes and confirm the account running Flask can write to `backend/` or to the directory containing the configured database. SQLite uses WAL mode and waits up to 30 seconds for competing writes.
 
 ### Frontend shows fallback or empty data
 
@@ -280,5 +261,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File backend\run.ps1
 - Use a unique, randomly generated `JWT_SECRET` containing at least 32 characters.
 - Set `JWT_COOKIE_SECURE=1` behind HTTPS.
 - Restrict `CORS_ORIGIN` to trusted frontend origins.
-- Keep PostgreSQL, Neo4j, `.env`, backups, and credentials outside version control.
+- Keep SQLite database files, Neo4j data, `.env`, backups, and credentials outside version control.
 - Run `npm run build` and the backend test suite before deploying.

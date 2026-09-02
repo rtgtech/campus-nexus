@@ -90,6 +90,7 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
   const [signalItems, setSignalItems] = useState<SignalBarItem[]>(() => initialSignalItems.map((item) => ({ ...item })));
   const [signalFormOpen, setSignalFormOpen] = useState(false);
   const [signalSaving, setSignalSaving] = useState(false);
+  const [deletingSignalId, setDeletingSignalId] = useState<string | null>(null);
   const [editingSignalId, setEditingSignalId] = useState<string | null>(null);
   const [signalTitle, setSignalTitle] = useState("");
   const [signalLink, setSignalLink] = useState("");
@@ -294,6 +295,34 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
       setSignalMessage(error instanceof Error ? error.message : "Signal Bar update failed");
     } finally {
       setSignalSaving(false);
+    }
+  }
+
+  async function deleteSignal(signal: SignalBarItem) {
+    setDeletingSignalId(signal.id);
+    setSignalMessage("");
+    try {
+      const response = await authFetch(
+        `${API_BASE_URL}/api/signal-bar/${encodeURIComponent(signal.id)}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(typeof data.error === "string" ? data.error : "Signal Bar title could not be deleted");
+      }
+      setSignalItems((items) => items.filter((item) => item.id !== signal.id));
+      if (editingSignalId === signal.id) {
+        setEditingSignalId(null);
+        setSignalTitle("");
+        setSignalLink("");
+        setSignalFormOpen(false);
+      }
+      setSignalMessage("Title deleted.");
+      router.refresh();
+    } catch (error) {
+      setSignalMessage(error instanceof Error ? error.message : "Signal Bar title could not be deleted");
+    } finally {
+      setDeletingSignalId(null);
     }
   }
 
@@ -673,9 +702,39 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
                         {signal.title}
                       </a>
                       <span className="min-w-0 truncate font-mono text-xs text-on-surface-variant">{signal.link}</span>
-                      <Button className="w-fit rounded-[3px]" size="sm" type="button" variant="outline" onClick={() => beginEditSignal(signal)}>
-                        Edit
-                      </Button>
+                      <div className="flex w-fit items-center gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger
+                            render={
+                              <Button
+                                aria-label={`Delete ${signal.title}`}
+                                className="size-8 rounded-[3px] border border-red-300 p-0 text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
+                                disabled={deletingSignalId === signal.id}
+                                size="icon-sm"
+                                type="button"
+                                variant="ghost"
+                              />
+                            }
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete {signal.title}?</AlertDialogTitle>
+                              <AlertDialogDescription>This removes the title from the Signal Bar.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction variant="destructive" onClick={() => void deleteSignal(signal)}>
+                                Delete title
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                        <Button className="rounded-[3px]" size="sm" type="button" variant="outline" onClick={() => beginEditSignal(signal)}>
+                          Edit
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

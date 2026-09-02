@@ -26,11 +26,11 @@ from sqlalchemy import (
     delete,
     event,
     func,
-    inspect,
     select,
     text as sql_text,
     update,
 )
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -84,7 +84,8 @@ ALLOWED_EMAIL_DOMAINS = frozenset(
     if entry.strip()
 )
 
-DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/campus_nexus"
+DEFAULT_DATABASE_PATH = BACKEND_DIR / "campus_nexus.db"
+DEFAULT_DATABASE_URL = f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
 PROFILE_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='64' fill='%23e9e7f3'/%3E%3Ccircle cx='64' cy='48' r='24' fill='%23777d86'/%3E%3Cpath d='M24 116c6-27 22-41 40-41s34 14 40 41' fill='%23777d86'/%3E%3C/svg%3E"
 
 DEFAULT_ADMIN_USER = {
@@ -113,44 +114,6 @@ EVENT_PLACE_MAX_LENGTH = 200
 EVENT_TYPES = {"Competition", "Workshop", "Alumni Talk"}
 LAST_ACTIVE_WRITE_INTERVAL = timedelta(minutes=5)
 ONLINE_WINDOW = timedelta(minutes=5)
-REQUIRED_SCHEMA_VERSION = "004_department_options"
-REQUIRED_SCHEMA_COLUMNS = {
-    "users": {"lastActiveAt"},
-    "user_interests": {"userId", "interest", "createdAt"},
-    "user_preferences": {
-        "userId",
-        "notifyOfficial",
-        "notifyDepartment",
-        "notifyClub",
-        "notifyStudent",
-        "notifyExternal",
-        "profileVisibility",
-        "eventHistoryVisibility",
-        "marketplaceActivityVisibility",
-        "createdAt",
-        "updatedAt",
-    },
-    "badges": {"badgeId", "name", "icon", "isActive", "createdAt"},
-    "user_badges": {"userId", "badgeId", "earnedAt"},
-    "signal_bar_items": {"signalBarItemId", "title", "link", "position", "createdAt", "updatedAt"},
-    "marketplace_trades": {"tradeId", "itemId", "sellerId", "buyerId", "status", "completedAt"},
-    "marketplace_reviews": {"reviewId", "tradeId", "reviewerId", "revieweeId", "rating"},
-    "chat_threads": {"directKey"},
-    "post_bookmarks": {"postId", "userId", "createdAt"},
-    "campus_events": {"eventId", "title", "link", "eventType", "eventDate", "place", "createdAt", "updatedAt"},
-}
-REQUIRED_TIMEZONE_COLUMNS = {
-    "users": {"lastActiveAt"},
-    "user_interests": {"createdAt"},
-    "user_preferences": {"createdAt", "updatedAt"},
-    "badges": {"createdAt"},
-    "user_badges": {"earnedAt"},
-    "signal_bar_items": {"createdAt", "updatedAt"},
-    "marketplace_trades": {"completedAt", "createdAt", "updatedAt"},
-    "marketplace_reviews": {"createdAt"},
-    "post_bookmarks": {"createdAt"},
-    "campus_events": {"createdAt", "updatedAt"},
-}
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg")
 VIDEO_EXTENSIONS = (".mp4",)
 HASHTAG_RE = re.compile(r"(?<![\w])#([A-Za-z0-9_]+)")
@@ -181,10 +144,6 @@ if JWT_EXPIRES_HOURS <= 0:
 
 
 class Base(DeclarativeBase):
-    pass
-
-
-class DatabaseSchemaError(RuntimeError):
     pass
 
 
@@ -769,25 +728,41 @@ class AdminIdentity:
 AuthUser = User | AdminIdentity
 
 
+def validate_database_url(database_url: str) -> str:
+    if make_url(database_url).get_backend_name() != "sqlite":
+        raise RuntimeError("DATABASE_URL must use SQLite (for example, sqlite:///campus_nexus.db)")
+    return database_url
+
+
 def build_engine_options(database_url: str) -> dict[str, Any]:
-    options: dict[str, Any] = {"pool_pre_ping": True}
-    if database_url.startswith("sqlite"):
-        options["connect_args"] = {"check_same_thread": False}
-        if ":memory:" in database_url:
-            options["poolclass"] = StaticPool
+    url = make_url(validate_database_url(database_url))
+    options: dict[str, Any] = {
+        "pool_pre_ping": True,
+        "connect_args": {"check_same_thread": False, "timeout": 30.0},
+    }
+    if url.database in (None, "", ":memory:"):
+        options["poolclass"] = StaticPool
     return options
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
-engine = create_engine(DATABASE_URL, **build_engine_options(DATABASE_URL))
+def create_database_engine(database_url: str) -> Engine:
+    url = make_url(validate_database_url(database_url))
+    database_engine = create_engine(database_url, **build_engine_options(database_url))
 
-
-if engine.dialect.name == "sqlite":
-    @event.listens_for(engine, "connect")
-    def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+    @event.listens_for(database_engine, "connect")
+    def configure_sqlite_connection(dbapi_connection, _connection_record) -> None:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        if url.database not in (None, "", ":memory:"):
+            cursor.execute("PRAGMA journal_mode=WAL")
         cursor.close()
+
+    return database_engine
+
+
+DATABASE_URL = validate_database_url(os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
+engine = create_database_engine(DATABASE_URL)
 
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -800,35 +775,6 @@ def db() -> Session:
     return session
 
 
-def database_schema_issues() -> list[str]:
-    if engine.dialect.name == "sqlite":
-        return []
-    issues: list[str] = []
-    with engine.connect() as connection:
-        database_inspector = inspect(connection)
-        table_names = set(database_inspector.get_table_names())
-        if "schema_migrations" not in table_names:
-            issues.append("schema_migrations table is missing")
-        elif connection.scalar(
-            sql_text("SELECT 1 FROM schema_migrations WHERE version = :version"),
-            {"version": REQUIRED_SCHEMA_VERSION},
-        ) is None:
-            issues.append(f"migration {REQUIRED_SCHEMA_VERSION} is not recorded")
-        for table_name, required_columns in REQUIRED_SCHEMA_COLUMNS.items():
-            if table_name not in table_names:
-                issues.append(f"table {table_name} is missing")
-                continue
-            columns = {column["name"]: column for column in database_inspector.get_columns(table_name)}
-            missing_columns = sorted(required_columns - set(columns))
-            if missing_columns:
-                issues.append(f"{table_name} is missing columns {', '.join(missing_columns)}")
-            for column_name in REQUIRED_TIMEZONE_COLUMNS.get(table_name, set()):
-                column = columns.get(column_name)
-                if column is not None and not bool(getattr(column["type"], "timezone", False)):
-                    issues.append(f"{table_name}.{column_name} must use TIMESTAMPTZ")
-    return issues
-
-
 def ensure_database_initialized() -> None:
     global _database_initialized
     if _database_initialized:
@@ -836,16 +782,7 @@ def ensure_database_initialized() -> None:
     with _database_lock:
         if _database_initialized:
             return
-        if engine.dialect.name == "sqlite":
-            Base.metadata.create_all(engine)
-        else:
-            issues = database_schema_issues()
-            if issues:
-                detail = "; ".join(issues)
-                raise DatabaseSchemaError(
-                    f"Database schema is not ready: {detail}. "
-                    "Provision a database containing the current schema before starting the backend."
-                )
+        Base.metadata.create_all(engine)
         _database_initialized = True
 
 
@@ -2786,15 +2723,6 @@ def handle_database_error(error):
     return jsonify({"error": "database error"}), 500
 
 
-@app.errorhandler(DatabaseSchemaError)
-def handle_database_schema_error(error):
-    app.logger.error(
-        "Database schema validation failed",
-        exc_info=(type(error), error, error.__traceback__),
-    )
-    return jsonify({"error": "database schema is not ready"}), 503
-
-
 @app.errorhandler(GraphUnavailable)
 def handle_graph_error(error):
     return jsonify({"error": "relationship graph unavailable"}), 503
@@ -2864,7 +2792,7 @@ def signal_bar_collection():
     return jsonify({"error": "signal position conflict; retry the request"}), 409
 
 
-@app.route("/api/signal-bar/<int:item_id>", methods=["PATCH"])
+@app.route("/api/signal-bar/<int:item_id>", methods=["PATCH", "DELETE"])
 def signal_bar_item(item_id: int):
     admin_error = require_admin_user()
     if admin_error is not None:
@@ -2872,6 +2800,10 @@ def signal_bar_item(item_id: int):
     item = db().get(SignalBarItem, item_id)
     if item is None:
         return jsonify({"error": "not found"}), 404
+    if request.method == "DELETE":
+        db().delete(item)
+        db().commit()
+        return ("", 204)
     data = read_json()
     if not any(key in data for key in ("title", "link")):
         return jsonify({"error": "title or link is required"}), 400

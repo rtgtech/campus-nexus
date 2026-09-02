@@ -7,7 +7,7 @@ from schema_app import SessionLocal, ensure_database_initialized, update_neo4j_g
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build or refresh the Neo4j feed graph")
-    parser.add_argument("--bootstrap", action="store_true", help="one-time import of PostgreSQL friendships")
+    parser.add_argument("--bootstrap", action="store_true", help="one-time import of SQLite friendships")
     args = parser.parse_args()
 
     ensure_database_initialized()

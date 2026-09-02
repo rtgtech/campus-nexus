@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 import unittest
 from pathlib import Path
 
@@ -11,26 +12,43 @@ MODEL_PATH = ROOT / "backend" / "schema_app.py"
 
 
 class SchemaBaselineTest(unittest.TestCase):
-    def test_baseline_contains_every_current_model_table_and_metadata_table(self) -> None:
+    def test_baseline_contains_every_current_model_table(self) -> None:
         model_source = MODEL_PATH.read_text(encoding="utf-8")
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
         model_tables = set(re.findall(r'__tablename__\s*=\s*"([^"]+)"', model_source))
         created_tables = set(
-            re.findall(r"^CREATE TABLE public\.([a-z_]+)\s*\(", schema_sql, flags=re.MULTILINE)
+            re.findall(r"^CREATE TABLE ([a-z_]+)\s*\(", schema_sql, flags=re.MULTILINE)
         )
 
-        self.assertEqual(created_tables, model_tables | {"schema_migrations"})
+        self.assertEqual(created_tables, model_tables)
         self.assertNotIn("auth_sessions", created_tables)
 
-    def test_baseline_is_structure_only_and_starts_at_the_final_version(self) -> None:
+    def test_baseline_is_structure_only_sqlite(self) -> None:
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
 
-        self.assertEqual(schema_sql.count("INSERT INTO "), 1)
-        self.assertIn("INSERT INTO public.schema_migrations", schema_sql)
-        self.assertIn("VALUES ('004_department_options', CURRENT_TIMESTAMP);", schema_sql)
-        self.assertNotIn("COPY public.", schema_sql)
-        self.assertNotIn("CREATE ROLE", schema_sql)
+        self.assertIn("PRAGMA foreign_keys=ON;", schema_sql)
+        self.assertNotIn("INSERT INTO ", schema_sql)
+        self.assertNotIn("public.", schema_sql)
+        self.assertNotIn("CREATE SEQUENCE", schema_sql)
         self.assertNotIn("PASSWORD", schema_sql)
+
+    def test_baseline_executes_in_sqlite(self) -> None:
+        schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.executescript(schema_sql)
+            created_tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                )
+            }
+        finally:
+            connection.close()
+
+        model_source = MODEL_PATH.read_text(encoding="utf-8")
+        model_tables = set(re.findall(r'__tablename__\s*=\s*"([^"]+)"', model_source))
+        self.assertEqual(created_tables, model_tables)
 
     def test_historical_migration_directory_is_absent(self) -> None:
         self.assertFalse((ROOT / "backend" / "migrations").exists())

@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from flask import g
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects import sqlite
 from sqlalchemy.schema import CreateTable
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
@@ -69,16 +69,6 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         self.assertEqual(unhealthy.status_code, 503)
         self.assertEqual(unhealthy.get_json()["database"], "unavailable")
 
-        with self.assertLogs(backend_schema.app.logger, level="ERROR"):
-            with patch.object(
-                backend_schema,
-                "ensure_database_initialized",
-                side_effect=backend_schema.DatabaseSchemaError("schema mismatch"),
-            ):
-                blocked_api = self.client.get("/api/signal-bar")
-        self.assertEqual(blocked_api.status_code, 503)
-        self.assertEqual(blocked_api.get_json()["error"], "database schema is not ready")
-
     def test_signal_bar_contract_authorization_validation_and_order(self) -> None:
         _, student_token = self.add_user("student")
         self.assertEqual(self.client.get("/api/signal-bar").get_json(), {"items": [], "total": 0})
@@ -138,6 +128,16 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(updated.get_json()["link"], "/first")
         self.assertEqual(self.client.patch("/api/signal-bar/999", json={"title": "Missing"}, headers=self.admin_auth()).status_code, 404)
+
+        self.assertEqual(self.client.delete(f"/api/signal-bar/{item_id}").status_code, 401)
+        self.assertEqual(
+            self.client.delete(f"/api/signal-bar/{item_id}", headers=self.auth(student_token)).status_code,
+            403,
+        )
+        self.assertEqual(self.client.delete("/api/signal-bar/999", headers=self.admin_auth()).status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/signal-bar/{item_id}", headers=self.admin_auth()).status_code, 204)
+        remaining_items = self.client.get("/api/signal-bar").get_json()["items"]
+        self.assertEqual([item["title"] for item in remaining_items], ["Second"])
 
     def test_profile_and_user_mutations_require_owner_or_admin(self) -> None:
         owner_id, owner_token = self.add_user("owner", batch_year=2027)
@@ -524,15 +524,15 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         )
         self.assertEqual(duplicate.status_code, 409)
 
-    def test_postgresql_ddl_quotes_mixed_case_constraint_columns(self) -> None:
+    def test_sqlite_ddl_quotes_mixed_case_constraint_columns(self) -> None:
         preference_ddl = str(
-            CreateTable(backend_schema.UserPreference.__table__).compile(dialect=postgresql.dialect())
+            CreateTable(backend_schema.UserPreference.__table__).compile(dialect=sqlite.dialect())
         )
         trade_ddl = str(
-            CreateTable(backend_schema.MarketplaceTrade.__table__).compile(dialect=postgresql.dialect())
+            CreateTable(backend_schema.MarketplaceTrade.__table__).compile(dialect=sqlite.dialect())
         )
         review_ddl = str(
-            CreateTable(backend_schema.MarketplaceReview.__table__).compile(dialect=postgresql.dialect())
+            CreateTable(backend_schema.MarketplaceReview.__table__).compile(dialect=sqlite.dialect())
         )
 
         for column_name in (
@@ -543,7 +543,7 @@ class FrontendApiRequirementsTest(unittest.TestCase):
             self.assertIn(f'CHECK ("{column_name}" IN ', preference_ddl)
         self.assertIn('CHECK ("sellerId" <> "buyerId")', trade_ddl)
         self.assertIn('CHECK ("reviewerId" <> "revieweeId")', review_ddl)
-        self.assertIn("TIMESTAMP WITH TIME ZONE", preference_ddl)
+        self.assertIn("DATETIME", preference_ddl)
         self.assertIn('FOREIGN KEY("userId") REFERENCES users ("userId") ON DELETE CASCADE', preference_ddl)
 
         for table in backend_schema.Base.metadata.sorted_tables:

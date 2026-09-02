@@ -140,12 +140,12 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
           </div>
         </DialogHeader>
 
-        <ScrollArea className="min-h-0">
-        <form className="mt-2 space-y-5 pr-3" onSubmit={handleSubmit}>
+        <ScrollArea className="min-h-0 w-full">
+        <form className="mt-2 w-full min-w-0 space-y-5 pr-3" onSubmit={handleSubmit}>
           {step === "media" ? (
             <div
               className={[
-                "flex h-[420px] max-h-[calc(100dvh-14rem)] flex-col items-center justify-center overflow-hidden rounded-[10px] border border-dashed p-4 text-center transition md:h-[500px]",
+                "flex h-[420px] w-full min-w-0 max-h-[calc(100dvh-14rem)] flex-col items-center justify-center overflow-hidden rounded-[10px] border border-dashed p-4 text-center transition md:h-[500px]",
                 isDragging
                   ? "border-secondary bg-secondary/5"
                   : "border-outline-variant/80 bg-surface-container-low",
@@ -163,12 +163,12 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
               />
 
               {previewUrl ? (
-                <div className="flex min-h-0 w-full max-w-md flex-1 flex-col justify-center">
-                  <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[10px] bg-black">
+                <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center">
+                  <div className="flex min-h-0 w-full min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[10px] bg-black">
                     {mediaKind(selectedFile) === "video" ? (
-                      <video className="max-h-full max-w-full object-contain" controls src={previewUrl} />
+                      <video className="h-full min-h-0 w-full min-w-0 object-contain" controls src={previewUrl} />
                     ) : (
-                      <img alt="" className="max-h-full max-w-full object-contain" src={previewUrl} />
+                      <img alt="" className="h-full min-h-0 w-full min-w-0 object-contain" src={previewUrl} />
                     )}
                   </div>
                   <p className="mt-3 truncate text-sm font-semibold text-on-surface">{selectedFile?.name}</p>

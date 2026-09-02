@@ -42,8 +42,12 @@ Thumbs.db
 # backend
 backend/__pycache__
 backend/venv
+backend/campus_nexus.db
+backend/campus_nexus.db-journal
+backend/campus_nexus.db-shm
+backend/campus_nexus.db-wal
 
-# Keep the consolidated database baseline versioned even when a developer's
+# Keep the SQLite database baseline versioned even when a developer's
 # global or repository-local excludes ignore SQL files.
 !campus_nexus_schema.sql
 
