@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File backend/run.ps1",
+    "dev:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File backend/run_data_tool.ps1 backup",
+    "dev:sync": "powershell -NoProfile -ExecutionPolicy Bypass -File backend/run_data_tool.ps1 sync",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

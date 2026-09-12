@@ -108,6 +108,40 @@ For later synchronization runs:
 backend\venv\Scripts\python.exe backend\update_feed_graph.py
 ```
 
+### Share a consistent development snapshot
+
+Stop `npm run dev:backend` and keep Neo4j running, then create a matched SQLite and Neo4j snapshot:
+
+```powershell
+npm run dev:backup
+```
+
+The command writes a timestamped directory under `backups/` containing `campus_nexus.db`, `neo4j_graph.json`, and a checksummed `manifest.json`. Share that entire directory with your teammate through a secure channel; snapshots contain application data and are ignored by Git.
+
+After placing the directory under `backups/` on another machine, stop that machine's backend, start its configured Neo4j instance, and overwrite both local databases from the newest compatible snapshot:
+
+```powershell
+npm run dev:sync
+```
+
+Select a particular snapshot when needed:
+
+```powershell
+npm run dev:sync -- --snapshot backups\campus_nexus_snapshot_YYYYMMDD_HHMMSS_microseconds
+```
+
+Before any overwrite, sync verifies file hashes, the expected SQLite table set, SQLite integrity and foreign keys, and agreement between active SQLite user/club IDs and Neo4j nodes and edges. SQLite is staged with a rollback copy, while the Neo4j replacement is a single transaction protected by uniqueness constraints. If validation or the graph transaction fails, the previous SQLite database is restored. A backup is rejected when the graph is stale; run `backend\venv\Scripts\python.exe backend\update_feed_graph.py` and retry.
+
+### Import an existing PostgreSQL dump
+
+Install the PostgreSQL client tools so `pg_restore` is available, then run:
+
+```powershell
+backend\venv\Scripts\python.exe backend\import_postgres_dump.py .\path\to\campus_nexus.dump
+```
+
+The importer reads a custom-format `pg_dump` archive without a running PostgreSQL server. It builds and validates a temporary SQLite database, imports current tables and columns, skips the retired `auth_sessions` table, and backs up the existing SQLite file before replacing it. Tables added after the dump remain empty and new columns receive their SQLAlchemy defaults.
+
 ### 7. Start the frontend
 
 Keep the backend running and open a second terminal in the repository root:
@@ -194,6 +228,8 @@ Run these commands from the repository root:
 ```powershell
 npm run dev
 npm run dev:backend
+npm run dev:backup
+npm run dev:sync
 npm run build
 npm run start
 node --test lib/post-time.test.mjs
@@ -204,6 +240,8 @@ backend\venv\Scripts\python.exe -m unittest discover -s backend\tests -p "test_*
 | --- | --- |
 | `npm run dev` | Start the Next.js development server. |
 | `npm run dev:backend` | Prepare and start the Flask backend on Windows. |
+| `npm run dev:backup` | Create a validated, matched SQLite and Neo4j snapshot. |
+| `npm run dev:sync` | Overwrite both local databases from the latest validated snapshot. |
 | `npm run build` | Create and validate a production frontend build. |
 | `npm run start` | Run the production frontend after a successful build. |
 | `node --test lib/post-time.test.mjs` | Run the focused frontend utility test documented by the project. |

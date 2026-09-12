@@ -58,6 +58,36 @@ backend\venv\Scripts\python.exe backend\update_feed_graph.py
 
 Friend and unfriend requests update Neo4j immediately. Other graph topology changes appear after the next normal update. Feed requests fall back to engagement and recency ranking when Neo4j is unavailable; friendship endpoints return `503`.
 
+## Backing up and synchronizing local data
+
+To share a matched copy of both databases, stop the Flask backend, keep the configured Neo4j instance running, and run from the repository root:
+
+```powershell
+npm run dev:backup
+```
+
+This creates `backups\campus_nexus_snapshot_<timestamp>` with a SQLite backup, a logical Neo4j export, and a manifest containing file hashes and row counts. Copy the complete snapshot directory to the teammate's `backups\` directory through a secure channel. These files may contain credentials and private application data and must not be committed.
+
+On the destination machine, stop Flask, start its local Neo4j instance, and run:
+
+```powershell
+npm run dev:sync
+```
+
+The latest compatible snapshot is selected by default. Use `npm run dev:sync -- --snapshot <directory>` to select one explicitly. Sync validates checksums, the expected SQLite table set, SQLite `integrity_check`, all SQLite foreign keys, Neo4j uniqueness, edge endpoints, and exact user/club agreement across stores before overwriting anything. SQLite is staged with a rollback copy; Neo4j is replaced in one transaction. A graph failure restores the previous SQLite file.
+
+Only snapshots containing `campus_nexus.db`, `neo4j_graph.json`, and the version-2 `manifest.json` can be used by `dev:sync`. Older native `neo4j.dump` snapshots remain useful for manual disaster recovery but are intentionally not selected by this developer synchronization command.
+
+## Importing a PostgreSQL backup
+
+With PostgreSQL client tools installed, import a custom-format `pg_dump` archive directly into SQLite:
+
+```powershell
+backend\venv\Scripts\python.exe backend\import_postgres_dump.py backups\campus_nexus.dump
+```
+
+The command does not require a running PostgreSQL server. It creates and validates a temporary SQLite database, copies compatible table data, applies model defaults for newer columns, skips retired tables, and backs up the current `backend/campus_nexus.db` before replacing it. Stop the backend first so no SQLite WAL files are active.
+
 ## Aggregate Endpoints
 
 | Method | Endpoint | Description |
@@ -146,6 +176,17 @@ Content-Type: application/json
 ```
 
 Only thread participants can read a conversation or create messages in it.
+
+Conversation responses include `unread`, the number of non-deleted incoming messages
+after that participant's persisted `lastReadAt`. `GET /api/messages/unread` returns
+`{"unreadFriends": N}`, counting distinct senders with unread messages, not total
+messages. Both endpoints require authentication.
+
+`POST /api/messages/conversations/<threadId>/read` with `{"messageId": 123}` marks
+messages through the displayed message as read for the authenticated participant.
+History requests do not change read status. The chat page acknowledges messages
+only while visible, focused, and at the end of the conversation. This uses the
+existing `chat_participants.lastReadAt` column; no schema migration is needed.
 
 ## Database schema
 

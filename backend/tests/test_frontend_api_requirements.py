@@ -386,6 +386,131 @@ class FrontendApiRequirementsTest(unittest.TestCase):
             self.assertEqual(session.query(backend_app.ChatParticipant).count(), 0)
             self.assertEqual(session.query(backend_app.ChatMessage).count(), 0)
 
+    def test_chat_history_persists_across_clients_and_is_isolated_by_thread(self) -> None:
+        first_id, first_token = self.add_user("chat-sender")
+        second_id, second_token = self.add_user("chat-recipient")
+        third_id, third_token = self.add_user("chat-outsider")
+        thread = self.client.post(
+            "/api/messages/conversations",
+            json={"participantUserId": second_id},
+            headers=self.auth(first_token),
+        ).get_json()["threadId"]
+        other_thread = self.client.post(
+            "/api/messages/conversations",
+            json={"participantUserId": third_id},
+            headers=self.auth(first_token),
+        ).get_json()["threadId"]
+        for token, target, content in (
+            (first_token, thread, "Hello\nSee you on campus!"),
+            (second_token, thread, "See you there!"),
+            (first_token, other_thread, "Separate conversation"),
+        ):
+            response = self.client.post(
+                "/api/messages/items",
+                json={"threadId": target, "text": content, "senderId": third_id},
+                headers=self.auth(token),
+            )
+            self.assertEqual(response.status_code, 201)
+
+        # A fresh client/request reads committed database state, not sender-local state.
+        fresh_client = backend_app.app.test_client()
+        history = fresh_client.get(
+            f"/api/messages/items?threadId={thread}", headers=self.auth(second_token),
+        ).get_json()
+        self.assertEqual([item["text"] for item in history], ["Hello\nSee you on campus!", "See you there!"])
+        self.assertEqual([item["side"] for item in history], ["left", "right"])
+        self.assertTrue(all(item["threadId"] == thread for item in history))
+        self.assertEqual(fresh_client.get(
+            f"/api/messages/items?threadId={thread}", headers=self.auth(third_token),
+        ).get_json(), [])
+        self.assertEqual(fresh_client.get(
+            f"/api/messages/items/{history[0]['id']}", headers=self.auth(third_token),
+        ).status_code, 404)
+        self.assertEqual(fresh_client.get("/api/messages/items").status_code, 401)
+        conversations = fresh_client.get(
+            "/api/messages/conversations", headers=self.auth(second_token),
+        ).get_json()
+        self.assertEqual([item["threadId"] for item in conversations], [thread])
+        self.assertEqual(conversations[0]["preview"], "See you there!")
+        with backend_app.SessionLocal() as session:
+            saved = session.get(backend_app.ChatMessage, history[0]["id"])
+            self.assertEqual(saved.senderId, first_id)
+            self.assertEqual(saved.content, "Hello\nSee you on campus!")
+        invalid = self.client.post(
+            "/api/messages/items", json={"threadId": thread, "text": "   "},
+            headers=self.auth(first_token),
+        )
+        self.assertEqual(invalid.status_code, 400)
+
+    def test_chat_unread_counts_senders_and_persists_read_position(self) -> None:
+        viewer_id, viewer_token = self.add_user("unread-viewer")
+        first_id, first_token = self.add_user("unread-first")
+        second_id, second_token = self.add_user("unread-second")
+        threads = [self.client.post(
+            "/api/messages/conversations", json={"participantUserId": user_id},
+            headers=self.auth(viewer_token),
+        ).get_json()["threadId"] for user_id in (first_id, second_id)]
+
+        def send(thread: int, token: str, content: str) -> int:
+            return self.client.post(
+                "/api/messages/items", json={"threadId": thread, "text": content},
+                headers=self.auth(token),
+            ).get_json()["id"]
+
+        first_message = send(threads[0], first_token, "First")
+        second_message = send(threads[0], first_token, "Second")
+        send(threads[1], second_token, "Another friend")
+        send(threads[0], viewer_token, "My own reply")
+        deleted = send(threads[0], first_token, "Removed")
+        self.client.delete(f"/api/messages/items/{deleted}", headers=self.auth(first_token))
+
+        def counts() -> dict[int, int]:
+            return {item["threadId"]: item["unread"] for item in self.client.get(
+                "/api/messages/conversations", headers=self.auth(viewer_token),
+            ).get_json()}
+
+        self.assertEqual(counts(), {threads[0]: 2, threads[1]: 1})
+        self.assertEqual(self.client.get("/api/messages/unread", headers=self.auth(viewer_token)).get_json(), {"unreadFriends": 2})
+        # Fetching history alone does not acknowledge it.
+        self.client.get(f"/api/messages/items?threadId={threads[0]}", headers=self.auth(viewer_token))
+        self.assertEqual(counts()[threads[0]], 2)
+        endpoint = f"/api/messages/conversations/{threads[0]}/read"
+        self.assertEqual(self.client.post(endpoint, json={"messageId": first_message}, headers=self.auth(viewer_token)).status_code, 200)
+        self.assertEqual(counts()[threads[0]], 1)
+        self.client.post(endpoint, json={"messageId": second_message}, headers=self.auth(viewer_token))
+        self.assertEqual(counts(), {threads[0]: 0, threads[1]: 1})
+        self.assertEqual(self.client.get("/api/messages/unread", headers=self.auth(viewer_token)).get_json(), {"unreadFriends": 1})
+        # A delayed acknowledgement cannot move the persisted marker backwards.
+        self.client.post(endpoint, json={"messageId": first_message}, headers=self.auth(viewer_token))
+        self.assertEqual(counts()[threads[0]], 0)
+        with backend_app.SessionLocal() as session:
+            participant = session.get(backend_app.ChatParticipant, {"threadId": threads[0], "userId": viewer_id})
+            self.assertEqual(participant.lastReadAt, session.get(backend_app.ChatMessage, second_message).createdAt)
+        send(threads[0], first_token, "New arrival")
+        self.assertEqual(counts()[threads[0]], 1)
+        fresh = backend_app.app.test_client()
+        self.assertEqual(fresh.get("/api/messages/unread", headers=self.auth(viewer_token)).get_json(), {"unreadFriends": 2})
+
+    def test_chat_read_acknowledgements_require_membership_and_valid_message(self) -> None:
+        _, viewer_token = self.add_user("read-viewer")
+        friend_id, friend_token = self.add_user("read-friend")
+        outsider_id, outsider_token = self.add_user("read-outsider")
+        threads = [self.client.post(
+            "/api/messages/conversations", json={"participantUserId": user_id},
+            headers=self.auth(viewer_token),
+        ).get_json()["threadId"] for user_id in (friend_id, outsider_id)]
+        message = self.client.post(
+            "/api/messages/items", json={"threadId": threads[0], "text": "Private"},
+            headers=self.auth(friend_token),
+        ).get_json()["id"]
+        endpoint = f"/api/messages/conversations/{threads[0]}/read"
+        self.assertEqual(self.client.get("/api/messages/unread").status_code, 401)
+        self.assertEqual(self.client.post(endpoint, json={"messageId": message}).status_code, 401)
+        self.assertEqual(self.client.post(endpoint, json={"messageId": message}, headers=self.auth(outsider_token)).status_code, 404)
+        self.assertEqual(self.client.post(f"/api/messages/conversations/{threads[1]}/read", json={"messageId": message}, headers=self.auth(viewer_token)).status_code, 400)
+        self.assertEqual(self.client.post(endpoint, json={}, headers=self.auth(viewer_token)).status_code, 400)
+        self.assertEqual(self.client.get("/api/messages/unread", headers=self.auth(outsider_token)).get_json(), {"unreadFriends": 0})
+
     def test_post_user_and_game_mutations_require_the_correct_actor(self) -> None:
         owner_id, owner_token = self.add_user("post-owner")
         _, other_token = self.add_user("post-other")

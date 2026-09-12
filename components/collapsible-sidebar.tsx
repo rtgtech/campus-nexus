@@ -6,6 +6,7 @@ import { ProfileNavLink } from "@/components/profile-nav-link";
 import { CreatePostLink } from "@/components/create-post-route";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ChatUnreadBadge } from "@/components/chat-unread-badge";
 
 type NavKey = "feed" | "clubs" | "marketplace" | "games" | "messages" | "profile";
 type NavItemKey = NavKey | "create-post" | "saved";
@@ -66,7 +67,7 @@ export function CollapsibleSidebar({ active }: CollapsibleSidebarProps) {
         <div className="h-12" />
         <div className="space-y-2">
           {navItems.map((item) => {
-            const icon = <span className="material-symbols-outlined shrink-0 text-[22px]">{item.icon}</span>;
+            const icon = <span className="relative inline-flex shrink-0"><span className="material-symbols-outlined text-[22px]">{item.icon}</span>{item.key === "messages" && <ChatUnreadBadge />}</span>;
             const label = <span className={labelClassName}>{item.label}</span>;
 
             if (item.key === "profile") {

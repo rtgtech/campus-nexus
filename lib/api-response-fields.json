@@ -41,7 +41,7 @@
   },
   "Conversation": {
     "required": ["id", "threadId", "name", "preview", "time", "active", "href", "participants"],
-    "optional": []
+    "optional": ["unread"]
   },
   "Message": {
     "required": ["id", "threadId", "side", "text", "time", "status"],

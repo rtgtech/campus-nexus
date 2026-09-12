@@ -5,6 +5,7 @@ import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
 import { CreatePostLink } from "@/components/create-post-route";
 import type { HeaderSearchProps } from "@/components/header-search";
 import { ProfileNavLink } from "@/components/profile-nav-link";
+import { ChatUnreadBadge } from "@/components/chat-unread-badge";
 
 type NavItemKey = CampusNavKey | "create-post" | "saved";
 
@@ -110,7 +111,7 @@ export function CampusShell({ active, children, feedView = "home", headerSearchP
                   href={item.href}
                   className={className}
                 >
-                  <span className="material-symbols-outlined mb-0.5">{item.icon}</span>
+                  <span className="relative mb-0.5 inline-flex"><span className="material-symbols-outlined">{item.icon}</span>{item.key === "messages" && <ChatUnreadBadge />}</span>
                   <span>{label}</span>
                 </Link>
               );

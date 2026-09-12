@@ -46,6 +46,7 @@ backend/campus_nexus.db
 backend/campus_nexus.db-journal
 backend/campus_nexus.db-shm
 backend/campus_nexus.db-wal
+/backups/
 
 # Keep the SQLite database baseline versioned even when a developer's
 # global or repository-local excludes ignore SQL files.

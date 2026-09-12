@@ -2319,6 +2319,19 @@ def is_chat_participant(thread_id: int, user_id: int) -> bool:
     return db().get(ChatParticipant, {"threadId": thread_id, "userId": user_id}) is not None
 
 
+def unread_chat_messages(user_id: int):
+    return (
+        select(ChatMessage)
+        .join(ChatParticipant, ChatParticipant.threadId == ChatMessage.threadId)
+        .where(
+            ChatParticipant.userId == user_id,
+            ChatMessage.senderId != user_id,
+            ChatMessage.isDeleted.is_(False),
+            (ChatParticipant.lastReadAt.is_(None)) | (ChatMessage.createdAt > ChatParticipant.lastReadAt),
+        )
+    )
+
+
 def serialize_conversation(thread: ChatThread, viewer: User, active: bool = False) -> dict[str, Any]:
     participants = db().scalars(
         select(User)
@@ -2342,6 +2355,11 @@ def serialize_conversation(thread: ChatThread, viewer: User, active: bool = Fals
         "active": active,
         "href": f"/chat?thread={thread.threadId}",
         "participants": [user.to_dict() for user in participants],
+        "unread": db().scalar(
+            select(func.count()).select_from(
+                unread_chat_messages(viewer.userId).where(ChatMessage.threadId == thread.threadId).subquery()
+            )
+        ) or 0,
     }
 
 
@@ -3478,6 +3496,42 @@ def messages():
         return jsonify({"error": "unauthorized"}), 401
     thread_id = optional_int(request.args.get("threadId"))
     return jsonify({"conversations": serialize_conversations(user), "messages": serialize_messages(user, thread_id)})
+
+
+@app.route("/api/messages/unread")
+def unread_chat_summary():
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    unread = unread_chat_messages(user.userId).subquery()
+    count = db().scalar(select(func.count(func.distinct(unread.c.senderId)))) or 0
+    return jsonify({"unreadFriends": count})
+
+
+@app.route("/api/messages/conversations/<int:itemId>/read", methods=["POST"])
+def mark_conversation_read(itemId: int):
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    if not is_chat_participant(itemId, user.userId):
+        return jsonify({"error": "not found"}), 404
+    message_id = optional_int(read_json().get("messageId"))
+    message = db().get(ChatMessage, message_id) if message_id is not None else None
+    if message is None or message.threadId != itemId or message.isDeleted:
+        return jsonify({"error": "messageId must reference a message in this conversation"}), 400
+    # Acknowledge only displayed messages. A newer arrival remains unread, and
+    # delayed requests from another tab cannot move the read position backwards.
+    db().execute(
+        update(ChatParticipant)
+        .where(
+            ChatParticipant.threadId == itemId,
+            ChatParticipant.userId == user.userId,
+            (ChatParticipant.lastReadAt.is_(None)) | (ChatParticipant.lastReadAt < message.createdAt),
+        )
+        .values(lastReadAt=message.createdAt)
+    )
+    db().commit()
+    return jsonify({"read": True})
 
 
 @app.route("/api/messages/conversations", methods=["GET", "POST"])
