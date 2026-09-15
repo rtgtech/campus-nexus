@@ -12,6 +12,7 @@ import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { getInitials, type FeedCard, type PostLikeData, type PostSaveData } from "@/lib/app-data";
 import { parseApiResponse } from "@/lib/api-response-contract";
 import { PostTime } from "@/components/post-time";
+import { cn } from "@/lib/utils";
 
 const POST_SAVE_EVENT = "campus-nexus:post-save-change";
 const explanations: Record<string, string> = {
@@ -27,13 +28,14 @@ function count(value: string | number | undefined) {
   return Number.isFinite(number) ? Math.max(0, number) : 0;
 }
 
-export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onExclude, onOpen, detail = false }: {
+export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onExclude, onOpen, detail = false, fitViewport = false }: {
   post: FeedCard;
   onSavedChange?: (postId: string, saved: boolean) => void;
   showDeleteButton?: boolean;
   onExclude?: (target: string) => void;
   onOpen?: () => void;
   detail?: boolean;
+  fitViewport?: boolean;
 }) {
   const router = useRouter();
   const [liked, setLiked] = useState(post.likedByCurrentUser ?? post.viewerHasLiked ?? false);
@@ -43,7 +45,7 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onE
   const [deleted, setDeleted] = useState(false);
   const [status, setStatus] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(detail);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsCount, setCommentsCount] = useState(count(post.comments));
   const title = post.caption || post.title || "Campus update";
   const body = post.body && post.body !== title ? post.body : "";
@@ -57,6 +59,9 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onE
     setLikes(count(post.likes));
     setSaved(post.savedByCurrentUser ?? post.bookmarkedByCurrentUser ?? post.viewerHasSaved ?? false);
   }, [post.likedByCurrentUser, post.viewerHasLiked, post.likes, post.savedByCurrentUser, post.bookmarkedByCurrentUser, post.viewerHasSaved]);
+  useEffect(() => {
+    setCommentsOpen(false);
+  }, [post.postId]);
   useEffect(() => {
     function changed(event: Event) {
       const detail = (event as CustomEvent<{ postId: string; saved: boolean }>).detail;
@@ -105,8 +110,9 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onE
   }
   function exclude(target: string) { setMenuOpen(false); onExclude?.(target); }
   if (deleted) return null;
-  return <article id={post.postId} className="scroll-mt-24 overflow-hidden rounded border border-border bg-white">
-    <header className="flex items-start justify-between gap-3 px-5 pb-3 pt-5 sm:px-6">
+  return <article id={post.postId} className={cn("relative scroll-mt-24 overflow-hidden rounded border border-border bg-white", fitViewport && "flex h-full min-h-0 flex-col")}>
+    <div className={cn(fitViewport && "flex min-h-0 flex-1 flex-col")} aria-hidden={commentsOpen || undefined} inert={commentsOpen || undefined}>
+    <header className={cn("flex items-start justify-between gap-3 px-5 pb-3 pt-5 sm:px-6", fitViewport && "shrink-0")}>
       <div className="flex min-w-0 items-center gap-3">
         <Link href={authorHref} aria-label={"View " + post.author + "'s profile"} className="flex size-11 shrink-0 items-center justify-center rounded bg-accent text-sm font-semibold text-primary">{getInitials(post.author)}</Link>
         <div className="min-w-0"><Link href={authorHref} className="block truncate text-sm font-semibold hover:underline">{post.author}</Link>
@@ -131,17 +137,17 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onE
         </Popover>}
       </div>
     </header>
-    <div className="px-5 pb-4 sm:px-6">
+    <div className={cn("px-5 pb-4 sm:px-6", fitViewport && (media.length ? "max-h-[30%] shrink-0 overflow-hidden" : "min-h-0 flex-1 overflow-hidden"))}>
       {detail ? <p className="whitespace-pre-wrap break-words text-base leading-7">{title}</p> : <Link href={postHref} onClick={onOpen} className="block whitespace-pre-wrap break-words text-base leading-7 hover:underline" aria-label={"Open post: " + title}>{title}</Link>}
       {body && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{body}</p>}
       {post.price && <p className="mt-2 text-lg font-semibold text-primary">{post.price}</p>}
     </div>
-    {media.length > 0 && <div className={media.length > 1 ? "grid grid-cols-2 gap-px bg-muted" : "bg-muted"}>
+    {media.length > 0 && <div className={cn(media.length > 1 ? "grid grid-cols-2 gap-px bg-muted" : "bg-muted", fitViewport && "min-h-0 flex-1 overflow-hidden")}>
       {media.map((url, index) => /\.mp4(?:\?|$)|^data:video\/mp4/i.test(url) ?
-        <video key={url + index} controls preload="metadata" className="max-h-[540px] w-full object-contain" src={url} /> :
-        detail ? <img key={url + index} src={url} alt={title} className="max-h-[540px] w-full object-contain" /> : <Link key={url + index} href={postHref} onClick={onOpen} aria-label="View post media"><img src={url} alt={title + (media.length > 1 ? " — image " + (index + 1) : "")} loading="lazy" className="max-h-[540px] w-full object-contain" /></Link>)}
+        <video key={url + index} controls preload="metadata" className={cn("max-h-[540px] w-full object-contain", fitViewport && "h-full max-h-full")} src={url} /> :
+        detail ? <img key={url + index} src={url} alt={title} className={cn("max-h-[540px] w-full object-contain", fitViewport && "h-full max-h-full")} /> : <Link key={url + index} href={postHref} onClick={onOpen} aria-label="View post media"><img src={url} alt={title + (media.length > 1 ? " — image " + (index + 1) : "")} loading="lazy" className="max-h-[540px] w-full object-contain" /></Link>)}
     </div>}
-    <footer className="px-4 pb-4 pt-2 sm:px-5">
+    <footer className={cn("px-4 pb-4 pt-2 sm:px-5", fitViewport && "shrink-0")}>
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1">
           <Button variant="ghost" disabled={pending !== null} aria-label={liked ? "Unlike post" : "Like post"} aria-pressed={liked} onClick={() => void react("like")}><Heart size={19} className={liked ? "fill-secondary text-secondary" : ""} /><span>{new Intl.NumberFormat("en", { notation: "compact" }).format(likes)}</span></Button>
@@ -154,6 +160,7 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onE
       </div>
       {status && <p role="status" className="mt-2 px-1 text-sm text-muted-foreground">{status}</p>}
     </footer>
-    {commentsOpen && post.postId && <PostComments postId={post.postId} onCountChange={setCommentsCount} />}
+    </div>
+    {commentsOpen && post.postId && <PostComments postId={post.postId} onCountChange={setCommentsCount} onClose={() => setCommentsOpen(false)} />}
   </article>;
 }

@@ -2,13 +2,18 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { parseApiResponse } from "@/lib/api-response-contract";
 import type { PostComment } from "@/lib/app-data";
 
-export function PostComments({ postId, onCountChange }: { postId: string; onCountChange: (count: number) => void }) {
+export function PostComments({ postId, onCountChange, onClose }: {
+  postId: string;
+  onCountChange: (count: number) => void;
+  onClose: () => void;
+}) {
   const [comments, setComments] = useState<PostComment[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
@@ -29,9 +34,17 @@ export function PostComments({ postId, onCountChange }: { postId: string; onCoun
       .then(async (response) => {
         if (!response.ok) throw new Error("Comments couldn't be loaded.");
         const data = parseApiResponse<{ items: PostComment[]; total: number }>(path, await response.json());
-        if (!controller.signal.aborted) { setComments(data.items); onCountChange(data.total); }
-      }).catch(() => { if (!controller.signal.aborted) setError("Comments couldn't be loaded. Please try again."); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        if (!controller.signal.aborted) {
+          setComments(data.items);
+          onCountChange(data.total);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setError("Comments couldn't be loaded. Please try again.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
   }, [path, revision, onCountChange]);
 
@@ -54,24 +67,49 @@ export function PostComments({ postId, onCountChange }: { postId: string; onCoun
       onCountChange(data.comments);
       setDraft("");
       setStatus("Comment posted.");
-    } catch (cause) { setStatus(cause instanceof Error ? cause.message : "Your comment couldn't be posted."); }
-    finally { sendLock.current = false; setSending(false); }
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : "Your comment couldn't be posted.");
+    } finally {
+      sendLock.current = false;
+      setSending(false);
+    }
   }
 
-  return <section aria-label="Post comments" className="space-y-4 border-t px-5 py-5 sm:px-6">
-    <h3 className="text-sm font-semibold">Comments</h3>
-    {loading && <p role="status" className="text-sm text-muted-foreground">Loading comments…</p>}
-    {error && <div role="alert" className="space-y-2 text-sm"><p>{error}</p><Button variant="outline" onClick={() => setRevision((value) => value + 1)}>Retry comments</Button></div>}
-    {!loading && !error && !comments.length && <p className="text-sm text-muted-foreground">No comments yet. Start the conversation.</p>}
-    <ul className="max-h-80 space-y-4 overflow-y-auto">{comments.map((comment) => <li key={comment.id} className="text-sm">
-      <div className="flex flex-wrap items-baseline gap-2"><Link className="font-semibold hover:underline" href={`/${encodeURIComponent(comment.username || comment.userId)}`}>{comment.author}</Link>
-        <time className="text-xs text-muted-foreground" dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString()}</time></div>
-      <p className="mt-1 whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">{comment.content}</p>
-    </li>)}</ul>
-    {signedIn ? <form onSubmit={submit} className="space-y-3">
-      <Textarea aria-label="Write a comment" placeholder="Add to the conversation…" maxLength={2000} rows={3} value={draft} disabled={sending} onChange={(event) => setDraft(event.target.value)} />
-      <Button type="submit" disabled={loading || sending || !draft.trim()}>{sending ? "Posting…" : "Post comment"}</Button>
-    </form> : <p className="text-sm"><Link href="/auth" className="font-medium text-primary underline">Sign in</Link> to comment.</p>}
-    {status && <p role="status" className="text-sm">{status}</p>}
+  return <section aria-label="Post comments" className="absolute inset-0 z-20 flex min-h-0 flex-col bg-white">
+    <header className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
+      <div>
+        <h3 className="text-sm font-semibold">Comments</h3>
+        <p className="text-xs text-muted-foreground">{comments.length === 1 ? "1 response" : `${comments.length} responses`}</p>
+      </div>
+      <Button variant="ghost" size="icon" aria-label="Close comments" onClick={onClose}>
+        <X size={19} />
+      </Button>
+    </header>
+
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+      {loading && <p role="status" className="text-sm text-muted-foreground">Loading comments...</p>}
+      {error && <div role="alert" className="space-y-2 text-sm">
+        <p>{error}</p>
+        <Button variant="outline" onClick={() => setRevision((value) => value + 1)}>Retry comments</Button>
+      </div>}
+      {!loading && !error && !comments.length && <p className="text-sm text-muted-foreground">No comments yet. Start the conversation.</p>}
+      {!loading && !error && comments.length > 0 && <ul className="space-y-4">
+        {comments.map((comment) => <li key={comment.id} className="text-sm">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <Link className="font-semibold hover:underline" href={`/${encodeURIComponent(comment.username || comment.userId)}`}>{comment.author}</Link>
+            <time className="text-xs text-muted-foreground" dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString()}</time>
+          </div>
+          <p className="mt-1 whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">{comment.content}</p>
+        </li>)}
+      </ul>}
+    </div>
+
+    <div className="shrink-0 border-t bg-white px-3 py-3 sm:px-4">
+      {signedIn ? <form onSubmit={submit} className="flex items-end gap-2">
+        <Textarea aria-label="Write a comment" placeholder="Add to the conversation..." maxLength={2000} rows={1} value={draft} disabled={sending} onChange={(event) => setDraft(event.target.value)} className="max-h-24 min-h-10 resize-none" />
+        <Button type="submit" aria-label="Post comment" disabled={loading || sending || !draft.trim()}>{sending ? "Posting..." : "Post"}</Button>
+      </form> : <p className="text-sm"><Link href="/auth" className="font-medium text-primary underline">Sign in</Link> to comment.</p>}
+      {status && <p role="status" className="mt-2 text-sm">{status}</p>}
+    </div>
   </section>;
 }

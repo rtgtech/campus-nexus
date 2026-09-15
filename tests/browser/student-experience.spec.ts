@@ -67,7 +67,15 @@ test("mobile navigation, post overlay and saved posts are reachable", async ({ p
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
   await page.getByRole("link", { name: "Open post", exact: true }).first().click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  const postDialog = page.getByRole("dialog");
+  await expect(postDialog).toBeVisible();
+  await expect(postDialog.locator("article")).toBeVisible();
+  await expect(postDialog.getByRole("region", { name: "Post comments" })).toHaveCount(0);
+  await expect(postDialog.getByRole("button", { name: "Comments", exact: true })).toBeVisible();
+  expect(await postDialog.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBeTruthy();
+  const dialogBox = await postDialog.boundingBox();
+  expect(dialogBox?.y).toBeGreaterThanOrEqual(0);
+  expect((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)).toBeLessThanOrEqual(800);
   await page.screenshot({ path: "test-results/screenshots/post-detail-360.png" });
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
@@ -102,7 +110,16 @@ test("comments preserve failed drafts and persist on post detail", async ({ page
   await page.goto("/");
   const card = page.locator("[data-feed-post]").first();
   const postId = await card.getAttribute("data-feed-post");
+  const article = card.locator("article");
+  const heightBeforeComments = (await article.boundingBox())?.height;
   await card.getByRole("button", { name: "Comments", exact: true }).click();
+  const comments = card.getByRole("region", { name: "Post comments" });
+  await expect(comments).toBeVisible();
+  const articleBox = await article.boundingBox();
+  const commentsBox = await comments.boundingBox();
+  expect(Math.abs((articleBox?.height ?? 0) - (heightBeforeComments ?? 0))).toBeLessThanOrEqual(1);
+  expect(commentsBox?.y).toBeGreaterThanOrEqual(articleBox?.y ?? 0);
+  expect((commentsBox?.y ?? 0) + (commentsBox?.height ?? 0)).toBeLessThanOrEqual((articleBox?.y ?? 0) + (articleBox?.height ?? 0) + 1);
   const draft = card.getByRole("textbox", { name: "Write a comment" });
   await draft.fill("Looking forward to this campus conversation!");
   await page.route("**/api/posts/*/comments", (route) => route.request().method() === "POST"
@@ -114,9 +131,30 @@ test("comments preserve failed drafts and persist on post detail", async ({ page
   await card.getByRole("button", { name: "Post comment", exact: true }).click();
   await expect(card.getByText("Comment posted.", { exact: true })).toBeVisible();
   await expect(draft).toHaveValue("");
+  await card.getByRole("button", { name: "Close comments", exact: true }).click();
   await expect(card.getByRole("button", { name: "Comments", exact: true })).toHaveText("1");
   await page.goto(`/viewpost?=${postId}`);
-  await expect(page.getByRole("region", { name: "Post comments" }).getByText("Looking forward to this campus conversation!", { exact: true })).toBeVisible();
+  const detailDialog = page.getByRole("dialog");
+  await expect(detailDialog).toBeVisible();
+  await expect(detailDialog.getByRole("region", { name: "Post comments" })).toHaveCount(0);
+  await detailDialog.getByRole("button", { name: "Comments", exact: true }).click();
+  const detailComments = page.getByRole("region", { name: "Post comments" });
+  await expect(detailComments.getByText("Looking forward to this campus conversation!", { exact: true })).toBeVisible();
+  expect(await detailDialog.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBeTruthy();
+  const detailBounds = await detailDialog.locator("article").evaluate((element) => {
+    const overlay = element.querySelector<HTMLElement>('[aria-label="Post comments"]');
+    if (!overlay) return null;
+    const articleBox = element.getBoundingClientRect();
+    const overlayBox = overlay.getBoundingClientRect();
+    return {
+      top: overlayBox.top - articleBox.top,
+      bottom: overlayBox.bottom - articleBox.top,
+      height: articleBox.height,
+    };
+  });
+  expect(detailBounds).not.toBeNull();
+  expect(detailBounds?.top).toBeGreaterThanOrEqual(-1);
+  expect(detailBounds?.bottom).toBeLessThanOrEqual((detailBounds?.height ?? 0) + 1);
   await page.screenshot({ path: "test-results/screenshots/comments-360.png" });
 });
 

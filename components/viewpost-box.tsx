@@ -54,10 +54,10 @@ export function ViewPostBox({ postId, returnHref }: { postId: string; returnHref
     else router.replace("/");
   }
   return <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
-    <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto p-4 sm:p-6">
-      <DialogHeader><DialogTitle>Campus post</DialogTitle><DialogDescription>Catch up with your campus.</DialogDescription></DialogHeader>
-      {error ? <div role="alert" className="space-y-4 py-10 text-center"><p>This post couldn't be loaded.</p><Button variant="outline" onClick={() => setRevision((value) => value + 1)}>Try again</Button></div> :
-        post ? <FeedPostCard post={post} detail /> : <p role="status" className="py-10 text-center text-sm text-muted-foreground">Loading post…</p>}
+    <DialogContent className="h-[calc(100dvh-2rem)] max-h-[760px] w-[calc(100%-2rem)] max-w-3xl grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden p-4 sm:p-6">
+      <DialogHeader className="shrink-0 pr-10"><DialogTitle>Campus post</DialogTitle><DialogDescription>Catch up with your campus.</DialogDescription></DialogHeader>
+      {error ? <div role="alert" className="self-center space-y-4 text-center"><p>This post couldn't be loaded.</p><Button variant="outline" onClick={() => setRevision((value) => value + 1)}>Try again</Button></div> :
+        post ? <FeedPostCard post={post} detail fitViewport /> : <p role="status" className="self-center text-center text-sm text-muted-foreground">Loading post…</p>}
     </DialogContent>
   </Dialog>;
 }
