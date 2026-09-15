@@ -1,11 +1,14 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Conversation, Message, SearchData, SearchItem } from "@/lib/app-data";
+import type { Conversation, Message, FriendshipStatus, FriendshipUser } from "@/lib/app-data";
 import { readAuthSession } from "@/lib/auth-client";
 import { chatRequest } from "@/lib/chat-api";
 import { CHAT_READ_EVENT } from "@/components/chat-unread-badge";
@@ -22,7 +25,7 @@ function timestamp(value: string) {
 }
 
 function Avatar({ name }: { name: string }) {
-  return <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary-fixed font-bold text-primary">
+  return <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded bg-primary-fixed font-bold text-primary">
     {name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
   </span>;
 }
@@ -39,7 +42,7 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
   const [filter, setFilter] = useState("");
   const [composing, setComposing] = useState(false);
   const [query, setQuery] = useState("");
-  const [people, setPeople] = useState<SearchItem[]>([]);
+  const [people, setPeople] = useState<FriendshipUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -157,16 +160,15 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
   useEffect(() => {
     setPeople([]);
     setSearchError("");
-    if (!composing || query.trim().length < 2) { setSearching(false); return; }
+    if (!composing) { setSearching(false); return; }
     const controller = new AbortController();
     setSearching(true);
     const timeout = setTimeout(async () => {
       try {
-        const results = await chatRequest<SearchData>(`/api/search?types=user&q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
-        if (!controller.signal.aborted) {
-          const self = readAuthSession()?.user.userId;
-          setPeople(results.users.filter((person) => String(person.userId ?? person.id) !== String(self)));
-        }
+        const self = readAuthSession()?.user.userId;
+        if (!self) throw new Error("Sign in to find your friends.");
+        const results = await chatRequest<FriendshipStatus>(`/api/users/${encodeURIComponent(self)}/friends?includeLists=true`, { signal: controller.signal });
+        if (!controller.signal.aborted) setPeople(results.friendsList ?? []);
       } catch (error) {
         if (!controller.signal.aborted) setSearchError((error as Error).message);
       } finally {
@@ -174,7 +176,7 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
       }
     }, 250);
     return () => { controller.abort(); clearTimeout(timeout); };
-  }, [query, composing]);
+  }, [composing, revision]);
 
   function selectConversation(id: string | null) {
     if (id === activeId.current) return;
@@ -188,7 +190,7 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
     window.history.replaceState(null, "", url);
   }
 
-  async function startChat(person: SearchItem) {
+  async function startChat(person: FriendshipUser) {
     if (creating) return;
     setCreating(true);
     setActionError("");
@@ -209,7 +211,7 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
-    if (!selected || !active || !draft.trim() || sendLock.current) return;
+    if (!selected || !active?.canMessage || !draft.trim() || sendLock.current) return;
     const destination = selected;
     const originalDraft = draft;
     sendLock.current = true;
@@ -234,7 +236,7 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-outline-variant/60 bg-white shadow-sm">
+    <div className="overflow-hidden rounded border border-outline-variant/60 bg-white ">
       {(listError || actionError) && <div role="alert" className="flex flex-wrap items-center gap-3 border-b bg-red-50 p-4 text-sm text-red-800">
         <span>{actionError || listError}</span>
         <Button variant="outline" size="sm" onClick={() => setRevision((value) => value + 1)}>Refresh chats</Button>
@@ -244,23 +246,23 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
         <aside className={`${selected ? "hidden md:flex" : "flex"} min-h-0 flex-col border-r border-outline-variant/50 bg-surface-container-low`}>
           <div className="space-y-4 border-b border-outline-variant/50 p-5">
             <div className="flex items-center justify-between gap-2">
-              <h1 className="text-2xl font-bold">Chat</h1>
+              <h1 className="font-editorial font-medium text-2xl">Chat</h1>
               <Button size="sm" variant={composing ? "outline" : "default"} onClick={() => setComposing(!composing)}>{composing ? "Cancel" : "New chat"}</Button>
             </div>
-            <Input aria-label={composing ? "Find a person" : "Search conversations"} placeholder={composing ? "Search name or username" : "Search conversations"} type="search" value={composing ? query : filter} onChange={(event) => composing ? setQuery(event.target.value) : setFilter(event.target.value)} />
+            <Input aria-label={composing ? "Find a friend" : "Search conversations"} placeholder={composing ? "Search your friends" : "Search conversations"} type="search" value={composing ? query : filter} onChange={(event) => composing ? setQuery(event.target.value) : setFilter(event.target.value)} />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {composing ? <>
-              <p role="status" className="p-3 text-sm text-on-surface-variant">{searchError || (searching ? "Searching…" : query.trim().length < 2 ? "Enter at least 2 characters to find someone." : people.length ? "Choose someone to start chatting." : "No people found.")}</p>
-              {people.map((person) => <button key={person.id} disabled={creating} onClick={() => void startChat(person)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-white disabled:opacity-50">
-                <Avatar name={person.title} /><span className="min-w-0"><span className="block truncate font-semibold">{person.title}</span><span className="block truncate text-sm text-on-surface-variant">{person.subtitle}</span></span>
+              <p role="status" className="p-3 text-sm text-on-surface-variant">{searchError || (searching ? "Searching…" : people.length ? "Choose a friend to start chatting." : "You can only message friends. Add a friend from their profile first.")}</p>
+              {people.filter((person) => `${person.name} ${person.username}`.toLowerCase().includes(query.trim().toLowerCase())).map((person) => <button key={person.id} disabled={creating} onClick={() => void startChat(person)} className="flex w-full items-center gap-3 rounded p-3 text-left hover:bg-white disabled:opacity-50">
+                <Avatar name={person.name} /><span className="min-w-0"><span className="block truncate font-semibold">{person.name}</span><span className="block truncate text-sm text-on-surface-variant">{person.username}</span></span>
               </button>)}
             </> : <>
-              {loading ? <p role="status" className="p-4 text-sm">Loading conversations…</p> : conversations.length === 0 && !listError ? <div className="space-y-3 p-4 text-sm text-on-surface-variant"><p>No conversations yet. Find a classmate to say hello.</p><Button onClick={() => setComposing(true)}>Start a conversation</Button></div> : null}
-              {conversations.filter((item) => item.name.toLowerCase().includes(filter.toLowerCase())).map((conversation) => <button key={threadId(conversation)} aria-current={selected === threadId(conversation) ? "true" : undefined} onClick={() => selectConversation(threadId(conversation))} className={`flex w-full items-center gap-3 rounded-xl p-3 text-left ${selected === threadId(conversation) ? "bg-primary-fixed/60" : "hover:bg-white"}`}>
+              {loading ? <p role="status" className="p-4 text-sm">Loading conversations…</p> : conversations.length === 0 && !listError ? <div className="space-y-3 p-4 text-sm text-on-surface-variant"><p>No conversations yet. Choose a friend to say hello.</p><Button onClick={() => setComposing(true)}>Start a conversation</Button></div> : null}
+              {conversations.filter((item) => item.name.toLowerCase().includes(filter.toLowerCase())).map((conversation) => <button key={threadId(conversation)} aria-current={selected === threadId(conversation) ? "true" : undefined} onClick={() => selectConversation(threadId(conversation))} className={`flex w-full items-center gap-3 rounded p-3 text-left ${selected === threadId(conversation) ? "bg-primary-fixed/60" : "hover:bg-white"}`}>
                 <Avatar name={conversation.name} />
                 <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{conversation.name}</span><span className="mt-1 block truncate text-sm text-on-surface-variant">{conversation.preview || "Say hello"}</span><span className="mt-1 block text-xs text-on-surface-variant">{timestamp(conversation.time)}</span></span>
-                {(conversation.unread ?? 0) > 0 && <span aria-label={`${conversation.unread} unread messages`} className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-secondary px-1.5 text-xs font-bold text-white">{conversation.unread}</span>}
+                {(conversation.unread ?? 0) > 0 && <span aria-label={`${conversation.unread} unread messages`} className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded bg-secondary px-1.5 text-xs font-bold text-black">{conversation.unread}</span>}
               </button>)}
               {filter && conversations.length > 0 && !conversations.some((item) => item.name.toLowerCase().includes(filter.toLowerCase())) && <p className="p-4 text-sm">No matching conversations.</p>}
             </>}
@@ -269,7 +271,7 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
         <section aria-label="Conversation" className={`${selected ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col`}>
           {selected ? <>
             <header className="flex items-center gap-3 border-b border-outline-variant/50 p-4">
-              <Button aria-label="Back to conversations" className="md:hidden" size="icon" variant="ghost" onClick={() => selectConversation(null)}><span className="material-symbols-outlined">arrow_back</span></Button>
+              <Button aria-label="Back to conversations" className="md:hidden" size="icon" variant="ghost" onClick={() => selectConversation(null)}><CampusIcon name="arrow_back" className="" /></Button>
               <Avatar name={active?.name ?? "Chat"} />
               <div><h2 className="font-bold">{active?.name ?? (loading ? "Loading…" : "Conversation unavailable")}</h2><p className="text-xs text-on-surface-variant">Private conversation</p></div>
             </header>
@@ -278,14 +280,15 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
               {loadingMessages ? <p role="status" className="text-center text-sm">Loading messages…</p> : messages.length === 0 && !messageError && active ? <p className="py-10 text-center text-sm text-on-surface-variant">This is the start of your conversation. Say hello!</p> : null}
               {!loading && !active && <p className="text-sm">This conversation is unavailable. Choose a chat or start a new one.</p>}
               {messages.map((message) => <div key={message.id} className={`flex ${message.side === "right" ? "justify-end" : "justify-start"}`}>
-                <div className="max-w-[85%] md:max-w-[75%]"><p className={`whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm [overflow-wrap:anywhere] ${message.side === "right" ? "rounded-br-sm bg-primary text-on-primary" : "rounded-bl-sm border border-outline-variant/40 bg-white"}`}>{message.text}</p><p className="mt-1 text-xs text-on-surface-variant">{message.side === "right" ? "You · " : ""}{timestamp(message.time)}</p></div>
+                <div className="max-w-[85%] md:max-w-[75%]"><p className={`whitespace-pre-wrap break-words rounded px-4 py-3 text-sm [overflow-wrap:anywhere] ${message.side === "right" ? "rounded-br-sm bg-primary text-on-primary" : "rounded-bl-sm border border-outline-variant/40 bg-white"}`}>{message.text}</p><p className="mt-1 text-xs text-on-surface-variant">{message.side === "right" ? "You · " : ""}{timestamp(message.time)}</p></div>
               </div>)}
             </div>
+            {active && !active.canMessage && <p role="status" className="border-t px-4 py-3 text-sm text-muted-foreground">Messaging is available only while you are friends. Add this person as a friend to send messages.</p>}
             <form onSubmit={sendMessage} className="flex items-end gap-3 border-t border-outline-variant/50 p-4">
-              <Textarea aria-label="Message" placeholder="Write a message…" maxLength={5000} rows={2} disabled={!active} value={draft} onChange={(event) => setDrafts((previous) => ({ ...previous, [selected]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} className="max-h-32 min-h-12 flex-1 resize-none" />
-              <Button type="submit" disabled={sending || !active || !draft.trim()}>{sending ? "Sending…" : "Send"}</Button>
+              <Textarea aria-label="Message" placeholder="Write a message…" maxLength={5000} rows={2} disabled={!active?.canMessage} value={draft} onChange={(event) => setDrafts((previous) => ({ ...previous, [selected]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} className="max-h-32 min-h-12 flex-1 resize-none" />
+              <Button type="submit" disabled={sending || !active?.canMessage || !draft.trim()}>{sending ? "Sending…" : "Send"}</Button>
             </form>
-          </> : <div className="m-auto max-w-sm space-y-3 p-8 text-center"><span className="material-symbols-outlined text-4xl text-primary">forum</span><h2 className="text-xl font-bold">Your campus conversations</h2><p className="text-sm text-on-surface-variant">Choose a conversation or start a new chat. Messages are saved so you can pick up where you left off.</p><Button onClick={() => setComposing(true)}>New chat</Button></div>}
+          </> : <div className="m-auto max-w-sm space-y-3 p-8 text-center"><CampusIcon name="forum" className=" text-4xl text-primary" /><h2 className="text-xl font-bold">Your campus conversations</h2><p className="text-sm text-on-surface-variant">Choose a conversation or start a new chat with a friend. Messages are saved so you can pick up where you left off.</p><Button onClick={() => setComposing(true)}>New chat</Button></div>}
         </section>
       </div>
     </div>

@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, DateTime, MetaData, Table, create_engine, select
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-32-characters"
@@ -21,6 +22,18 @@ import schema_app as backend_schema  # noqa: E402
 
 
 class PostgreSQLImportTest(unittest.TestCase):
+    def test_import_preserves_timestamp_instants_after_sqlite_roundtrip(self) -> None:
+        engine = create_engine("sqlite:///:memory:")
+        self.addCleanup(engine.dispose)
+        metadata = MetaData()
+        table = Table("timestamps", metadata, Column("posted_at", DateTime(timezone=True)))
+        metadata.create_all(engine)
+        values = ["2026-09-14 12:30:00+05:30", "2026-09-14 03:00:00-04:00", "2026-09-14 07:00:00+00", "2026-09-14 07:00:00"]
+        with engine.begin() as connection:
+            connection.execute(table.insert(), [{"posted_at": importer.convert_value(value, table.c.posted_at)} for value in values])
+            restored = connection.scalars(select(table.c.posted_at)).all()
+        self.assertEqual([backend_schema.utc_isoformat(value) for value in restored], ["2026-09-14T07:00:00+00:00"] * len(values))
+
     def test_copy_parser_decodes_nulls_and_escapes(self) -> None:
         source = [
             'COPY public.sample (id, "displayName", note) FROM stdin;\n',

@@ -133,12 +133,12 @@ def export_graph() -> dict[str, Any]:
     def read_graph(transaction):
         users = transaction.run(
             "MATCH (user:User) "
-            "RETURN user.userId AS userId, user.pagerank AS pagerank "
+            "RETURN user.userId AS userId, user.pagerank AS pagerank, user.pagerankPercentile AS pagerankPercentile "
             "ORDER BY user.userId"
         ).data()
         clubs = transaction.run(
             "MATCH (club:Club) "
-            "RETURN club.clubId AS clubId, club.pagerank AS pagerank "
+            "RETURN club.clubId AS clubId, club.pagerank AS pagerank, club.pagerankPercentile AS pagerankPercentile "
             "ORDER BY club.clubId"
         ).data()
         metadata = transaction.run(
@@ -374,13 +374,13 @@ def restore_graph(graph: dict[str, Any]) -> None:
         transaction.run(
             "UNWIND $rows AS row "
             "CREATE (user:User {userId: row.userId}) "
-            "SET user.pagerank = row.pagerank",
+            "SET user.pagerank = row.pagerank, user.pagerankPercentile = coalesce(row.pagerankPercentile, 0.0)",
             rows=graph["users"],
         ).consume()
         transaction.run(
             "UNWIND $rows AS row "
             "CREATE (club:Club {clubId: row.clubId}) "
-            "SET club.pagerank = row.pagerank",
+            "SET club.pagerank = row.pagerank, club.pagerankPercentile = coalesce(row.pagerankPercentile, 0.0)",
             rows=graph["clubs"],
         ).consume()
         transaction.run(

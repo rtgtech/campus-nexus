@@ -146,10 +146,11 @@ export function HeaderSearch({
         onSubmit={handleSubmit}
       >
         <PopoverTrigger
+          nativeButton={false}
           render={
             <InputGroup
               aria-expanded={expanded}
-              className="h-10 overflow-hidden rounded-full border-primary/15 bg-primary-fixed/70 px-2 text-black shadow-inner"
+              className="h-11 w-full overflow-hidden rounded border-border bg-muted px-2 text-foreground"
             />
           }
         >
@@ -190,7 +191,7 @@ export function HeaderSearch({
 
       <PopoverContent
         align={expandable ? "end" : "start"}
-        className="w-(--anchor-width) min-w-80 overflow-hidden rounded-[10px] border-primary/15 p-0 shadow-[0_24px_70px_rgba(35,30,93,0.16)]"
+        className="w-(--anchor-width) min-w-80 overflow-hidden rounded border-primary/15 p-0 shadow-[0_24px_70px_rgba(35,30,93,0.16)]"
         initialFocus={false}
         sideOffset={8}
       >
@@ -207,7 +208,7 @@ export function HeaderSearch({
             <div className="p-2">
               {groups.map((group) => (
                 <div key={group.label} className="py-1">
-                  <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-black">
+                  <p className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-black">
                     {group.label}
                   </p>
                   {group.items.map((item) => (
@@ -221,10 +222,10 @@ export function HeaderSearch({
                       initials={item.initials}
                       badgeIcon={typeMeta[item.type].badge}
                       badgeLabel={typeMeta[item.type].label}
-                      className="flex min-w-0 items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-surface-container-low"
-                      avatarClassName="rounded-full bg-primary-fixed text-primary"
+                      className="flex min-w-0 items-center gap-3 rounded px-3 py-3 transition hover:bg-surface-container-low"
+                      avatarClassName="rounded bg-primary-fixed text-primary"
                       trailing={
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black">
+                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-black">
                           {typeMeta[item.type].label}
                         </span>
                       }

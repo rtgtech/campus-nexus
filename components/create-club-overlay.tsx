@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -167,7 +170,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
   if (!sessionLoaded) {
     return (
       <Dialog open onOpenChange={closeDialog}>
-        <DialogContent className="max-w-xl rounded-[3px] border-outline-variant bg-white p-6">
+        <DialogContent className="max-w-xl rounded border-outline-variant bg-white p-6">
           <DialogTitle className="sr-only">Checking admin access</DialogTitle>
           <DialogDescription className="sr-only">Please wait while admin access is verified.</DialogDescription>
           <p className="text-sm font-semibold text-on-surface-variant">Checking admin access...</p>
@@ -179,7 +182,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
   if (!isAdminUser(session?.user)) {
     return (
       <Dialog open onOpenChange={closeDialog}>
-        <DialogContent className="max-w-xl rounded-[3px] border-outline-variant bg-white p-6">
+        <DialogContent className="max-w-xl rounded border-outline-variant bg-white p-6">
           <DialogHeader className="pr-10">
               <p className="text-xs font-medium text-on-surface-variant">Admin only</p>
               <DialogTitle className="mt-2 text-2xl font-semibold text-on-background">Club creation is restricted.</DialogTitle>
@@ -194,7 +197,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
 
   return (
     <Dialog open onOpenChange={closeDialog}>
-      <DialogContent className="flex h-[calc(100dvh-3rem)] max-w-2xl flex-col overflow-hidden rounded-[3px] border-outline-variant bg-white p-5 md:h-[720px] md:p-6">
+      <DialogContent className="flex h-[calc(100dvh-3rem)] max-w-2xl flex-col overflow-hidden rounded border-outline-variant bg-white p-5 md:h-[720px] md:p-6">
         <DialogHeader className="shrink-0 pr-10">
           <div>
             <p className="text-xs font-medium text-on-surface-variant">Create club</p>
@@ -212,7 +215,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
                 <Field>
                   <FieldLabel htmlFor="club-name">Club name</FieldLabel>
                   <Input
-                    className="h-11 rounded-[3px] border-outline-variant bg-white px-3"
+                    className="h-11 rounded border-outline-variant bg-white px-3"
                     id="club-name"
                     type="text"
                     value={clubName}
@@ -227,7 +230,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
                   <Field>
                     <FieldLabel htmlFor="associated-department">Associated department</FieldLabel>
                     <NativeSelect
-                      className="w-full [&_select]:h-11 [&_select]:rounded-[3px] [&_select]:border-outline-variant [&_select]:bg-white"
+                      className="w-full [&_select]:h-11 [&_select]:rounded [&_select]:border-outline-variant [&_select]:bg-white"
                       id="associated-department"
                       value={associatedDepartment}
                       onChange={(event) => {
@@ -247,23 +250,23 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
 
                   <div className="space-y-2">
                     <span className="text-sm font-semibold text-on-surface">Related departments</span>
-                    <div className="flex min-h-11 flex-wrap gap-2 rounded-[3px] border border-outline-variant bg-white p-2">
+                    <div className="flex min-h-11 flex-wrap gap-2 rounded border border-outline-variant bg-white p-2">
                       {relatedDepartments.length > 0 ? (
                         relatedDepartments.map((department) => (
                           <Badge
                             key={department}
-                            className="gap-2 rounded-[3px] border border-outline-variant bg-[#f7f7f4] px-3 py-1.5 text-xs font-semibold text-on-surface"
+                            className="gap-2 rounded border border-outline-variant bg-[#f7f7f4] px-3 py-1.5 text-xs font-semibold text-on-surface"
                           >
                             {department}
                             <Button
                               aria-label={`Remove ${department}`}
-                              className="size-5 rounded-[3px] text-on-surface-variant hover:text-secondary"
+                              className="size-5 rounded text-on-surface-variant hover:text-on-secondary-fixed-variant"
                               size="icon-xs"
                               type="button"
                               variant="ghost"
                               onClick={() => removeRelatedDepartment(department)}
                             >
-                              <span className="material-symbols-outlined text-sm">close</span>
+                              <CampusIcon name="close" className=" text-sm" />
                             </Button>
                           </Badge>
                         ))
@@ -274,7 +277,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
                       )}
                     </div>
                     <NativeSelect
-                      className="w-full [&_select]:h-11 [&_select]:rounded-[3px] [&_select]:border-outline-variant [&_select]:bg-white"
+                      className="w-full [&_select]:h-11 [&_select]:rounded [&_select]:border-outline-variant [&_select]:bg-white"
                       defaultValue=""
                       disabled={availableRelatedDepartments.length === 0}
                       onChange={handleRelatedDepartmentsChange}
@@ -294,7 +297,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
                 <Field className="min-h-0">
                   <FieldLabel htmlFor="club-description">Description</FieldLabel>
                   <Textarea
-                    className="min-h-0 flex-1 resize-none rounded-[3px] border-outline-variant bg-white px-3 py-3 text-sm leading-6"
+                    className="min-h-0 flex-1 resize-none rounded border-outline-variant bg-white px-3 py-3 text-sm leading-6"
                     id="club-description"
                     value={description}
                     onChange={(event) => {
@@ -314,26 +317,24 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
                   onChange={handleBannerChange}
                 />
 
-                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[3px] border border-dashed border-outline-variant bg-[#f7f7f4] p-4">
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded border border-dashed border-outline-variant bg-[#f7f7f4] p-4">
                   {bannerPreviewUrl ? (
-                    <img alt="" className="max-h-full max-w-full rounded-[3px] object-contain" src={bannerPreviewUrl} />
+                    <img alt="" className="max-h-full max-w-full rounded object-contain" src={bannerPreviewUrl} />
                   ) : (
                     <div className="text-center">
-                      <span className="material-symbols-outlined border border-outline-variant bg-white p-5 text-4xl text-on-surface">
-                        add_photo_alternate
-                      </span>
+                      <CampusIcon name="add_photo_alternate" className=" border border-outline-variant bg-white p-5 text-4xl text-on-surface" />
                       <p className="mt-5 text-lg font-bold text-on-background">Select a banner image</p>
                     </div>
                   )}
                 </div>
 
                 <Button
-                  className="mt-4 w-full rounded-[3px] px-5"
+                  className="mt-4 w-full rounded px-5"
                   type="button"
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <span className="material-symbols-outlined text-base">add</span>
+                  <CampusIcon name="add" className=" text-base" />
                   Choose banner
                 </Button>
               </div>
@@ -341,7 +342,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
           </div>
 
           <div className="mt-5 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-outline-variant/60 pt-5">
-            <p className={status === "error" ? "text-sm font-semibold text-secondary" : "text-sm text-on-surface-variant"}>
+            <p className={status === "error" ? "text-sm font-semibold text-on-secondary-fixed-variant" : "text-sm text-on-surface-variant"}>
               {status === "saving"
                 ? "Creating..."
                 : status === "success"
@@ -357,7 +358,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
             <div className="flex flex-wrap gap-3">
               {step === "banner" ? (
                 <Button
-                  className="rounded-[3px] px-5"
+                  className="rounded px-5"
                   disabled={status === "saving"}
                   type="button"
                   variant="outline"
@@ -369,7 +370,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
               {step === "details" ? (
                 <Button
                   disabled={!detailStepComplete()}
-                  className="rounded-[3px] px-5"
+                  className="rounded px-5"
                   type="button"
                   onClick={() => setStep("banner")}
                 >
@@ -378,7 +379,7 @@ export function CreateClubOverlay({ returnHref = "/admin" }: { returnHref?: stri
               ) : (
                 <Button
                   disabled={status === "saving" || !bannerFile}
-                  className="rounded-[3px] px-5"
+                  className="rounded px-5"
                   name="intent"
                   type="submit"
                   value="create-club"

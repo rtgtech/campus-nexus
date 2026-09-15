@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/empty-state";
@@ -65,7 +68,7 @@ export function SavedPostsDialog({ returnHref }: SavedPostsDialogProps) {
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent
-        className="flex h-[calc(100dvh-2rem)] max-h-[900px] max-w-6xl flex-col gap-0 overflow-hidden rounded-[14px] border-white/60 bg-background/95 p-0 shadow-[0_28px_100px_rgba(15,18,33,0.3)] backdrop-blur-xl"
+        className="flex h-[calc(100dvh-2rem)] max-h-[900px] max-w-6xl flex-col gap-0 overflow-hidden rounded border-white/60 bg-background/95 p-0 shadow-[0_28px_100px_rgba(15,18,33,0.3)] backdrop-blur-xl"
         showCloseButton={false}
       >
         <DialogHeader className="shrink-0 border-b border-outline-variant/60 bg-white/90 px-6 py-5 pr-20 md:px-8">
@@ -79,13 +82,13 @@ export function SavedPostsDialog({ returnHref }: SavedPostsDialogProps) {
 
         <Button
           aria-label="Close saved posts"
-          className="absolute right-5 top-5 z-10 rounded-full text-on-surface-variant"
+          className="absolute right-5 top-5 z-10 rounded text-on-surface-variant"
           size="icon"
           type="button"
           variant="ghost"
           onClick={close}
         >
-          <span className="material-symbols-outlined">close</span>
+          <CampusIcon name="close" className="" />
         </Button>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
@@ -96,9 +99,9 @@ export function SavedPostsDialog({ returnHref }: SavedPostsDialogProps) {
           ) : status === "error" ? (
             <div className="grid min-h-72 place-items-center text-center" role="alert">
               <div>
-                <span className="material-symbols-outlined text-4xl text-secondary">error</span>
+                <CampusIcon name="error" className=" text-4xl text-on-secondary-fixed-variant" />
                 <p className="mt-3 font-semibold text-on-surface">Saved posts could not be loaded.</p>
-                <Button className="mt-4 rounded-full" type="button" variant="outline" onClick={() => void loadSavedPosts()}>
+                <Button className="mt-4 rounded" type="button" variant="outline" onClick={() => void loadSavedPosts()}>
                   Try again
                 </Button>
               </div>

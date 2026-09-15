@@ -1,9 +1,14 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ProfilePostsGrid } from "@/components/profile-posts-grid";
+import { FeedPreferences } from "@/components/feed-preferences";
+import { LoadError } from "@/components/load-error";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -50,6 +55,7 @@ type ProfilePageViewProps = {
   memberships: ProfileClubSummary[];
   mutualFriendsPreview: ProfileFriend[];
   posts: FeedCard[];
+  postsError?: string | null;
   preferences?: ProfilePreferences;
   profile: ProfileData;
   profileStats: ProfileOverviewData["stats"];
@@ -96,10 +102,10 @@ function listingTime(value: string, now: number) {
 function FriendPreview({ friend }: { friend: FriendshipUser }) {
   return (
     <Link className="min-w-0 text-center" href={profileHref(friend)}>
-      <span className="mx-auto flex aspect-square w-full items-center justify-center rounded-[10px] border border-primary/15 bg-primary-fixed text-xs font-bold text-black transition hover:border-primary/40">
+      <span className="mx-auto flex aspect-square w-full items-center justify-center rounded border border-primary/15 bg-primary-fixed text-xs font-bold text-black transition hover:border-primary/40">
         {friend.initials || friend.acronym || getInitials(friend.name)}
       </span>
-      <span className="mt-1.5 block truncate text-[10px] text-[#6f6f69]">{friend.name.split(" ")[0]}</span>
+      <span className="mt-1.5 block truncate text-xs text-[#6f6f69]">{friend.name.split(" ")[0]}</span>
     </Link>
   );
 }
@@ -108,15 +114,15 @@ function ClubRow({ summary }: { summary: ProfileClubSummary }) {
   const { club, membership } = summary;
   return (
     <Link className="flex items-center gap-3 border-b border-[#e8e8e2] py-3 last:border-0" href={`/clubs/${encodeURIComponent(club.slug)}`}>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[9px] border border-primary/15 bg-primary-fixed text-[10px] font-bold text-black">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-primary/15 bg-primary-fixed text-xs font-bold text-black">
         {club.bannerImage ? <img alt="" className="h-full w-full object-cover" src={club.bannerImage} /> : getInitials(club.title)}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-semibold text-[#222]">{club.title}</span>
-        <span className="mt-0.5 block text-[10px] text-[#777770]">{membershipDate(membership.createdAt)}</span>
+        <span className="mt-0.5 block text-xs text-[#777770]">{membershipDate(membership.createdAt)}</span>
       </span>
       {membership.title && membership.title.toLowerCase() !== "member" ? (
-        <span className="rounded-[4px] border border-[#d8d8d2] px-2 py-1 font-mono text-[8px] uppercase text-[#686862]">
+        <span className="rounded border border-[#d8d8d2] px-2 py-1 font-mono text-[8px] uppercase text-[#686862]">
           {membership.title}
         </span>
       ) : null}
@@ -127,12 +133,12 @@ function ClubRow({ summary }: { summary: ProfileClubSummary }) {
 function FollowedClubRow({ club }: { club: ClubCard }) {
   return (
     <Link className="flex items-center gap-3 py-2" href={`/clubs/${encodeURIComponent(club.slug)}`}>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[8px] border border-secondary/15 bg-secondary-fixed text-[9px] font-bold text-black">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-secondary/15 bg-secondary-fixed text-xs font-bold text-black">
         {club.bannerImage ? <img alt="" className="h-full w-full object-cover" src={club.bannerImage} /> : getInitials(club.title)}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-semibold">{club.title}</span>
-        <span className="mt-0.5 block text-[10px] text-[#777770]">
+        <span className="mt-0.5 block text-xs text-[#777770]">
           {club.followers === undefined ? "Followers unavailable" : `${club.followers} followers`}
         </span>
       </span>
@@ -142,7 +148,7 @@ function FollowedClubRow({ club }: { club: ClubCard }) {
 
 function PlaceholderCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[12px] border border-[#deded8] bg-white p-4">
+    <section className="rounded border border-[#deded8] bg-white p-4">
       <h3 className="text-[13px] font-semibold">{title}</h3>
       <div className="mt-3">{children}</div>
     </section>
@@ -163,6 +169,7 @@ export function ProfilePageView({
   preferences: initialPreferences,
   profile: initialProfile,
   profileStats,
+  postsError,
   user,
 }: ProfilePageViewProps) {
   const router = useRouter();
@@ -268,7 +275,7 @@ export function ProfilePageView({
   }
 
   async function startConversation() {
-    if (isSelf || messageStatus === "saving") {
+    if (isSelf || !friendship?.isFriend || messageStatus === "saving") {
       return;
     }
     setMessageStatus("saving");
@@ -363,9 +370,9 @@ export function ProfilePageView({
 
   return (
     <div className="mx-auto max-w-[1100px] pb-12 md:pl-16">
-      <section className="rounded-[14px] border border-primary/12 bg-white p-5 shadow-[0_14px_36px_rgba(35,30,93,0.06)] md:p-6">
+      <section className="rounded border border-primary/12 bg-white p-5  md:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          <div className="flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-primary/15 bg-primary-fixed text-xl font-bold text-black">
+          <div className="flex h-[88px] w-[88px] shrink-0 items-center justify-center overflow-hidden rounded border border-primary/15 bg-primary-fixed text-xl font-bold text-black">
             {profile.avatar ? (
               <img alt={`${user.name} profile`} className="h-full w-full object-cover" src={profile.avatar} />
             ) : (
@@ -377,10 +384,10 @@ export function ProfilePageView({
             <div className="flex flex-col items-start justify-between gap-4 md:flex-row">
               <div>
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-2xl font-bold tracking-[-0.03em] text-black">{user.name}</h1>
+                  <h1 className="font-editorial font-medium text-2xl  tracking-[-0.03em] text-black">{user.name}</h1>
                   {leaderboardEntry !== undefined && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#d8d8d2] px-2.5 py-1 font-mono text-[10px] font-bold text-[#454541]">
-                    <span className="material-symbols-outlined text-[12px]">leaderboard</span>
+                    <span className="inline-flex items-center gap-1.5 rounded border border-[#d8d8d2] px-2.5 py-1 font-mono text-xs font-bold text-[#454541]">
+                    <CampusIcon name="leaderboard" className=" text-xs" />
                     {rankLabel}
                   </span>
                   )}
@@ -388,8 +395,8 @@ export function ProfilePageView({
                 <p className="mt-1 text-xs text-[#6d6d67]">
                   {profile.major || user.department || "Department —"} · {yearLabel}
                 </p>
-                <p className="mt-2 flex items-center gap-1.5 font-mono text-[10px] uppercase text-[#85857e]">
-                  <span className={cn("h-[7px] w-[7px] rounded-full", profile.isOnline ? "bg-emerald-500" : "bg-[#92928b]")} />
+                <p className="mt-2 flex items-center gap-1.5 font-mono text-xs uppercase text-[#85857e]">
+                  <span className={cn("h-[7px] w-[7px] rounded", profile.isOnline ? "bg-emerald-500" : "bg-[#92928b]")} />
                   {activityLabel}
                 </p>
               </div>
@@ -397,8 +404,9 @@ export function ProfilePageView({
               <div className="flex flex-wrap gap-2">
                 {!isSelf ? (
                   <Button
-                    className="h-9 rounded-[8px] border-[#d8d8d2] px-4 text-xs"
-                    disabled={messageStatus === "saving"}
+                    className="h-9 rounded border-[#d8d8d2] px-4 text-xs"
+                    disabled={!friendship?.isFriend || messageStatus === "saving"}
+                    title={friendship?.isFriend ? "Message your friend" : "Add this person as a friend to message them"}
                     type="button"
                     variant="outline"
                     onClick={startConversation}
@@ -406,20 +414,20 @@ export function ProfilePageView({
                     {messageStatus === "saving" ? "Opening…" : "Message"}
                   </Button>
                 ) : null}
-                <Button className="h-9 rounded-[8px] border-[#d8d8d2] px-4 text-xs" type="button" variant="outline" onClick={shareProfile}>
+                <Button className="h-9 rounded border-[#d8d8d2] px-4 text-xs" type="button" variant="outline" onClick={shareProfile}>
                   Share profile
                 </Button>
                 {isSelf ? (
-                  <Button className="h-9 rounded-[8px] bg-primary px-4 text-xs text-white hover:bg-primary/90" type="button" onClick={() => setEditOpen(true)}>
+                  <Button className="h-9 rounded bg-primary px-4 text-xs text-white hover:bg-primary/90" type="button" onClick={() => setEditOpen(true)}>
                     Edit profile
                   </Button>
                 ) : (
                   <Button
                     className={cn(
-                      "h-9 rounded-[8px] px-4 text-xs",
+                      "h-9 rounded px-4 text-xs",
                       friendship?.isFriend
                         ? "border-primary/15 bg-white text-black hover:bg-primary-fixed"
-                        : "bg-secondary text-white hover:bg-secondary/90",
+                        : "bg-secondary text-black hover:bg-secondary/90",
                     )}
                     disabled={friendStatus === "loading" || friendStatus === "saving"}
                     type="button"
@@ -437,11 +445,11 @@ export function ProfilePageView({
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {profile.interests.length > 0 ? profile.interests.map((interest) => (
-                <span key={interest} className="rounded-full border border-primary/15 bg-primary-fixed/65 px-2.5 py-1 font-mono text-[9px] uppercase text-black">
+                <span key={interest} className="rounded border border-primary/15 bg-primary-fixed/65 px-2.5 py-1 font-mono text-xs uppercase text-black">
                   {interest}
                 </span>
               )) : (
-                <span className="text-[10px] text-[#85857e]">No interests added.</span>
+                <span className="text-xs text-[#85857e]">No interests added.</span>
               )}
             </div>
 
@@ -449,19 +457,19 @@ export function ProfilePageView({
 
             <button className="mt-4 text-left" type="button" onClick={() => setFriendsDialogView("friends")}>
               <strong className="block text-base">{friendCount === undefined ? "—" : friendCount}</strong>
-              <span className="text-[10px] text-[#777770]">Friends</span>
+              <span className="text-xs text-[#777770]">Friends</span>
             </button>
 
             {!isSelf && mutuals.length > 0 ? (
               <button className="mt-3 flex items-center gap-2 text-left" type="button" onClick={() => setFriendsDialogView("mutuals")}>
                 <span className="flex -space-x-1.5">
                   {mutuals.slice(0, 3).map((friend) => (
-                    <span key={friend.userId} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[#ededE8] text-[7px] font-bold">
+                    <span key={friend.userId} className="flex h-6 w-6 items-center justify-center rounded border-2 border-white bg-[#ededE8] text-[7px] font-bold">
                       {friend.initials || friend.acronym || getInitials(friend.name)}
                     </span>
                   ))}
                 </span>
-                <span className="text-[10px] text-[#777770]">
+                <span className="text-xs text-[#777770]">
                   {mutuals.length} mutual {mutuals.length === 1 ? "friend" : "friends"}
                 </span>
               </button>
@@ -495,15 +503,15 @@ export function ProfilePageView({
             <div className="mb-3 flex items-end justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold">Posts</h2>
-                <p className="mt-1 text-[10px] text-[#777770]">{posts.length} published {posts.length === 1 ? "post" : "posts"}</p>
+                <p className="mt-1 text-xs text-[#777770]">{posts.length} published {posts.length === 1 ? "post" : "posts"}</p>
               </div>
               {isSelf ? (
-                <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-[7px] text-xs")} href="/my_activity">
+                <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded text-xs")} href="/my_activity">
                   My activity
                 </Link>
               ) : null}
             </div>
-            <ProfilePostsGrid ownerUserId={user.userId} posts={posts} />
+            {postsError ? <LoadError message={postsError} /> : <ProfilePostsGrid ownerUserId={user.userId} posts={posts} />}
           </div>
 
           <aside className="space-y-3">
@@ -515,17 +523,17 @@ export function ProfilePageView({
                       key={badge.id}
                       aria-label={`${badge.name}${badge.earned ? ", earned" : ", locked"}`}
                       className={cn(
-                        "flex aspect-square items-center justify-center rounded-[9px] border bg-[#f7f7f4]",
+                        "flex aspect-square items-center justify-center rounded border bg-[#f7f7f4]",
                         badge.earned ? "border-[#aaa] text-[#353532]" : "border-dashed border-[#d8d8d2] text-[#aaa]",
                       )}
                       title={badge.name}
                     >
-                      <span className="material-symbols-outlined text-base">{badge.earned ? badge.icon : "lock"}</span>
+                      <CampusIcon name={badge.earned ? badge.icon : "lock"} className=" text-base" />
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] text-[#777770]">No badges are configured.</p>
+                <p className="text-xs text-[#777770]">No badges are configured.</p>
               )}
             </PlaceholderCard>
 
@@ -535,12 +543,12 @@ export function ProfilePageView({
                   {visibleFriendPreview.map((friend) => <FriendPreview key={friend.userId} friend={friend} />)}
                 </div>
               ) : (
-                <p className="text-[11px] text-[#777770]">
+                <p className="text-xs text-[#777770]">
                   {friendStatus === "loading" ? "Loading friends…" : isSelf ? "No friends yet." : "No mutual friends yet."}
                 </p>
               )}
               <button
-                className="mt-3 text-[10px] font-semibold text-[#5f5f59] underline underline-offset-4"
+                className="mt-3 text-xs font-semibold text-[#5f5f59] underline underline-offset-4"
                 type="button"
                 onClick={() => setFriendsDialogView(isSelf ? "friends" : "mutuals")}
               >
@@ -555,13 +563,13 @@ export function ProfilePageView({
         <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" role="tabpanel">
           <PlaceholderCard title="Member of">
             {memberships.length > 0 ? memberships.map((summary) => <ClubRow key={summary.club.slug} summary={summary} />) : (
-              <p className="text-[11px] text-[#777770]">No club memberships yet.</p>
+              <p className="text-xs text-[#777770]">No club memberships yet.</p>
             )}
           </PlaceholderCard>
           {isSelf ? (
             <PlaceholderCard title="Following">
               {followedClubs.length > 0 ? followedClubs.map((club) => <FollowedClubRow key={club.slug} club={club} />) : (
-                <p className="text-[11px] text-[#777770]">No followed clubs yet.</p>
+                <p className="text-xs text-[#777770]">No followed clubs yet.</p>
               )}
             </PlaceholderCard>
           ) : <div />}
@@ -573,15 +581,15 @@ export function ProfilePageView({
           <PlaceholderCard title={`Active listings (${listings.length})`}>
             {listings.length > 0 ? listings.map((listing) => (
               <Link key={listing.id || listing.postId || listing.title} className="flex items-center gap-3 border-b border-[#e8e8e2] py-3 last:border-0" href={`/marketplace#${listing.postId || listing.id || ""}`}>
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[9px] border border-[#deded8] bg-[#f3f3ef]">
-                  {listing.image ? <img alt="" className="h-full w-full object-cover" src={listing.image} /> : <span className="material-symbols-outlined text-base text-[#85857e]">sell</span>}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded border border-[#deded8] bg-[#f3f3ef]">
+                  {listing.image ? <img alt="" className="h-full w-full object-cover" src={listing.image} /> : <CampusIcon name="sell" className=" text-base text-[#85857e]" />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-semibold">{listing.title}</span>
-                  <span className="mt-0.5 block text-[10px] text-[#777770]">{listing.price || "Price unavailable"} · {listingTime(listing.createdAt, now)}</span>
+                  <span className="mt-0.5 block text-xs text-[#777770]">{listing.price || "Price unavailable"} · {listingTime(listing.createdAt, now)}</span>
                 </span>
               </Link>
-            )) : <p className="text-[11px] text-[#777770]">No active listings.</p>}
+            )) : <p className="text-xs text-[#777770]">No active listings.</p>}
           </PlaceholderCard>
           <PlaceholderCard title="Trust">
             <div className="space-y-3">
@@ -589,9 +597,9 @@ export function ProfilePageView({
                 <strong className="block text-base">
                   {marketplaceSummary.sellerRating === null ? "No ratings" : `${marketplaceSummary.sellerRating.toFixed(1)} / 5`}
                 </strong>
-                <span className="text-[10px] text-[#777770]">Seller rating · {marketplaceSummary.sellerRatingCount} reviews</span>
+                <span className="text-xs text-[#777770]">Seller rating · {marketplaceSummary.sellerRatingCount} reviews</span>
               </div>
-              <div><strong className="block text-base">{marketplaceSummary.successfulTrades}</strong><span className="text-[10px] text-[#777770]">Successful trades</span></div>
+              <div><strong className="block text-base">{marketplaceSummary.successfulTrades}</strong><span className="text-xs text-[#777770]">Successful trades</span></div>
             </div>
           </PlaceholderCard>
         </section>
@@ -599,6 +607,7 @@ export function ProfilePageView({
 
       {activeTab === "settings" && isSelf ? (
         <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" role="tabpanel">
+          <div className="lg:col-span-2"><FeedPreferences /></div>
           <PlaceholderCard title="Notification sources">
             {preferences ? (
               <div className="flex flex-wrap gap-2">
@@ -609,7 +618,7 @@ export function ProfilePageView({
                       key={key}
                       aria-pressed={enabled}
                       className={cn(
-                        "rounded-[6px] border px-3 py-2 font-mono text-[9px] uppercase",
+                        "rounded border px-3 py-2 font-mono text-xs uppercase",
                         enabled ? "border-primary bg-primary text-white" : "border-primary/15 text-black",
                       )}
                       type="button"
@@ -626,7 +635,7 @@ export function ProfilePageView({
                   );
                 })}
               </div>
-            ) : <p className="text-[11px] text-[#777770]">Preferences could not be loaded.</p>}
+            ) : <p className="text-xs text-[#777770]">Preferences could not be loaded.</p>}
           </PlaceholderCard>
           <PlaceholderCard title="Privacy">
             {preferences ? privacyLabels.map(({ key, label }) => (
@@ -634,7 +643,7 @@ export function ProfilePageView({
                 <p className="text-xs font-semibold">{label}</p>
                 <NativeSelect
                   aria-label={label}
-                  className="w-28 [&_select]:rounded-[6px]"
+                  className="w-28 [&_select]:rounded"
                   size="sm"
                   value={preferences.privacy[key]}
                   onChange={(event) => setPreferences((current) => current ? {
@@ -650,12 +659,12 @@ export function ProfilePageView({
                   ))}
                 </NativeSelect>
               </div>
-            )) : <p className="text-[11px] text-[#777770]">Preferences could not be loaded.</p>}
+            )) : <p className="text-xs text-[#777770]">Preferences could not be loaded.</p>}
             {preferencesMessage ? (
-              <p className={cn("mt-3 text-[10px]", preferencesStatus === "error" ? "text-destructive" : "text-[#5f5f59]")}>{preferencesMessage}</p>
+              <p className={cn("mt-3 text-xs", preferencesStatus === "error" ? "text-destructive" : "text-[#5f5f59]")}>{preferencesMessage}</p>
             ) : null}
             <Button
-              className="mt-4 w-full rounded-[7px] bg-primary text-white hover:bg-primary/90"
+              className="mt-4 w-full rounded bg-primary text-white hover:bg-primary/90"
               disabled={!preferences || preferencesStatus === "saving"}
               size="sm"
               type="button"
@@ -673,7 +682,7 @@ export function ProfilePageView({
           if (!open) setFriendsDialogView(null);
         }}
       >
-        <DialogContent className="max-w-2xl rounded-[12px] p-0">
+        <DialogContent className="max-w-2xl rounded p-0">
           <DialogHeader className="border-b border-[#e5e5df] p-5 pr-14">
             <DialogTitle className="text-xl font-bold">
               {friendsDialogView === "mutuals" ? `Mutual friends with ${user.name}` : isSelf ? "Friends" : `Friends of ${user.name}`}
@@ -690,21 +699,21 @@ export function ProfilePageView({
             <div className="p-4">
               {dialogFriends.length > 0 ? dialogFriends.map((friend) => (
                 <div key={friend.userId} className="flex items-center gap-3 border-b border-[#e8e8e2] py-3 last:border-0">
-                  <Link className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[#deded8] bg-[#f3f3ef] text-[10px] font-bold" href={profileHref(friend)}>
+                  <Link className="flex h-9 w-9 items-center justify-center rounded border border-[#deded8] bg-[#f3f3ef] text-xs font-bold" href={profileHref(friend)}>
                     {friend.initials || friend.acronym || getInitials(friend.name)}
                   </Link>
                   <Link className="min-w-0 flex-1" href={profileHref(friend)}>
                     <span className="block truncate text-xs font-semibold">{friend.name}</span>
-                    <span className="block truncate text-[10px] text-[#777770]">@{friend.username || friend.userId}</span>
+                    <span className="block truncate text-xs text-[#777770]">@{friend.username || friend.userId}</span>
                   </Link>
                   {isSelf && friendsDialogView === "friends" ? (
-                    <Button className="rounded-[7px] text-xs" size="sm" type="button" variant="outline" onClick={() => removeFriend(friend.userId)}>
+                    <Button className="rounded text-xs" size="sm" type="button" variant="outline" onClick={() => removeFriend(friend.userId)}>
                       Unfriend
                     </Button>
                   ) : null}
                 </div>
               )) : (
-                <p className="rounded-[9px] bg-[#f5f5f1] p-4 text-xs text-[#777770]">
+                <p className="rounded bg-[#f5f5f1] p-4 text-xs text-[#777770]">
                   {friendsDialogView === "mutuals" ? "No mutual friends to show." : "No friends to show."}
                 </p>
               )}
@@ -714,7 +723,7 @@ export function ProfilePageView({
       </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl rounded-[12px] p-5 sm:p-6">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl rounded p-5 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Edit profile</DialogTitle>
             <DialogDescription>Update the profile fields currently supported by the API.</DialogDescription>
@@ -722,12 +731,12 @@ export function ProfilePageView({
           <form className="mt-4 space-y-4" onSubmit={saveProfile}>
             <label className="block text-xs font-semibold">
               Major
-              <Input className="mt-2 h-10 rounded-[8px] bg-[#f7f7f4]" value={editMajor} onChange={(event) => setEditMajor(event.target.value)} />
+              <Input className="mt-2 h-10 rounded bg-[#f7f7f4]" value={editMajor} onChange={(event) => setEditMajor(event.target.value)} />
             </label>
             <label className="block text-xs font-semibold">
               Batch year
               <Input
-                className="mt-2 h-10 rounded-[8px] bg-[#f7f7f4]"
+                className="mt-2 h-10 rounded bg-[#f7f7f4]"
                 inputMode="numeric"
                 placeholder="2027"
                 type="number"
@@ -738,16 +747,16 @@ export function ProfilePageView({
             <label className="block text-xs font-semibold">
               Interests
               <Input
-                className="mt-2 h-10 rounded-[8px] bg-[#f7f7f4]"
+                className="mt-2 h-10 rounded bg-[#f7f7f4]"
                 placeholder="Robotics, design, music"
                 value={editInterests}
                 onChange={(event) => setEditInterests(event.target.value)}
               />
-              <span className="mt-1 block text-[10px] font-normal text-[#777770]">Separate interests with commas.</span>
+              <span className="mt-1 block text-xs font-normal text-[#777770]">Separate interests with commas.</span>
             </label>
             <label className="block text-xs font-semibold">
               Bio
-              <Textarea className="mt-2 min-h-32 rounded-[8px] bg-[#f7f7f4]" maxLength={500} value={editBio} onChange={(event) => setEditBio(event.target.value)} />
+              <Textarea className="mt-2 min-h-32 rounded bg-[#f7f7f4]" maxLength={500} value={editBio} onChange={(event) => setEditBio(event.target.value)} />
             </label>
             {editMessage ? <p className="text-xs font-semibold text-destructive">{editMessage}</p> : null}
             <div className="flex justify-end gap-2">

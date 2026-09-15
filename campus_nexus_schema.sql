@@ -4,6 +4,7 @@
 
 PRAGMA foreign_keys=ON;
 
+
 CREATE TABLE badges (
 	"badgeId" VARCHAR(80) NOT NULL,
 	name VARCHAR(120) NOT NULL,
@@ -394,3 +395,62 @@ CREATE TABLE marketplace_reviews (
 CREATE INDEX "ix_marketplace_reviews_revieweeId" ON marketplace_reviews ("revieweeId");
 
 CREATE INDEX "ix_marketplace_reviews_tradeId" ON marketplace_reviews ("tradeId");
+
+CREATE TABLE feed_affinities (
+	"userId" INTEGER NOT NULL,
+	target VARCHAR(100) NOT NULL,
+	day VARCHAR(10) NOT NULL,
+	weight FLOAT NOT NULL,
+	PRIMARY KEY ("userId", target, day),
+	FOREIGN KEY("userId") REFERENCES users ("userId") ON DELETE CASCADE
+);
+
+CREATE TABLE feed_exclusions (
+	"userId" INTEGER NOT NULL,
+	target VARCHAR(100) NOT NULL,
+	PRIMARY KEY ("userId", target),
+	FOREIGN KEY("userId") REFERENCES users ("userId") ON DELETE CASCADE
+);
+
+CREATE TABLE feed_settings (
+	"userId" INTEGER NOT NULL,
+	enabled BOOLEAN NOT NULL,
+	"historyResetAt" DATETIME,
+	PRIMARY KEY ("userId"),
+	FOREIGN KEY("userId") REFERENCES users ("userId") ON DELETE CASCADE
+);
+
+CREATE TABLE feed_snapshots (
+	id VARCHAR(64) NOT NULL,
+	"userId" INTEGER,
+	mode VARCHAR(20) NOT NULL,
+	version VARCHAR(20) NOT NULL,
+	records TEXT NOT NULL,
+	"createdAt" DATETIME NOT NULL,
+	"expiresAt" DATETIME NOT NULL,
+	PRIMARY KEY (id),
+	FOREIGN KEY("userId") REFERENCES users ("userId") ON DELETE CASCADE
+);
+
+CREATE INDEX "ix_feed_snapshots_expiresAt" ON feed_snapshots ("expiresAt");
+
+CREATE INDEX "ix_feed_snapshots_userId" ON feed_snapshots ("userId");
+
+CREATE TABLE feed_events (
+	"userId" INTEGER NOT NULL,
+	"postId" INTEGER NOT NULL,
+	kind VARCHAR(20) NOT NULL,
+	day VARCHAR(10) NOT NULL,
+	"createdAt" DATETIME NOT NULL,
+	duration INTEGER NOT NULL,
+	version VARCHAR(20) NOT NULL,
+	position INTEGER,
+	PRIMARY KEY ("userId", "postId", kind, day),
+	FOREIGN KEY("userId") REFERENCES users ("userId") ON DELETE CASCADE,
+	FOREIGN KEY("postId") REFERENCES posts ("postId") ON DELETE CASCADE
+);
+
+CREATE INDEX "ix_feed_events_createdAt" ON feed_events ("createdAt");
+
+CREATE INDEX ix_posts_feed_order ON posts ("createdAt", "postId");
+CREATE INDEX ix_feed_affinities_day ON feed_affinities (day);

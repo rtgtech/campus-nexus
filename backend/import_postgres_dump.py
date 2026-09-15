@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, TextIO
@@ -159,7 +159,10 @@ def convert_value(value: str | None, column) -> Any:
     if isinstance(column_type, Boolean):
         return value.lower() in {"t", "true", "1"}
     if isinstance(column_type, DateTime):
-        return datetime.fromisoformat(value.replace(" ", "T", 1))
+        parsed = datetime.fromisoformat(value.replace(" ", "T", 1))
+        # SQLite drops offsets on storage. Normalize the instant before that
+        # happens so serialization can safely interpret stored values as UTC.
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else parsed
     if isinstance(column_type, Date):
         return date.fromisoformat(value)
     if isinstance(column_type, Integer):

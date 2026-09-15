@@ -1,9 +1,11 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CampusHeader } from "@/components/campus-header";
-import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
+import { CampusShell } from "@/components/campus-shell";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
@@ -251,32 +253,17 @@ export default function MindSnapPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-white pb-10 font-body-md text-on-surface">
-        <CampusHeader
-          active="games"
-          contextAction={
-            <Link
-              href="/games"
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "hidden rounded-full px-3 text-xs text-on-surface-variant hover:text-primary xl:inline-flex")}
-            >
-              Games
-            </Link>
-          }
-        />
-
-        <CollapsibleSidebar active="games" />
-
-        <main className="mx-auto grid max-w-6xl gap-4 px-4 pt-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <section className="rounded-[10px] border border-surface-container-highest bg-white p-3 shadow-xs sm:p-4">
+      <CampusShell active="games"><div className="grid  gap-4   lg:grid-cols-[minmax(0,1fr)_280px]">
+          <section className="rounded border border-surface-container-highest bg-white p-3  sm:p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-secondary">Memory Grid</p>
-                <h1 className="mt-1 font-sans text-2xl font-black tracking-normal text-on-background sm:text-3xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-on-secondary-fixed-variant">Memory Grid</p>
+                <h1 className="font-editorial font-medium mt-1  text-2xl  tracking-normal text-on-background sm:text-3xl">
                   Mind Snap
                 </h1>
               </div>
-              <div className="flex items-center gap-2 rounded-full border border-secondary/25 bg-secondary-fixed px-3 py-1.5 text-xs font-bold text-secondary">
-                <span className="material-symbols-outlined text-base">timer</span>
+              <div className="flex items-center gap-2 rounded border border-secondary/25 bg-secondary-fixed px-3 py-1.5 text-xs font-bold text-on-secondary-fixed-variant">
+                <CampusIcon name="timer" className=" text-base" />
                 {formatTime(timeLeft)}
               </div>
             </div>
@@ -289,7 +276,7 @@ export default function MindSnapPage() {
 
             <div className="flex justify-center py-1">
               <div
-                className="grid w-full max-w-[420px] gap-1.5 rounded-[10px] border border-outline-variant bg-surface-container-low p-2.5 shadow-inner sm:gap-2 sm:p-3"
+                className="grid w-full max-w-[420px] gap-1.5 rounded border border-outline-variant bg-surface-container-low p-2.5  sm:gap-2 sm:p-3"
                 style={{ gridTemplateColumns: `repeat(${config.cols}, minmax(0, 1fr))` }}
               >
                 {Array.from({ length: config.cells }, (_, index) => {
@@ -306,17 +293,17 @@ export default function MindSnapPage() {
                       key={index}
                       aria-label={`Cell ${index + 1}`}
                       className={[
-                        "h-auto aspect-square w-full rounded-xl border p-0 text-transparent",
+                        "h-auto aspect-square w-full rounded border p-0 text-transparent",
                         "focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-white",
                         isRevealed
-                          ? "border-secondary bg-secondary shadow-[0_0_16px_rgba(236,32,36,0.34)]"
-                          : "border-primary bg-primary shadow-[inset_0_0_18px_rgba(255,255,255,0.08)]",
+                          ? "border-secondary bg-secondary "
+                          : "border-primary bg-primary ",
                         phase === "selecting" ? "hover:border-primary-container hover:bg-primary-container" : "",
                         isSelected && phase === "selecting"
-                          ? "border-secondary bg-secondary shadow-[0_0_14px_rgba(236,32,36,0.28)]"
+                          ? "border-secondary bg-secondary "
                           : "",
-                        isCorrectSelection ? "border-secondary bg-secondary shadow-[0_0_14px_rgba(236,32,36,0.28)]" : "",
-                        isWrongSelection ? "border-secondary bg-secondary shadow-[0_0_14px_rgba(236,32,36,0.28)]" : "",
+                        isCorrectSelection ? "border-secondary bg-secondary " : "",
+                        isWrongSelection ? "border-secondary bg-secondary " : "",
                         isMissedTarget ? "border-secondary bg-secondary-fixed" : "",
                       ].join(" ")}
                       disabled={phase !== "selecting"}
@@ -333,36 +320,36 @@ export default function MindSnapPage() {
           </section>
 
           <aside className="space-y-3">
-            <section className="rounded-[10px] border border-surface-container-highest bg-white p-4 shadow-xs">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-secondary">Status</p>
+            <section className="rounded border border-surface-container-highest bg-white p-4 ">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-on-secondary-fixed-variant">Status</p>
               <h2 className="mt-1 font-sans text-xl font-black tracking-normal text-on-background">{statusText}</h2>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-surface-container-low p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Level</p>
+                <div className="rounded bg-surface-container-low p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-surface-variant">Level</p>
                   <p className="mt-1 font-sans text-2xl font-black tracking-normal text-on-background">{level}</p>
                 </div>
-                <div className="rounded-xl bg-surface-container-low p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">XP</p>
+                <div className="rounded bg-surface-container-low p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-surface-variant">XP</p>
                   <p className="mt-1 font-sans text-2xl font-black tracking-normal text-on-background">{score}</p>
                 </div>
               </div>
-              <div className="mt-3 rounded-xl bg-surface-container-low p-3 text-xs text-on-surface-variant">
+              <div className="mt-3 rounded bg-surface-container-low p-3 text-xs text-on-surface-variant">
                 Grid {config.rows} x {config.cols}. Selected {selected.size}/{config.targetCount} squares.
               </div>
               {phase === "finished" && finalXp !== null ? (
-                <div className="mt-3 rounded-xl border border-secondary/20 bg-secondary-fixed p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary">XP earned</p>
+                <div className="mt-3 rounded border border-secondary/20 bg-secondary-fixed p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-on-secondary-fixed-variant">XP earned</p>
                   <p className="mt-1 font-sans text-3xl font-black tracking-normal text-on-background">{finalXp}</p>
                 </div>
               ) : null}
               {xpSaveMessage ? (
                 <div
                   className={[
-                    "mt-3 rounded-xl p-3 text-xs font-semibold",
+                    "mt-3 rounded p-3 text-xs font-semibold",
                     xpSaveStatus === "saved"
                       ? "bg-primary-fixed text-primary"
                       : xpSaveStatus === "error"
-                        ? "bg-secondary-fixed text-secondary"
+                        ? "bg-secondary-fixed text-on-secondary-fixed-variant"
                         : "bg-surface-container-low text-on-surface-variant",
                   ].join(" ")}
                 >
@@ -372,8 +359,8 @@ export default function MindSnapPage() {
             </section>
 
             {result ? (
-              <section className="rounded-[10px] border border-surface-container-highest bg-white p-4 shadow-xs">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-secondary">Round</p>
+              <section className="rounded border border-surface-container-highest bg-white p-4 ">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-on-secondary-fixed-variant">Round</p>
                 <div className="mt-2 flex items-end justify-between gap-3">
                   <div>
                     <p className="text-xs text-on-surface-variant">Correct squares</p>
@@ -381,14 +368,14 @@ export default function MindSnapPage() {
                       {result.correct}/{result.total}
                     </p>
                   </div>
-                  <p className={result.solved ? "text-xs font-bold text-primary" : "text-xs font-bold text-secondary"}>
+                  <p className={result.solved ? "text-xs font-bold text-primary" : "text-xs font-bold text-on-secondary-fixed-variant"}>
                     {result.solved ? "Solved" : `${result.wrong} wrong`}
                   </p>
                 </div>
               </section>
             ) : null}
 
-            <section className="rounded-[10px] border border-surface-container-highest bg-white p-4 shadow-xs">
+            <section className="rounded border border-surface-container-highest bg-white p-4 ">
               <p className="text-xs leading-5 text-on-surface-variant">
                 Watch the flash, then select the required number of squares. Every correct square adds one XP, and every full
                 selection advances to the next level.
@@ -397,36 +384,35 @@ export default function MindSnapPage() {
               <div className="mt-4 flex flex-col gap-2">
                 {phase === "ready" || phase === "finished" ? (
                   <Button
-                    className="rounded-full bg-secondary px-4 text-xs font-black text-white shadow-[0_12px_28px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
+                    className="rounded bg-secondary px-4 text-xs font-black text-black  hover:bg-secondary/90"
                     type="button"
                     onClick={startGame}
                   >
-                    <span className="material-symbols-outlined text-base">play_arrow</span>
+                    <CampusIcon name="play_arrow" className=" text-base" />
                     {phase === "finished" ? "Play again" : "Start"}
                   </Button>
                 ) : (
                   <Button
-                    className="rounded-full bg-secondary px-4 text-xs font-black text-white shadow-[0_12px_28px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
+                    className="rounded bg-secondary px-4 text-xs font-black text-black  hover:bg-secondary/90"
                     type="button"
                     onClick={cancelGame}
                   >
-                    <span className="material-symbols-outlined text-base">close</span>
+                    <CampusIcon name="close" className=" text-base" />
                     Cancel
                   </Button>
                 )}
 
                 <Link
                   href="/games/leaderboards"
-                  className={cn(buttonVariants({ variant: "outline" }), "rounded-full px-4 text-xs text-on-surface-variant hover:text-primary")}
+                  className={cn(buttonVariants({ variant: "outline" }), "rounded px-4 text-xs text-on-surface-variant hover:text-primary")}
                 >
-                  <span className="material-symbols-outlined text-base">leaderboard</span>
+                  <CampusIcon name="leaderboard" className=" text-base" />
                   {phase === "finished" ? "View leaderboard" : "Leaderboard"}
                 </Link>
               </div>
             </section>
           </aside>
-        </main>
-      </div>
+        </div></CampusShell>
     </>
   );
 }

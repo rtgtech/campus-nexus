@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { readAuthSession } from "@/lib/auth-client";
@@ -28,7 +31,7 @@ export function ProfileNavLink({ className, icon, iconClassName, label, labelCla
 
   return (
     <Link href={href} className={className}>
-      <span className={iconClassName ? `material-symbols-outlined ${iconClassName}` : "material-symbols-outlined"}>{icon}</span>
+      <CampusIcon name={icon} className={iconClassName ? ` ${iconClassName}` : ""} />
       <span className={labelClassName}>{label}</span>
     </Link>
   );

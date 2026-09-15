@@ -42,12 +42,12 @@ function UserRow({
       subtitle={`@${user.username || userId}`}
       kind="user"
       initials={user.initials || user.acronym}
-      className="flex min-w-0 items-center gap-3 rounded-2xl bg-surface-container-low p-3"
-      avatarClassName="rounded-full bg-primary-fixed text-primary"
+      className="flex min-w-0 items-center gap-3 rounded bg-surface-container-low p-3"
+      avatarClassName="rounded bg-primary-fixed text-primary"
       trailing={
         canUnfriend ? (
           <Button
-            className="rounded-full border-outline-variant px-3 text-xs text-on-surface-variant hover:border-secondary hover:text-secondary"
+            className="rounded border-outline-variant px-3 text-xs text-on-surface-variant hover:border-secondary hover:text-on-secondary-fixed-variant"
             disabled={isSaving}
             size="sm"
             type="button"
@@ -193,7 +193,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
     return (
       <Link
         href={`/auth?next=${encodeURIComponent(nextPath)}`}
-        className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6")}
+        className={cn(buttonVariants({ size: "lg" }), "rounded px-6")}
       >
         Sign in to add friends
       </Link>
@@ -208,12 +208,12 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
     <>
       <div className="flex flex-wrap items-center gap-3">
         {isSelf ? (
-          <Button className="rounded-full px-6" size="lg" type="button">
+          <Button className="rounded px-6" size="lg" type="button">
             Edit Profile
           </Button>
         ) : (
           <Button
-            className="rounded-full px-6"
+            className="rounded px-6"
             disabled={status === "loading" || status === "saving"}
             size="lg"
             type="button"
@@ -225,7 +225,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
         )}
 
         <Button
-          className="rounded-full px-4"
+          className="rounded px-4"
           size="lg"
           type="button"
           variant="outline"
@@ -233,25 +233,25 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
         >
           {friendship?.friends ?? 0} friends
         </Button>
-        {message ? <span className="text-sm font-semibold text-secondary">{message}</span> : null}
+        {message ? <span className="text-sm font-semibold text-on-secondary-fixed-variant">{message}</span> : null}
       </div>
 
       <Dialog open={showFriends} onOpenChange={setShowFriends}>
-        <DialogContent className="max-w-2xl rounded-[10px] p-5">
+        <DialogContent className="max-w-2xl rounded p-5">
           <DialogHeader>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Profile</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-on-secondary-fixed-variant">Profile</p>
             <DialogTitle className="font-sans text-2xl font-bold text-on-background">Friends</DialogTitle>
             <DialogDescription className="sr-only">Friends and mutual friends for {targetName}</DialogDescription>
           </DialogHeader>
             {listStatus === "loading" ? (
-              <p className="mt-5 flex items-center gap-2 rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+              <p className="mt-5 flex items-center gap-2 rounded bg-surface-container-low p-4 text-sm text-on-surface-variant">
                 <Spinner /> Loading...
               </p>
             ) : (
               <Tabs className="mt-5" value={activeTab} onValueChange={(value) => setActiveTab(value as FriendsTab)}>
-                <TabsList className="grid w-full grid-cols-2 rounded-full">
-                  <TabsTrigger className="rounded-full" value="friends">Friends</TabsTrigger>
-                  <TabsTrigger className="rounded-full" value="mutuals">Mutuals</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 rounded">
+                  <TabsTrigger className="rounded" value="friends">Friends</TabsTrigger>
+                  <TabsTrigger className="rounded" value="mutuals">Mutuals</TabsTrigger>
                 </TabsList>
                 <TabsContent value={activeTab}>
                   <ScrollArea className="mt-3 max-h-[55vh]">
@@ -267,7 +267,7 @@ export function FriendButton({ targetUserId, targetName }: FriendButtonProps) {
                           />
                         ))
                       ) : (
-                        <p className="rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+                        <p className="rounded bg-surface-container-low p-4 text-sm text-on-surface-variant">
                           {activeTab === "friends" ? `${targetName} has no friends yet.` : `You and ${targetName} have no mutual friends yet.`}
                         </p>
                       )}

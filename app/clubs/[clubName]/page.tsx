@@ -1,36 +1,15 @@
 import { notFound } from "next/navigation";
-import { CampusHeader } from "@/components/campus-header";
+import { CampusShell } from "@/components/campus-shell";
 import { ClubHub } from "@/components/club-hub";
-import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
-import { getCampusData } from "@/lib/campus-api";
-import { fallbackClubDetail, type ClubDetailData } from "@/lib/app-data";
+import { LoadError } from "@/components/load-error";
+import { getCampusDataResult } from "@/lib/campus-api";
+import type { ClubDetailData } from "@/lib/app-data";
 
-type ClubDetailPageProps = {
-  params: Promise<{
-    clubName: string;
-  }>;
-};
-
-async function getClubDetail(slug: string): Promise<ClubDetailData | null> {
-  return getCampusData<ClubDetailData | null>(
-    `/api/clubs/${encodeURIComponent(slug)}`,
-    fallbackClubDetail,
-  );
-}
-
-export default async function ClubDetailPage({ params }: ClubDetailPageProps) {
+export default async function ClubDetailPage({ params }: { params: Promise<{ clubName: string }> }) {
   const { clubName } = await params;
-  const detail = await getClubDetail(clubName);
-
-  if (detail === null || !detail.club.slug) {
-    notFound();
-  }
-
-  return (
-    <div className="min-h-screen bg-[#f6f6f3] font-sans">
-      <CampusHeader active="clubs" searchProps={{ placeholder: "Search campus clubs...", types: ["club"] }} />
-      <CollapsibleSidebar active="clubs" />
-      <ClubHub detail={detail} />
-    </div>
-  );
+  const result = await getCampusDataResult<ClubDetailData | null>("/api/clubs/" + encodeURIComponent(clubName), null);
+  if (result.status === 404) notFound();
+  return <CampusShell active="clubs" headerSearchProps={{ placeholder: "Search campus clubs", types: ["club"] }}>
+    {result.error || !result.data ? <LoadError /> : <ClubHub detail={result.data} />}
+  </CampusShell>;
 }

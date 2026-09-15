@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -74,14 +77,14 @@ export function EntityListItem({
   const rowClassName =
     className ??
     [
-      "flex min-w-0 items-center gap-3 rounded-2xl px-3 py-2 transition",
+      "flex min-w-0 items-center gap-3 rounded px-3 py-2 transition",
       selected ? "bg-primary text-on-primary" : "bg-surface-container-low text-on-surface hover:bg-primary-fixed",
     ].join(" ");
   const avatarClasses =
     avatarClassName ??
     (selected
-      ? `${kind === "club" ? "rounded-xl" : "rounded-full"} bg-white/18 text-white`
-      : `${kind === "club" ? "rounded-xl" : "rounded-full"} bg-primary-fixed text-primary`);
+      ? `${kind === "club" ? "rounded" : "rounded"} bg-white/18 text-white`
+      : `${kind === "club" ? "rounded" : "rounded"} bg-primary-fixed text-primary`);
   const defaultTitleClassName = selected
     ? "block truncate text-sm font-semibold text-white"
     : "block truncate text-sm font-semibold text-on-surface";
@@ -99,7 +102,7 @@ export function EntityListItem({
               {initials || kind === "user" ? (
                 initials || getInitials(title)
               ) : (
-                <span className="material-symbols-outlined text-xl">{icon || defaultIcons[kind]}</span>
+                <CampusIcon name={icon || defaultIcons[kind]} className=" text-xl" />
               )}
             </AvatarFallback>
             {badgeIcon ? (
@@ -108,7 +111,7 @@ export function EntityListItem({
                 className="size-5 bg-background text-primary ring-1 ring-background"
                 title={badgeLabel}
               >
-                <span className="material-symbols-outlined text-[11px] leading-none">{badgeIcon}</span>
+                <CampusIcon name={badgeIcon} className=" text-xs leading-none" />
               </AvatarBadge>
             ) : null}
           </Avatar>

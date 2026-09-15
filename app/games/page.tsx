@@ -1,36 +1,33 @@
+import { CampusIcon } from "@/components/campus-icon";
 import Link from "next/link";
-import { CampusHeader } from "@/components/campus-header";
-import { CollapsibleSidebar } from "@/components/collapsible-sidebar";
+import { CampusShell } from "@/components/campus-shell";
 import { buttonVariants } from "@/components/ui/button";
-import { getCampusData } from "@/lib/campus-api";
+import { LoadError } from "@/components/load-error";
+import { getCampusDataResult } from "@/lib/campus-api";
 import { fallbackGames, type GamesData } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 
 export default async function GamesPage() {
-  const gamesData = await getCampusData<GamesData>("/api/games", fallbackGames);
+  const result = await getCampusDataResult<GamesData>("/api/games", fallbackGames);
+  const gamesData = result.data;
 
   return (
     <>
-      <div className="min-h-screen bg-background pb-10 font-body-md text-on-surface">
-        <CampusHeader active="games" />
-
-        <CollapsibleSidebar active="games" />
-
-        <main className="mx-auto max-w-7xl space-y-10 px-4 pt-8 md:px-10">
-          <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs md:p-8">
+      <CampusShell active="games"><div className="space-y-10">{result.error && <LoadError message="Campus game activity is unavailable. You can still play below." />}
+          <section className="rounded border border-surface-container-highest bg-white p-6  md:p-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Games</p>
-                <h1 className="mt-3 font-headline-lg text-4xl text-primary md:text-5xl">Game catalog</h1>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-on-secondary-fixed-variant">Games</p>
+                <h1 className="font-editorial font-medium mt-3  text-4xl text-primary md:text-5xl">Game catalog</h1>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-on-surface-variant md:text-base">
-                  Real games, leaderboards, and recent activity will appear here as the product is built.
+                  Take a study break. Challenge your memory, solve a puzzle, and find your place on the leaderboard.
                 </p>
               </div>
               <Link
                 href="/games/leaderboards"
-                className={cn(buttonVariants({ size: "lg" }), "w-full rounded-full px-5 shadow-[0_14px_34px_rgba(56,72,96,0.18)] md:w-auto")}
+                className={cn(buttonVariants({ size: "lg" }), "w-full rounded px-5  md:w-auto")}
               >
-                <span className="material-symbols-outlined text-lg">leaderboard</span>
+                <CampusIcon name="leaderboard" className=" text-lg" />
                 Leaderboard
               </Link>
             </div>
@@ -38,18 +35,18 @@ export default async function GamesPage() {
 
           <section className="space-y-5">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Available now</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-on-secondary-fixed-variant">Available now</p>
               <h2 className="mt-2 font-headline-lg text-headline-lg">Play now</h2>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
               <Link
                 href="/games/mind-snap"
-                className="group grid overflow-hidden rounded-[10px] border border-surface-container-highest bg-white shadow-xs transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,1fr)_260px]"
+                className="group grid overflow-hidden rounded border border-surface-container-highest bg-white  transition hover:-translate-y-1  md:grid-cols-[minmax(0,1fr)_260px]"
               >
                 <div className="space-y-4 p-6 md:p-8">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_14px_34px_rgba(34,29,92,0.18)]">
-                    <span className="material-symbols-outlined text-3xl">grid_view</span>
+                  <div className="flex h-14 w-14 items-center justify-center rounded bg-primary text-white ">
+                    <CampusIcon name="grid_view" className=" text-3xl" />
                   </div>
                   <div>
                     <h2 className="font-headline-lg text-3xl text-primary">Mind Snap</h2>
@@ -57,23 +54,23 @@ export default async function GamesPage() {
                       Memorize the flashed squares, then select them before the 45 second timer runs out.
                     </p>
                   </div>
-                  <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)]">
-                    <span className="material-symbols-outlined text-lg">play_arrow</span>
+                  <div className="inline-flex items-center gap-2 rounded bg-secondary px-5 py-3 text-sm font-semibold text-black ">
+                    <CampusIcon name="play_arrow" className=" text-lg" />
                     Play
                   </div>
                 </div>
 
                 <div className="bg-white p-6">
-                  <div className="grid aspect-square grid-cols-3 gap-2 rounded-[10px] border border-primary/20 bg-primary p-3">
+                  <div className="grid aspect-square grid-cols-3 gap-2 rounded border border-primary/20 bg-primary p-3">
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((cell) => {
                       const isLit = [0, 2, 4, 7].includes(cell);
                       return (
                         <span
                           key={cell}
                           className={[
-                            "rounded-2xl border transition duration-200",
+                            "rounded border transition duration-200",
                             isLit
-                              ? "border-primary bg-secondary shadow-[0_0_18px_rgba(236,32,36,0.22)]"
+                              ? "border-primary bg-secondary "
                               : "border-primary/20 bg-primary-fixed",
                           ].join(" ")}
                         />
@@ -85,11 +82,11 @@ export default async function GamesPage() {
 
               <Link
                 href="/games/sudoku"
-                className="group grid overflow-hidden rounded-[10px] border border-surface-container-highest bg-white shadow-xs transition hover:-translate-y-1 hover:shadow-lg md:grid-cols-[minmax(0,1fr)_260px]"
+                className="group grid overflow-hidden rounded border border-surface-container-highest bg-white  transition hover:-translate-y-1  md:grid-cols-[minmax(0,1fr)_260px]"
               >
                 <div className="space-y-4 p-6 md:p-8">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_14px_34px_rgba(34,29,92,0.18)]">
-                    <span className="material-symbols-outlined text-3xl">apps</span>
+                  <div className="flex h-14 w-14 items-center justify-center rounded bg-primary text-white ">
+                    <CampusIcon name="apps" className=" text-3xl" />
                   </div>
                   <div>
                     <h2 className="font-headline-lg text-3xl text-primary">Sudoku</h2>
@@ -97,14 +94,14 @@ export default async function GamesPage() {
                       Solve a 6 x 6 board with 2 x 3 boxes. Each complete puzzle gives 100 XP.
                     </p>
                   </div>
-                  <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)]">
-                    <span className="material-symbols-outlined text-lg">play_arrow</span>
+                  <div className="inline-flex items-center gap-2 rounded bg-secondary px-5 py-3 text-sm font-semibold text-black ">
+                    <CampusIcon name="play_arrow" className=" text-lg" />
                     Play
                   </div>
                 </div>
 
                 <div className="bg-white p-6">
-                  <div className="grid aspect-square grid-cols-6 border-2 border-primary bg-primary p-1 shadow-[0_18px_44px_rgba(34,29,92,0.12)]">
+                  <div className="grid aspect-square grid-cols-6 border-2 border-primary bg-primary p-1 ">
                     {[1, 0, 3, 0, 5, 0, 0, 5, 0, 1, 0, 3, 0, 0, 4, 0, 6, 0, 5, 0, 0, 2, 0, 4, 0, 4, 0, 0, 1, 0, 0, 0, 2, 3, 0, 5].map((value, index) => (
                       <span
                         key={`${value}-${index}`}
@@ -129,7 +126,7 @@ export default async function GamesPage() {
               {gamesData.gameCards.map((card) => (
                 <article
                   key={card.title}
-                  className="overflow-hidden rounded-[10px] border border-outline-variant bg-white shadow-xs"
+                  className="overflow-hidden rounded border border-outline-variant bg-white "
                 >
                   <div className="relative aspect-square overflow-hidden bg-primary-fixed">
                     {card.image ? <img alt={card.title} className="h-full w-full object-cover" src={card.image} /> : null}
@@ -147,17 +144,17 @@ export default async function GamesPage() {
           ) : null}
 
           {gamesData.topRated.length > 0 ? (
-            <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs">
+            <section className="rounded border border-surface-container-highest bg-white p-6 ">
               <h2 className="font-headline-lg text-headline-lg">Top rated</h2>
               <div className="mt-5 space-y-3">
                 {gamesData.topRated.map((game) => (
-                  <div key={`${game.rank}-${game.title}`} className="flex items-center gap-4 rounded-2xl bg-surface-container-low p-4">
+                  <div key={`${game.rank}-${game.title}`} className="flex items-center gap-4 rounded bg-surface-container-low p-4">
                     <span className="font-display-lg text-primary">{game.rank}</span>
                     <div className="min-w-0 flex-1">
                       <h3 className="truncate font-headline-md text-headline-md">{game.title}</h3>
                       <p className="text-sm text-on-surface-variant">{game.subtitle}</p>
                     </div>
-                    <span className="text-sm font-semibold text-secondary">{game.rating}</span>
+                    <span className="text-sm font-semibold text-on-secondary-fixed-variant">{game.rating}</span>
                   </div>
                 ))}
               </div>
@@ -165,11 +162,11 @@ export default async function GamesPage() {
           ) : null}
 
           {gamesData.recentActivity.length > 0 ? (
-            <section className="rounded-[10px] border border-surface-container-highest bg-white p-6 shadow-xs">
+            <section className="rounded border border-surface-container-highest bg-white p-6 ">
               <h2 className="font-headline-lg text-headline-lg">Recent activity</h2>
               <div className="mt-5 space-y-3">
                 {gamesData.recentActivity.map((item) => (
-                  <div key={item.title} className="rounded-2xl bg-surface-container-low p-4">
+                  <div key={item.title} className="rounded bg-surface-container-low p-4">
                     <p className="font-semibold text-on-surface">{item.title}</p>
                     <p className="text-sm text-on-surface-variant">{item.subtitle}</p>
                   </div>
@@ -177,8 +174,7 @@ export default async function GamesPage() {
               </div>
             </section>
           ) : null}
-        </main>
-      </div>
+        </div></CampusShell>
     </>
   );
 }

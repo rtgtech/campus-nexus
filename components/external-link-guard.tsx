@@ -115,7 +115,7 @@ export function ExternalLinkGuard() {
   return (
     <Dialog open={Boolean(destination)} onOpenChange={(open) => !open && cancelRedirect()}>
       <DialogContent
-        className="gap-0 rounded-[3px] border border-outline-variant bg-white p-0 shadow-[0_16px_45px_rgba(15,18,33,0.16)]"
+        className="gap-0 rounded border border-outline-variant bg-white p-0 "
         style={{ width: "min(30rem, calc(100vw - 2rem))", maxWidth: "none" }}
       >
         <DialogHeader className="px-6 pb-5 pt-6 text-left">
@@ -130,11 +130,11 @@ export function ExternalLinkGuard() {
           </p>
         </div>
         <DialogFooter className="m-0 rounded-none border-0 bg-white px-6 py-4 sm:justify-end">
-          <Button className="rounded-[3px]" type="button" variant="outline" onClick={cancelRedirect}>
+          <Button className="rounded" type="button" variant="outline" onClick={cancelRedirect}>
             Cancel
           </Button>
           <a
-            className={buttonVariants({ className: "rounded-[3px]" })}
+            className={buttonVariants({ className: "rounded" })}
             data-external-link-guard="off"
             href={destination ?? undefined}
             rel="noopener noreferrer"

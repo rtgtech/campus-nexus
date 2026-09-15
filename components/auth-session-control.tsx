@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -43,9 +46,9 @@ export function AuthSessionControl({ compact = false }: AuthSessionControlProps)
     return (
       <Link
         href="/auth"
-        className={cn(buttonVariants({ variant: "outline" }), "rounded-full px-4 text-on-surface-variant hover:text-primary")}
+        className={cn(buttonVariants({ variant: "outline" }), "rounded px-4 text-on-surface-variant hover:text-primary")}
       >
-        <span className="material-symbols-outlined text-base">login</span>
+        <CampusIcon name="login" className=" text-base" />
         <span className={compact ? "hidden sm:inline" : ""}>Sign in</span>
       </Link>
     );
@@ -55,7 +58,7 @@ export function AuthSessionControl({ compact = false }: AuthSessionControlProps)
 
   return (
     <div className="flex items-center gap-2">
-      <Link href={`/${profileSlug}`} className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "h-auto min-w-0 rounded-full bg-surface-container-low py-1 pl-1 pr-3")}>
+      <Link href={`/${profileSlug}`} className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "h-auto min-w-0 rounded bg-surface-container-low py-1 pl-1 pr-3")}>
         <Avatar
           aria-label={`${session.user.name} profile`}
           className="size-9 border-2 border-primary bg-primary-fixed text-xs font-bold text-primary"
@@ -71,13 +74,13 @@ export function AuthSessionControl({ compact = false }: AuthSessionControlProps)
       <Button
         aria-label="Sign out"
         disabled={isLoggingOut}
-        className="rounded-full text-on-surface-variant hover:text-secondary"
+        className="rounded text-on-surface-variant hover:text-on-secondary-fixed-variant"
         size="icon"
         type="button"
         variant="ghost"
         onClick={handleLogout}
       >
-        <span className="material-symbols-outlined text-xl">logout</span>
+        <CampusIcon name="logout" className=" text-xl" />
       </Button>
     </div>
   );

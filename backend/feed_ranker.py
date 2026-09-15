@@ -39,7 +39,8 @@ def _read_id(row: Mapping[str, Any], *keys: str) -> Optional[str]:
 
 def _number(value: Any, default: float = 0.0) -> float:
     try:
-        return float(value)
+        number = float(value)
+        return number if math.isfinite(number) else default
     except (TypeError, ValueError):
         return default
 
@@ -52,7 +53,7 @@ def _timestamp(value: Any, default: Optional[float] = None) -> float:
         return default
 
     if isinstance(value, (int, float)):
-        return float(value)
+        return _number(value, default)
 
     if isinstance(value, datetime):
         if value.tzinfo is None:
@@ -313,3 +314,63 @@ def rank_feed_posts(
     if limit is not None:
         return ranked_posts[:limit]
     return ranked_posts
+
+
+def rank_personalized_posts(
+    posts: Sequence[Mapping[str, Any]],
+    *,
+    now_ts: float,
+    has_history: bool = False,
+    graph_available: bool = True,
+    latest: bool = False,
+) -> list[dict[str, Any]]:
+    """Score bounded candidates with absolute scales, then balance their sources.
+
+    Input records contain server-derived relationship, affinity, engagement and
+    population PageRank percentiles. No client-provided counters are trusted.
+    """
+    scored = []
+    for post in posts:
+        created = _timestamp(post.get("createdAt"), default=0.0)
+        freshness = 0.5 ** (max(0.0, now_ts - created) / 86400) if created > 0 else 0.0
+        relationship = min(1.0, max(0.0, _number(post.get("relationship"))))
+        affinity = min(1.0, max(0.0, _number(post.get("affinity"))))
+        engagement = min(math.log1p(max(0.0, _number(post.get("engagement")))) / math.log1p(100), 1.0)
+        pagerank = min(1.0, max(0.0, _number(post.get("pagerank"))))
+        weights = {"social": 0.35, "recency": 0.30, "affinity": 0.20 if has_history else 0.0,
+                   "engagement": 0.10, "pagerank": 0.05 if graph_available else 0.0}
+        signals = dict(social=relationship, recency=freshness, affinity=affinity,
+                       engagement=engagement, pagerank=pagerank)
+        score = sum(weights[key] * signals[key] for key in weights) / sum(weights.values())
+        if latest:
+            score = freshness
+            signals = dict(social=0.0, recency=freshness, affinity=0.0, engagement=0.0, pagerank=0.0)
+        if post.get("seen") and not latest:
+            score *= 0.5
+        reason = "recent" if latest else max(weights, key=lambda key: weights[key] * signals[key])
+        reasons = {"social": "network", "recency": "recent", "affinity": "interests",
+                   "engagement": "campus-engagement", "pagerank": "campus-discovery"}
+        scored.append({**post, "feedScore": round(score, 6),
+                       "rankingSignals": {key: round(value, 6) for key, value in signals.items()},
+                       "explanationCode": reasons.get(reason, "recent"), "_created": created})
+    scored.sort(key=lambda post: (
+        0 if latest else -post["feedScore"], -post["_created"], str(post["postId"]),
+    ))
+    if latest:
+        return scored
+
+    ordered: list[dict[str, Any]] = []
+    while scored:
+        block = ordered[(len(ordered) // 10) * 10:]
+        last_source = ordered[-1].get("source") if ordered else None
+        def diverse(post):
+            source = post.get("source")
+            return source != last_source and sum(item.get("source") == source for item in block) < 2
+        pool = scored
+        if (len(ordered) + 1) % 5 == 0:
+            exploration = [post for post in scored if not post.get("seen") and not post.get("relationship")]
+            pool = exploration or scored
+        selected = next((post for post in pool if diverse(post)), pool[0])
+        ordered.append(selected)
+        scored.remove(selected)
+    return ordered

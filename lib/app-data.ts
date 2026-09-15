@@ -26,11 +26,13 @@ export type FeedCard = {
   createdAt?: string;
   engagementScore?: number;
   feedScore?: number;
+  explanationCode?: string;
   rankingSignals?: {
     pagerank: number;
     engagement: number;
     recency: number;
     social: number;
+    affinity?: number;
   };
   likedByCurrentUser?: boolean;
   viewerHasLiked?: boolean;
@@ -138,6 +140,11 @@ export type FeedData = {
   feedCards: FeedCard[];
   trending: TrendingItem[];
   suggestedPeople: SuggestedPerson[];
+  nextCursor?: string | null;
+  snapshotId?: string;
+  rankingVersion?: string;
+  mode?: "for-you" | "latest";
+  personalizationEnabled?: boolean;
 };
 
 export type PostLikeData = {
@@ -297,7 +304,21 @@ export type GameXpData = {
   totalXp: number;
 };
 
+export type PostComment = {
+  id: string;
+  commentId: string;
+  postId: string;
+  userId: string;
+  author: string;
+  username: string;
+  initials: string;
+  content: string;
+  body: string;
+  createdAt: string;
+};
+
 export type Conversation = {
+  canMessage?: boolean;
   id?: number;
   threadId?: number;
   href?: string;

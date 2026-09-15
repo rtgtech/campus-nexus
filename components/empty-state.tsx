@@ -21,10 +21,10 @@ export function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <Empty className="w-full rounded-[10px] border border-outline-variant/70 bg-card/70 px-4 py-8 shadow-[0_12px_30px_rgba(27,27,35,0.04)] sm:p-8">
+    <Empty className="w-full rounded border border-outline-variant/70 bg-card/70 px-4 py-8  sm:p-8">
       <EmptyHeader className="w-full max-w-none">
         <EmptyMedia
-          className="size-12 rounded-[10px] bg-primary-fixed text-primary"
+          className="size-12 rounded bg-primary-fixed text-primary"
           variant="icon"
         >
           <InboxIcon className="size-5" />

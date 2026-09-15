@@ -28,6 +28,9 @@ next-env.d.ts
 
 # coverage and test artifacts
 coverage/
+test-results/
+playwright-report/
+.next-browser/
 
 # caches
 .turbo/

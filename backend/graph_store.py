@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+from bisect import bisect_right
 import os
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Optional
@@ -219,6 +220,16 @@ def feed_signals(
     return pagerank, social
 
 
+def feed_pagerank_percentiles(*, user_ids: Iterable[Any] = (), club_ids: Iterable[Any] = ()) -> dict[str, float]:
+    result = _execute("""
+        MATCH (node) WHERE (node:User AND node.userId IN $user_ids) OR (node:Club AND node.clubId IN $club_ids)
+        RETURN CASE WHEN node:User THEN 'user:' + toString(node.userId)
+                    ELSE 'club:' + toString(node.clubId) END AS key,
+               coalesce(node.pagerankPercentile, 0.0) AS percentile
+    """, user_ids=list(user_ids), club_ids=list(club_ids))
+    return {row["key"]: float(row["percentile"]) for row in result.records}
+
+
 def stored_friendships() -> list[dict[str, Any]]:
     result = _execute(
         """
@@ -246,7 +257,11 @@ def replace_graph(
     clubs = sorted({int(value) for value in club_ids})
     related = [dict(row) for row in relationships]
     friends = [dict(row) for row in bootstrap_friendships]
-    ranks = [{"key": key, "score": float(score)} for key, score in pagerank.items()]
+    populations = {kind: sorted(float(score) for key, score in pagerank.items() if key.startswith(kind + ":"))
+                   for kind in ("user", "club")}
+    ranks = [{"key": key, "score": float(score),
+              "percentile": bisect_right(populations[key.split(":")[0]], float(score)) / max(1, len(populations[key.split(":")[0]]))}
+             for key, score in pagerank.items()]
 
     def write(tx):
         count = tx.run(
@@ -298,7 +313,7 @@ def replace_graph(
             UNWIND $rows AS row
             MATCH (node) WHERE (node:User AND row.key = 'user:' + toString(node.userId))
                               OR (node:Club AND row.key = 'club:' + toString(node.clubId))
-            SET node.pagerank = row.score
+            SET node.pagerank = row.score, node.pagerankPercentile = row.percentile
             """,
             rows=ranks,
         ).consume()

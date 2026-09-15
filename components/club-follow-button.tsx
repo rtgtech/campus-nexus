@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -113,10 +116,10 @@ export function ClubFollowButton({
   const action = session ? (
     <Button
       className={cn(
-        compact ? "h-9 rounded-[8px] border-[#d6d6d0] px-4 text-xs font-bold" : "h-11 w-full rounded-full px-4",
+        compact ? "h-9 rounded border-[#d6d6d0] px-4 text-xs font-bold" : "h-11 w-full rounded px-4",
         compact && !isFollowing && "border-primary bg-primary text-white hover:bg-primary/90",
         compact && isFollowing && "bg-white text-black hover:bg-primary-fixed",
-        !compact && !isFollowing && "bg-secondary text-white hover:bg-secondary/90",
+        !compact && !isFollowing && "bg-secondary text-black hover:bg-secondary/90",
       )}
       disabled={status === "loading" || status === "saving"}
       type="button"
@@ -131,8 +134,8 @@ export function ClubFollowButton({
       className={cn(
         buttonVariants(),
         compact
-          ? "h-9 rounded-[8px] bg-primary px-4 text-xs font-bold text-white hover:bg-primary/90"
-          : "h-11 w-full rounded-full bg-secondary px-4 text-white hover:bg-secondary/90",
+          ? "h-9 rounded bg-primary px-4 text-xs font-bold text-white hover:bg-primary/90"
+          : "h-11 w-full rounded bg-secondary px-4 text-black hover:bg-secondary/90",
       )}
     >
       Sign in to follow
@@ -151,7 +154,7 @@ export function ClubFollowButton({
   if (layout === "inline") {
     return (
       <div className="flex w-full items-center justify-between gap-3">
-        <span className="text-[11px] text-[#686862]">{formatCount(followers)} followers</span>
+        <span className="text-xs text-[#686862]">{formatCount(followers)} followers</span>
         {action}
         {message ? <span className="sr-only" role="status">{message}</span> : null}
       </div>
@@ -159,18 +162,18 @@ export function ClubFollowButton({
   }
 
   return (
-    <Card className="rounded-[10px] border border-surface-container-highest bg-white py-0 shadow-xs">
+    <Card className="rounded border border-surface-container-highest bg-white py-0 ">
       <CardHeader className="flex-row items-start justify-between gap-4 p-5 pb-0">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Followers</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-on-secondary-fixed-variant">Followers</p>
           <p className="mt-2 font-headline-md text-2xl text-on-background">{formatCount(followers)}</p>
         </div>
-        <span className="material-symbols-outlined rounded-full bg-primary-fixed p-3 text-primary">favorite</span>
+        <CampusIcon name="favorite" className=" rounded bg-primary-fixed p-3 text-primary" />
       </CardHeader>
 
       <CardContent className="p-5 pt-0">
         {action}
-        {message ? <p className="mt-3 text-sm font-semibold text-secondary">{message}</p> : null}
+        {message ? <p className="mt-3 text-sm font-semibold text-on-secondary-fixed-variant">{message}</p> : null}
         <p className="mt-3 text-xs text-on-surface-variant">Follow {clubTitle} to keep it on your radar.</p>
       </CardContent>
     </Card>

@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import { useRouter } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -129,10 +132,10 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
         if (!nextOpen) router.replace(returnHref);
       }}
     >
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-hidden rounded-[10px] border-secondary/20 bg-white/95 p-5 shadow-[0_24px_80px_rgba(15,18,33,0.28)] backdrop-blur-xl md:p-6">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-hidden rounded border-secondary/20 bg-white/95 p-5 shadow-[0_24px_80px_rgba(15,18,33,0.28)] backdrop-blur-xl md:p-6">
         <DialogHeader className="pr-10">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Create Post</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-on-secondary-fixed-variant">Create Post</p>
             <DialogTitle className="mt-2 font-sans text-2xl font-bold tracking-tight text-on-background">
               {step === "media" ? "Choose your media." : "Write your post."}
             </DialogTitle>
@@ -145,7 +148,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
           {step === "media" ? (
             <div
               className={[
-                "flex h-[420px] w-full min-w-0 max-h-[calc(100dvh-14rem)] flex-col items-center justify-center overflow-hidden rounded-[10px] border border-dashed p-4 text-center transition md:h-[500px]",
+                "flex h-[420px] w-full min-w-0 max-h-[calc(100dvh-14rem)] flex-col items-center justify-center overflow-hidden rounded border border-dashed p-4 text-center transition md:h-[500px]",
                 isDragging
                   ? "border-secondary bg-secondary/5"
                   : "border-outline-variant/80 bg-surface-container-low",
@@ -164,7 +167,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
 
               {previewUrl ? (
                 <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-center">
-                  <div className="flex min-h-0 w-full min-w-0 flex-1 items-center justify-center overflow-hidden rounded-[10px] bg-black">
+                  <div className="flex min-h-0 w-full min-w-0 flex-1 items-center justify-center overflow-hidden rounded bg-black">
                     {mediaKind(selectedFile) === "video" ? (
                       <video className="h-full min-h-0 w-full min-w-0 object-contain" controls src={previewUrl} />
                     ) : (
@@ -175,27 +178,25 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
-                  <span className="material-symbols-outlined rounded-full bg-primary-fixed p-5 text-4xl text-primary">
-                    add_photo_alternate
-                  </span>
+                  <CampusIcon name="add_photo_alternate" className=" rounded bg-primary-fixed p-5 text-4xl text-primary" />
                   <p className="mt-5 text-lg font-bold text-on-background">Drag media here</p>
                   <p className="mt-2 text-sm leading-6 text-on-surface-variant">Images and videos are supported.</p>
                 </div>
               )}
 
               <Button
-                className="mt-6 rounded-full px-5"
+                className="mt-6 rounded px-5"
                 type="button"
                 variant="outline"
                 onClick={() => inputRef.current?.click()}
               >
-                <span className="material-symbols-outlined text-base">add</span>
+                <CampusIcon name="add" className=" text-base" />
                 Add media
               </Button>
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-[180px_minmax(0,1fr)]">
-              <div className="flex h-48 items-center justify-center overflow-hidden rounded-[10px] bg-black md:h-60">
+              <div className="flex h-48 items-center justify-center overflow-hidden rounded bg-black md:h-60">
                 {mediaKind(selectedFile) === "video" ? (
                   <video className="max-h-full max-w-full object-contain" controls src={previewUrl} />
                 ) : (
@@ -207,7 +208,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
                 <FieldLabel htmlFor="post-body">Post body</FieldLabel>
                 <Textarea
                   id="post-body"
-                  className="min-h-[300px] resize-none rounded-2xl bg-surface-container-low px-4 py-3 text-sm leading-6 md:min-h-[420px]"
+                  className="min-h-[300px] resize-none rounded bg-surface-container-low px-4 py-3 text-sm leading-6 md:min-h-[420px]"
                   maxLength={2000}
                   placeholder="Write something..."
                   value={content}
@@ -221,7 +222,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/60 pt-5">
-            <p className={status === "error" ? "text-sm font-semibold text-secondary" : "text-sm text-on-surface-variant"}>
+            <p className={status === "error" ? "text-sm font-semibold text-on-secondary-fixed-variant" : "text-sm text-on-surface-variant"}>
               {status === "saving"
                 ? "Publishing..."
                 : status === "success"
@@ -237,7 +238,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
             <div className="flex flex-wrap items-center gap-2">
               {step === "content" ? (
                 <Button
-                  className="rounded-full px-5"
+                  className="rounded px-5"
                   disabled={status === "saving"}
                   type="button"
                   variant="outline"
@@ -250,7 +251,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
               {step === "media" ? (
                 <Button
                   disabled={!selectedFile}
-                  className="rounded-full bg-secondary px-5 text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
+                  className="rounded bg-secondary px-5 text-black shadow-[0_14px_34px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
                   type="button"
                   onClick={() => setStep("content")}
                 >
@@ -259,7 +260,7 @@ export function CreatePostOverlay({ returnHref = "/" }: { returnHref?: string })
               ) : (
                 <Button
                   disabled={status === "saving" || !content.trim()}
-                  className="rounded-full bg-secondary px-5 text-white shadow-[0_14px_34px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
+                  className="rounded bg-secondary px-5 text-black shadow-[0_14px_34px_rgba(236,32,36,0.18)] hover:bg-secondary/90"
                   type="submit"
                 >
                   Post

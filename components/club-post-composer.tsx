@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -105,13 +108,13 @@ export function ClubPostComposer({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button className={cn("rounded-full bg-secondary text-white hover:bg-secondary/90", triggerClassName)} />
+          <Button className={cn("rounded bg-secondary text-black hover:bg-secondary/90", triggerClassName)} />
         }
       >
-        <span className="material-symbols-outlined text-lg">add</span>
+        <CampusIcon name="add" className=" text-lg" />
         Create
       </DialogTrigger>
-      <DialogContent className="max-w-2xl rounded-[3px] border border-outline-variant p-6">
+      <DialogContent className="max-w-2xl rounded border border-outline-variant p-6">
         <DialogHeader>
           <DialogTitle className="font-headline-md text-2xl text-on-background">Create club content</DialogTitle>
           <DialogDescription className="sr-only">Publish a post or announcement to this club</DialogDescription>
@@ -163,7 +166,7 @@ export function ClubPostComposer({
                 <Input
                   aria-describedby="announcement-link-description"
                   aria-invalid={Boolean(announcementLink) && !isValidExternalHttpUrl(announcementLink)}
-                  className="h-11 rounded-[3px] bg-surface-container-low"
+                  className="h-11 rounded bg-surface-container-low"
                   id="announcement-link"
                   name="registrationLink"
                   placeholder="https://register.example.edu/event"
@@ -188,11 +191,11 @@ export function ClubPostComposer({
             {files.length ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {files.map((file, index) => (
-                  <span key={`${file.name}-${file.lastModified}`} className="inline-flex max-w-full items-center gap-2 rounded-lg bg-surface-container px-3 py-2 text-xs font-semibold text-on-surface-variant">
-                    <span className="material-symbols-outlined text-base">{file.type.startsWith("video/") ? "videocam" : "image"}</span>
+                  <span key={`${file.name}-${file.lastModified}`} className="inline-flex max-w-full items-center gap-2 rounded bg-surface-container px-3 py-2 text-xs font-semibold text-on-surface-variant">
+                    <CampusIcon name={file.type.startsWith("video/") ? "videocam" : "image"} className=" text-base" />
                     <span className="max-w-52 truncate">{file.name}</span>
                     <Button type="button" variant="ghost" size="icon-xs" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`}>
-                      <span className="material-symbols-outlined text-base">close</span>
+                      <CampusIcon name="close" className=" text-base" />
                     </Button>
                   </span>
                 ))}
@@ -213,7 +216,7 @@ export function ClubPostComposer({
               />
             </Field>
 
-            {message ? <p className="mt-3 text-sm font-semibold text-secondary">{message}</p> : null}
+            {message ? <p className="mt-3 text-sm font-semibold text-on-secondary-fixed-variant">{message}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
               <Button type="button" onClick={() => setOpen(false)} variant="ghost">Cancel</Button>
               <Button
@@ -223,7 +226,7 @@ export function ClubPostComposer({
                   (type === 3 && (files.length !== 1 || !isValidExternalHttpUrl(announcementLink)))
                 }
                 type="submit"
-                className="rounded-[3px] bg-secondary text-white hover:bg-secondary/90"
+                className="rounded bg-secondary text-black hover:bg-secondary/90"
               >
                 {status === "saving" ? "Publishing..." : "Publish"}
               </Button>

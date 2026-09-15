@@ -18,6 +18,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     Numeric,
     String,
     Text,
@@ -47,6 +48,7 @@ try:
         delete_friendship as graph_delete_friendship,
         ensure_constraints as ensure_graph_constraints,
         feed_signals,
+        feed_pagerank_percentiles,
         friend_rows as graph_friend_rows,
         get_friendship as graph_get_friendship,
         replace_graph,
@@ -63,6 +65,7 @@ except ImportError:
         delete_friendship as graph_delete_friendship,
         ensure_constraints as ensure_graph_constraints,
         feed_signals,
+        feed_pagerank_percentiles,
         friend_rows as graph_friend_rows,
         get_friendship as graph_get_friendship,
         replace_graph,
@@ -422,6 +425,7 @@ class ClubFollower(Base):
 
 class Post(Base):
     __tablename__ = "posts"
+    __table_args__ = (Index("ix_posts_feed_order", "createdAt", "postId"),)
 
     postId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     authorId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId"), index=True, nullable=False)
@@ -516,6 +520,55 @@ class Post(Base):
             "comments": self.commentCount,
             "engagementScore": self.engagementScore or float(self.likeCount + self.shareCount * 2),
         }
+
+
+class FeedSetting(Base):
+    __tablename__ = "feed_settings"
+
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    historyResetAt: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class FeedEvent(Base):
+    __tablename__ = "feed_events"
+
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    postId: Mapped[int] = mapped_column(Integer, ForeignKey("posts.postId", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False, default=utcnow)
+    duration: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    version: Mapped[str] = mapped_column(String(20), default="v2", nullable=False)
+    position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
+class FeedAffinity(Base):
+    __tablename__ = "feed_affinities"
+
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    target: Mapped[str] = mapped_column(String(100), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True, index=True)
+    weight: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+
+class FeedExclusion(Base):
+    __tablename__ = "feed_exclusions"
+
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
+    target: Mapped[str] = mapped_column(String(100), primary_key=True)
+
+
+class FeedSnapshot(Base):
+    __tablename__ = "feed_snapshots"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    userId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), index=True, nullable=True)
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    version: Mapped[str] = mapped_column(String(20), nullable=False)
+    records: Mapped[str] = mapped_column(Text, nullable=False)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    expiresAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
 
 
 class PostMedia(Base):
@@ -783,6 +836,10 @@ def ensure_database_initialized() -> None:
         if _database_initialized:
             return
         Base.metadata.create_all(engine)
+        # create_all does not add newly declared indexes to existing tables.
+        for table in Base.metadata.sorted_tables:
+            for index in table.indexes:
+                index.create(engine, checkfirst=True)
         _database_initialized = True
 
 
@@ -2332,6 +2389,13 @@ def unread_chat_messages(user_id: int):
     )
 
 
+def can_message_thread(thread_id: int, viewer: User) -> bool:
+    recipients = db().scalars(select(User).join(ChatParticipant, ChatParticipant.userId == User.userId)
+        .where(ChatParticipant.threadId == thread_id, User.userId != viewer.userId)).all()
+    return bool(recipients) and all(person.isActive and friendship_between(viewer.userId, person.userId)
+                                    for person in recipients)
+
+
 def serialize_conversation(thread: ChatThread, viewer: User, active: bool = False) -> dict[str, Any]:
     participants = db().scalars(
         select(User)
@@ -2346,8 +2410,13 @@ def serialize_conversation(thread: ChatThread, viewer: User, active: bool = Fals
         .order_by(ChatMessage.createdAt.desc(), ChatMessage.messageId.desc())
         .limit(1)
     )
+    try:
+        can_message = can_message_thread(thread.threadId, viewer)
+    except GraphUnavailable:
+        can_message = False
     return {
         "id": thread.threadId,
+        "canMessage": can_message,
         "threadId": thread.threadId,
         "name": name,
         "preview": latest.content or "" if latest is not None else "",
@@ -2885,7 +2954,7 @@ def campus_event_item(item_id: int):
 
 @app.route("/api/feed")
 def feed():
-    return jsonify({"feedCards": ranked_feed_cards(feed_viewer_user_id(), feed_limit()), "trending": [], "suggestedPeople": []})
+    return feed_service.feed_response()
 
 
 @app.route("/api/search")
@@ -3063,6 +3132,7 @@ def posts_like_item(postId: str):
         return jsonify(post_like_payload(post, user))
     if existing is None:
         db().add(PostLike(postId=post.postId, userId=user.userId))
+        feed_service.record_behavior(user, post, "like")
         post.likeCount += 1
         post.engagementScore = float(post.likeCount + post.shareCount * 2)
         owner = db().get(User, post.authorId)
@@ -3099,6 +3169,7 @@ def posts_save_item(postId: str):
         return jsonify(post_bookmark_payload(post, user))
     if existing is None:
         db().add(PostBookmark(postId=post.postId, userId=user.userId))
+        feed_service.record_behavior(user, post, "save")
         db().commit()
         return jsonify(post_bookmark_payload(post, user)), 201
     return jsonify(post_bookmark_payload(post, user))
@@ -3136,6 +3207,13 @@ def post_comments_collection(postId: str):
     post = db().get(Post, optional_int(postId))
     if post is None or post.isDeleted:
         return jsonify({"error": "not found"}), 404
+    user = current_auth_user()
+    if request.method == "POST" and not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    viewer = user if isinstance(user, User) else None
+    friends, clubs, _, available = feed_service.context(viewer)
+    if db().scalar(feed_service.eligible_query(viewer, (friends, clubs, set(), available)).where(Post.postId == post.postId)) is None:
+        return jsonify({"error": "not found"}), 404
     if request.method == "GET":
         comments = db().scalars(
             select(Comment)
@@ -3147,10 +3225,11 @@ def post_comments_collection(postId: str):
     if not isinstance(user, User):
         return jsonify({"error": "unauthorized"}), 401
     content = text_value(get_first(read_json(), "content", "body", "text"))
-    if not content:
-        return jsonify({"error": "content is required"}), 400
+    if not content or len(content) > 2000:
+        return jsonify({"error": "Comments must contain between 1 and 2000 characters."}), 400
     comment = Comment(postId=post.postId, userId=user.userId, content=content)
     db().add(comment)
+    feed_service.record_behavior(user, post, "comment")
     post.commentCount += 1
     post.engagementScore = float(post.likeCount + post.shareCount * 2 + post.commentCount)
     if post.authorId != user.userId:
@@ -3549,6 +3628,8 @@ def conversations_collection():
             return jsonify({"error": "participantUserId must reference an active user"}), 400
         if participant.userId == user.userId:
             return jsonify({"error": "direct conversations require another participant"}), 400
+        if not friendship_between(user.userId, participant.userId):
+            return jsonify({"error": "You can only message your friends."}), 403
         direct_key = direct_conversation_key(user.userId, participant.userId)
         existing = db().scalar(select(ChatThread).where(ChatThread.directKey == direct_key))
         if existing is not None:
@@ -3604,6 +3685,8 @@ def messages_collection():
         threadId = optional_int(data.get("threadId"))
         if threadId is None or not is_chat_participant(threadId, user.userId):
             return jsonify({"error": "threadId must reference one of the user's conversations"}), 400
+        if not can_message_thread(threadId, user):
+            return jsonify({"error": "You can only message your friends."}), 403
         content = text_value(get_first(data, "text", "content"))
         if not content:
             return jsonify({"error": "content is required"}), 400
@@ -3637,6 +3720,8 @@ def message_item(itemId: int):
         db().commit()
         return ("", 204)
     if request.method in {"PATCH", "PUT"}:
+        if not can_message_thread(item.threadId, user):
+            return jsonify({"error": "You can only message your friends."}), 403
         item.content = text_value(get_first(read_json(), "text", "content"), item.content or "")
         db().commit()
         db().refresh(item)
@@ -3829,6 +3914,16 @@ def user_profile_overview(identifier: str):
     if not visibility_allows(target, "profileVisibility", viewer):
         return jsonify({"error": "profile is private"}), 403
     return jsonify(profile_overview_payload(target, viewer))
+
+
+import sys
+
+try:
+    from .personalized_feed import register_feed
+except ImportError:
+    from personalized_feed import register_feed
+
+feed_service = register_feed(sys.modules[__name__])
 
 
 if __name__ == "__main__":

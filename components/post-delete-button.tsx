@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL, authFetch, isAdminUser, readAuthSession } from "@/lib/auth-client";
@@ -49,7 +52,7 @@ export function PostDeleteButton({ postId, authorId, className, onDeleted }: Pos
     <Button
       aria-label="Delete post"
       className={cn(
-        "size-7 rounded-[3px] border border-red-300 bg-transparent p-0 text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700",
+        "size-7 rounded border border-red-300 bg-transparent p-0 text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700",
         className,
       )}
       disabled={pending}
@@ -59,7 +62,7 @@ export function PostDeleteButton({ postId, authorId, className, onDeleted }: Pos
       variant="ghost"
       onClick={deletePost}
     >
-      <span className="material-symbols-outlined text-[16px]">delete</span>
+      <CampusIcon name="delete" className=" text-[16px]" />
     </Button>
   );
 }

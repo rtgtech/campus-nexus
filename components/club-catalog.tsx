@@ -1,10 +1,13 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ClubFollowButton } from "@/components/club-follow-button";
 import { getInitials, type ClubCard } from "@/lib/app-data";
-import { formatPostTime } from "@/lib/post-time";
+import { PostTime } from "@/components/post-time";
 import { cn } from "@/lib/utils";
 
 type ClubCatalogProps = {
@@ -38,11 +41,6 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All");
   const [sort, setSort] = useState<SortMode>("alphabetical");
-  const [now, setNow] = useState(0);
-
-  useEffect(() => {
-    setNow(Date.now());
-  }, []);
 
   const hasCategoryData = clubs.some((club) => Boolean(club.category));
   const canSortByActivity = clubs.some((club) => club.postsCount !== undefined);
@@ -76,11 +74,11 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
   }, [clubs, filter, query, sort]);
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-4rem)] max-w-[1240px] px-5 pb-16 pt-8 text-black md:px-8 md:pl-24">
+    <div className="space-y-6">
       <section aria-labelledby="clubs-heading">
         <div className="flex flex-col items-start justify-between gap-5 border-b border-primary/15 pb-5 sm:flex-row sm:items-end">
           <div>
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-[#72726c]">Campus directory</p>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-[#72726c]">Campus directory</p>
             <h1 id="clubs-heading" className="text-[28px] font-bold tracking-[-0.03em]">Clubs</h1>
             <p className="mt-2 max-w-[500px] text-[13px] leading-6 text-[#686862]">
               Every club on campus, what they are working on, and where you can join in.
@@ -89,11 +87,9 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
 
           <label className="relative w-full sm:w-[280px]">
             <span className="sr-only">Search clubs</span>
-            <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#777770]">
-              search
-            </span>
+            <CampusIcon name="search" className=" pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#777770]" />
             <input
-              className="h-11 w-full rounded-[10px] border border-primary/15 bg-white py-2 pl-10 pr-3 text-[13px] text-black outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="h-11 w-full rounded border border-primary/15 bg-white py-2 pl-10 pr-3 text-[13px] text-black outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
               placeholder="Search clubs…"
               type="search"
               value={query}
@@ -103,21 +99,21 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2" aria-label="Club filters">
-          {["All", ...categories, "Recruiting now"].map((label) => {
+          {["All", ...(hasCategoryData ? categories : []), "Recruiting now"].map((label) => {
             const unavailable = categories.includes(label) && !hasCategoryData;
             const selected = filter === label;
             return (
               <button
                 key={label}
                 className={cn(
-                  "rounded-full border px-4 py-2 text-xs font-semibold transition",
+                  "rounded border px-4 py-2 text-xs font-semibold transition",
                   selected
-                    ? "border-primary bg-primary text-white shadow-[0_7px_18px_rgba(35,30,93,0.18)]"
+                    ? "border-primary bg-primary text-white "
                     : "border-primary/15 bg-primary-fixed/70 text-black hover:border-primary/40",
                   unavailable && "cursor-not-allowed opacity-45 hover:border-primary/15",
                 )}
                 disabled={unavailable}
-                title={unavailable ? `${label} filtering will be available when the API provides club categories.` : undefined}
+
                 type="button"
                 onClick={() => setFilter(label)}
               >
@@ -132,7 +128,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
             <span>Sort</span>
             <select
               aria-label="Sort clubs"
-              className="rounded-[8px] border border-primary/15 bg-white px-3 py-2 text-xs text-black focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="rounded border border-primary/15 bg-white px-3 py-2 text-xs text-black focus:border-primary focus:ring-2 focus:ring-primary/15"
               value={sort}
               onChange={(event) => setSort(event.target.value as SortMode)}
             >
@@ -146,7 +142,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
         <div className="mb-3 mt-8 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold">All clubs</h2>
-            <p className="mt-1 text-[11px] text-[#72726c]">
+            <p className="mt-1 text-xs text-[#72726c]">
               {visibleClubs.length} {visibleClubs.length === 1 ? "club" : "clubs"}
             </p>
           </div>
@@ -165,8 +161,8 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
         </div>
 
         {visibleClubs.length === 0 ? (
-          <div className="rounded-[12px] border border-primary/15 bg-white px-6 py-14 text-center shadow-[0_12px_34px_rgba(35,30,93,0.05)]">
-            <span className="material-symbols-outlined text-3xl text-[#8a8a83]">groups</span>
+          <div className="rounded border border-primary/15 bg-white px-6 py-14 text-center ">
+            <CampusIcon name="groups" className=" text-3xl text-[#8a8a83]" />
             <h3 className="mt-3 text-sm font-semibold">No clubs found</h3>
             <p className="mt-1 text-xs text-[#72726c]">Try a different search or filter.</p>
           </div>
@@ -174,19 +170,17 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {visibleClubs.map((club) => {
               const count = memberCount(club);
-              const latestPostTime = club.latestPost?.createdAt && now
-                ? formatPostTime(club.latestPost.createdAt, now)
-                : "—";
+              const latestPostTime = <PostTime value={club.latestPost?.createdAt} fallback="—" />;
 
               return (
                 <article
                   key={club.slug}
-                  className="flex min-h-[330px] flex-col rounded-[12px] border border-primary/12 bg-white p-4 shadow-[0_10px_28px_rgba(35,30,93,0.04)] transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_16px_36px_rgba(35,30,93,0.08)]"
+                  className="flex min-h-[330px] flex-col rounded border border-primary/12 bg-white p-4  transition hover:-translate-y-0.5 hover:border-primary/35 "
                 >
                   <div className="flex items-start justify-between gap-4">
                     <Link
                       aria-label={`Open ${club.title}`}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-primary/15 bg-primary-fixed text-xs font-bold text-black outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded border border-primary/15 bg-primary-fixed text-xs font-bold text-black outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                       href={`/clubs/${encodeURIComponent(club.slug)}`}
                     >
                       {club.bannerImage ? (
@@ -195,8 +189,8 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                         getInitials(club.title)
                       )}
                     </Link>
-                    <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase text-[#70706a]">
-                      <span className={cn("h-[7px] w-[7px] rounded-full", statusDotClass(club.status))} />
+                    <span className="flex items-center gap-1.5 font-mono text-xs uppercase text-[#70706a]">
+                      <span className={cn("h-[7px] w-[7px] rounded", statusDotClass(club.status))} />
                       {club.status || "Status —"}
                     </span>
                   </div>
@@ -208,7 +202,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                     >
                       {club.title}
                     </Link>
-                    <p className="mt-1 font-mono text-[10px] uppercase text-[#72726c]">
+                    <p className="mt-1 font-mono text-xs uppercase text-[#72726c]">
                       {club.category || "Category —"} · {count === undefined ? "—" : count} members
                     </p>
                   </div>
@@ -217,11 +211,11 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                     {club.description || "Description not available yet."}
                   </p>
 
-                  <div className="mt-3 rounded-[8px] border border-primary/10 bg-primary-fixed/55 px-3 py-2.5">
-                    <p className="font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-[#72726c]">
+                  <div className="mt-3 rounded border border-primary/10 bg-primary-fixed/55 px-3 py-2.5">
+                    <p className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-[#72726c]">
                       Latest post · {latestPostTime}
                     </p>
-                    <p className="mt-1 line-clamp-1 text-[11px] text-[#353532]">{latestPostText(club)}</p>
+                    <p className="mt-1 line-clamp-1 text-xs text-[#353532]">{latestPostText(club)}</p>
                   </div>
 
                   <div className="mt-auto pt-4">
@@ -231,7 +225,7 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                       initialFollowers={club.followers}
                       layout="inline"
                     />
-                    <p className="mt-3 border-t border-[#e5e5df] pt-3 text-[10px] text-[#7c7c75]">
+                    <p className="mt-3 border-t border-[#e5e5df] pt-3 text-xs text-[#7c7c75]">
                       {club.mutualFollowers === undefined
                         ? "Mutual follows unavailable"
                         : `${club.mutualFollowers} friends follow this`}
@@ -243,6 +237,6 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 }

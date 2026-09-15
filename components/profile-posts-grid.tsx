@@ -1,5 +1,8 @@
 "use client";
 
+import { CampusIcon } from "@/components/campus-icon";
+
+
 import { useEffect, useState } from "react";
 import { FeedPostCard } from "@/components/feed-post-card";
 import {
@@ -111,11 +114,11 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
   return (
     <>
       {visiblePosts.length === 0 ? (
-        <p className="rounded-2xl bg-surface-container-low p-5 text-sm font-semibold text-on-surface-variant">
+        <p className="rounded bg-surface-container-low p-5 text-sm font-semibold text-on-surface-variant">
           No posts to show.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4">
           {visiblePosts.map((post) => {
             const mediaUrl = postMedia(post);
             const title = postTitle(post);
@@ -123,7 +126,7 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
             return (
               <Button
                 key={post.postId ?? `${post.authorId}-${title}`}
-                className="group relative h-auto aspect-[4/3] w-full justify-start overflow-hidden rounded-[12px] border border-primary/12 bg-white p-0 text-left shadow-[0_10px_28px_rgba(35,30,93,0.04)] hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_16px_36px_rgba(35,30,93,0.08)]"
+                className="group relative h-auto aspect-[4/3] w-full justify-start overflow-hidden rounded border border-primary/12 bg-white p-0 text-left  hover:-translate-y-0.5 hover:border-primary/35 "
                 type="button"
                 variant="ghost"
                 onClick={() => openPost(post)}
@@ -135,11 +138,11 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
                     <img alt={title} className="h-full w-full object-cover transition duration-200 group-hover:scale-105" src={mediaUrl} />
                   )
                 ) : (
-                  <div className="flex h-full flex-col justify-between bg-primary-fixed/55 p-4">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-[9px] border border-primary/15 bg-white text-xs font-bold text-black">
+                  <div className="flex h-full min-w-0 w-full flex-col justify-between whitespace-normal bg-primary-fixed/55 p-4">
+                    <span className="flex h-10 w-10 items-center justify-center rounded border border-primary/15 bg-white text-xs font-bold text-black">
                       {getInitials(post.author)}
                     </span>
-                    <p className="line-clamp-4 text-sm font-semibold leading-6 text-[#242422] md:text-base">{title}</p>
+                    <p className="line-clamp-4 break-words text-sm font-semibold leading-6 text-[#242422] md:text-base">{title}</p>
                   </div>
                 )}
 
@@ -165,7 +168,7 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
             <DialogDescription className="sr-only">Post details and actions</DialogDescription>
             <div className="mb-3 flex justify-end">
               {deleteMessage ? (
-                <p className="mr-auto rounded-full bg-white px-4 py-2 text-sm font-semibold text-secondary shadow-xs">
+                <p className="mr-auto rounded bg-white px-4 py-2 text-sm font-semibold text-on-secondary-fixed-variant ">
                   {deleteMessage}
                 </p>
               ) : null}
@@ -175,14 +178,14 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
                     render={
                       <Button
                         aria-label="Delete post"
-                        className="mr-2 size-7 rounded-[3px] border border-red-300 bg-white p-0 text-red-600 shadow-xs hover:border-red-400 hover:bg-red-50 hover:text-red-700"
+                        className="mr-2 size-7 rounded border border-red-300 bg-white p-0 text-red-600  hover:border-red-400 hover:bg-red-50 hover:text-red-700"
                         disabled={deleteStatus === "deleting"}
                         size="icon-sm"
                         variant="ghost"
                       />
                     }
                   >
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    <CampusIcon name="delete" className=" text-[16px]" />
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -199,17 +202,17 @@ export function ProfilePostsGrid({ ownerUserId, posts }: ProfilePostsGridProps) 
                 </AlertDialog>
               ) : null}
               <Button
-                className="rounded-full bg-white text-on-surface shadow-xs hover:text-secondary"
+                className="rounded bg-white text-on-surface  hover:text-on-secondary-fixed-variant"
                 type="button"
                 variant="outline"
                 onClick={() => setSelectedPost(null)}
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                <CampusIcon name="close" className=" text-lg" />
                 Close
               </Button>
             </div>
             <ScrollArea className="max-h-[calc(100dvh-6rem)]">
-              <FeedPostCard post={selectedPost} showDeleteButton={false} />
+              <FeedPostCard post={selectedPost} showDeleteButton={false} detail />
             </ScrollArea>
           </DialogContent>
         ) : null}

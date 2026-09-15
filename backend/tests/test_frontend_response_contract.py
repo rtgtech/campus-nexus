@@ -284,13 +284,13 @@ class FrontendResponseContractTest(unittest.TestCase):
             side_effect=backend_schema.GraphUnavailable("offline"),
         ):
             feed = self.client.get("/api/feed").get_json()
-        self.assert_root(feed, {"feedCards", "trending", "suggestedPeople"})
+        self.assert_root(feed, {"feedCards", "trending", "suggestedPeople", "nextCursor", "snapshotId", "mode", "rankingVersion", "personalizationEnabled"})
         self.assertEqual(len(feed["feedCards"]), 1)
         self.assert_entity("FeedCard", feed["feedCards"][0])
         self.assertIsInstance(feed["feedCards"][0]["feedScore"], float)
         self.assertEqual(
             set(feed["feedCards"][0]["rankingSignals"]),
-            {"pagerank", "engagement", "recency", "social"},
+            {"pagerank", "engagement", "recency", "social", "affinity"},
         )
         self.assert_root(self.client.get("/api/signal-bar").get_json(), {"items", "total"})
         self.assert_root(self.client.get("/api/events").get_json(), {"items", "total"})

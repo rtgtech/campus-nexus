@@ -17,6 +17,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 import app as backend_app  # noqa: E402
 import schema_app as backend_schema  # noqa: E402
+from fake_graph import FakeGraph
 
 
 class CrudContractsTest(unittest.TestCase):
@@ -25,6 +26,10 @@ class CrudContractsTest(unittest.TestCase):
         backend_app.Base.metadata.create_all(backend_app.engine)
         backend_app._database_initialized = True
         self.client = backend_app.app.test_client()
+        self.graph = FakeGraph()
+        graph_patch = self.graph.patch_backend(backend_schema)
+        graph_patch.start()
+        self.addCleanup(graph_patch.stop)
 
     @staticmethod
     def auth(token: str) -> dict[str, str]:
@@ -340,6 +345,7 @@ class CrudContractsTest(unittest.TestCase):
     def test_conversations_and_messages_complete_their_supported_crud_lifecycle(self) -> None:
         first_id, first_token = self.add_user("chat-first")
         second_id, _ = self.add_user("chat-second")
+        self.graph.create_friendship(first_id, second_id)
         conversation = self.client.post(
             "/api/messages/conversations",
             json={"participantUserId": second_id, "threadType": "direct"},

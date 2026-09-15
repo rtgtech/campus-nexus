@@ -5,7 +5,7 @@
   },
   "FeedCard": {
     "required": ["postId", "id", "authorId", "author", "clubId", "clubSlug", "type", "postType", "mediaUrl", "mediaUrls", "caption", "likes", "shares", "hashtags", "mentions", "price", "description", "registrationLink", "createdAt", "meta", "title", "body", "image", "tag", "comments", "engagementScore", "likedByCurrentUser", "viewerHasLiked", "savedByCurrentUser", "bookmarkedByCurrentUser", "viewerHasSaved"],
-    "optional": ["feedScore", "rankingSignals"]
+    "optional": ["feedScore", "rankingSignals", "explanationCode"]
   },
   "SignalBarItem": {
     "required": ["id", "title", "link", "position", "createdAt", "updatedAt"],
@@ -39,9 +39,13 @@
     "required": ["sellerId", "sellerRating", "sellerRatingCount", "successfulTrades"],
     "optional": []
   },
+  "PostComment": {
+    "required": ["id", "commentId", "postId", "userId", "author", "username", "initials", "content", "body", "createdAt"],
+    "optional": []
+  },
   "Conversation": {
     "required": ["id", "threadId", "name", "preview", "time", "active", "href", "participants"],
-    "optional": ["unread"]
+    "optional": ["unread", "canMessage"]
   },
   "Message": {
     "required": ["id", "threadId", "side", "text", "time", "status"],

@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { CampusShell } from "@/components/campus-shell";
 import { ProfilePageView, type ProfileClubSummary } from "@/components/profile-page-view";
-import { getCampusData } from "@/lib/campus-api";
+import { LoadError } from "@/components/load-error";
+import { getCampusDataResult, getCampusData } from "@/lib/campus-api";
 import {
   getInitials,
   type CampusUser,
@@ -24,7 +25,7 @@ async function fetchApi<T>(path: string, fallback: T, token?: string): Promise<T
 }
 
 async function getProfileOverview(identifier: string, token?: string) {
-  return getCampusData<ProfileOverviewData | null>(
+  return getCampusDataResult<ProfileOverviewData | null>(
     `/api/users/${encodeURIComponent(identifier)}/profile-overview`,
     null,
     { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
@@ -42,19 +43,19 @@ async function getCurrentUser(token: string | undefined) {
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { user: identifier } = await params;
   const token = (await cookies()).get("campusNexusToken")?.value;
-  const [overview, currentUser] = await Promise.all([
+  const [overviewResult, currentUser] = await Promise.all([
     getProfileOverview(identifier, token),
     getCurrentUser(token),
   ]);
 
-  if (!overview) {
-    notFound();
-  }
+  if (overviewResult.status === 404) notFound();
+  const overview = overviewResult.data;
+  if (!overview) return <CampusShell active="profile">{overviewResult.status === 403 ? <p className="py-10 text-center">This profile is private.</p> : <LoadError />}</CampusShell>;
 
-  const posts = await fetchApi<FeedCard[]>(
+  const postsResult = await getCampusDataResult<FeedCard[]>(
     `/api/posts?authorId=${encodeURIComponent(overview.user.userId)}&limit=20`,
     [],
-    token,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
   );
   const memberships = overview.clubs.memberOf.map<ProfileClubSummary>((summary) => ({
     ...summary,
@@ -82,7 +83,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         marketplaceSummary={overview.marketplace}
         memberships={memberships}
         mutualFriendsPreview={overview.mutualFriendsPreview}
-        posts={posts}
+        posts={postsResult.data}
+        postsError={postsResult.error}
         preferences={overview.preferences}
         profile={overview.profile}
         profileStats={overview.stats}

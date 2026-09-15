@@ -21,6 +21,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 import app as backend_app  # noqa: E402
 import schema_app as backend_schema  # noqa: E402
+from fake_graph import FakeGraph
 
 
 class FrontendApiRequirementsTest(unittest.TestCase):
@@ -29,6 +30,10 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         backend_app.Base.metadata.create_all(backend_app.engine)
         backend_app._database_initialized = True
         self.client = backend_app.app.test_client()
+        self.graph = FakeGraph()
+        graph_patch = self.graph.patch_backend(backend_schema)
+        graph_patch.start()
+        self.addCleanup(graph_patch.stop)
 
     def add_user(self, username: str, *, batch_year: int | None = None) -> tuple[int, str]:
         with backend_app.SessionLocal() as session:
@@ -342,6 +347,7 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         first_id, first_token = self.add_user("first")
         second_id, second_token = self.add_user("second")
         _, outsider_token = self.add_user("outsider")
+        self.graph.create_friendship(first_id, second_id)
         endpoint = "/api/messages/conversations"
         payload = {"participantUserId": str(second_id), "threadType": "direct"}
         self.assertEqual(self.client.post(endpoint, json=payload).status_code, 401)
@@ -390,6 +396,8 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         first_id, first_token = self.add_user("chat-sender")
         second_id, second_token = self.add_user("chat-recipient")
         third_id, third_token = self.add_user("chat-outsider")
+        self.graph.create_friendship(first_id, second_id)
+        self.graph.create_friendship(first_id, third_id)
         thread = self.client.post(
             "/api/messages/conversations",
             json={"participantUserId": second_id},
@@ -446,6 +454,8 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         viewer_id, viewer_token = self.add_user("unread-viewer")
         first_id, first_token = self.add_user("unread-first")
         second_id, second_token = self.add_user("unread-second")
+        self.graph.create_friendship(viewer_id, first_id)
+        self.graph.create_friendship(viewer_id, second_id)
         threads = [self.client.post(
             "/api/messages/conversations", json={"participantUserId": user_id},
             headers=self.auth(viewer_token),
@@ -492,9 +502,11 @@ class FrontendApiRequirementsTest(unittest.TestCase):
         self.assertEqual(fresh.get("/api/messages/unread", headers=self.auth(viewer_token)).get_json(), {"unreadFriends": 2})
 
     def test_chat_read_acknowledgements_require_membership_and_valid_message(self) -> None:
-        _, viewer_token = self.add_user("read-viewer")
+        viewer_id, viewer_token = self.add_user("read-viewer")
         friend_id, friend_token = self.add_user("read-friend")
         outsider_id, outsider_token = self.add_user("read-outsider")
+        self.graph.create_friendship(viewer_id, friend_id)
+        self.graph.create_friendship(viewer_id, outsider_id)
         threads = [self.client.post(
             "/api/messages/conversations", json={"participantUserId": user_id},
             headers=self.auth(viewer_token),

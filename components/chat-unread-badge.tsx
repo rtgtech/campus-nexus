@@ -38,7 +38,7 @@ export function ChatUnreadBadge() {
 
   if (count === 0) return null;
   return (
-    <span aria-label={`${count} friends with unread messages`} className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 font-sans text-[10px] font-bold leading-none text-white ring-2 ring-white">
+    <span aria-label={`${count} friends with unread messages`} className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 font-sans text-xs font-bold leading-none text-black ring-2 ring-white">
       {count}
     </span>
   );

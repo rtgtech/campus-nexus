@@ -77,5 +77,6 @@ class FakeGraph:
             graph_get_friendship=self.get_friendship,
             graph_friend_rows=self.friend_rows,
             feed_signals=self.feed_signals,
+            feed_pagerank_percentiles=lambda **kwargs: self.pagerank,
         )
 

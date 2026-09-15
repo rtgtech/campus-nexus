@@ -45,13 +45,16 @@ function assertFeedRanking(value: unknown, location: string) {
   const signals = assertRoot(
     card.rankingSignals,
     ["pagerank", "engagement", "recency", "social"],
-    [],
+    ["affinity"],
     `${location}.rankingSignals`,
   );
   for (const key of ["pagerank", "engagement", "recency", "social"] as const) {
     if (typeof signals[key] !== "number" || !Number.isFinite(signals[key])) {
       throw new Error(`${location}.rankingSignals.${key} must be a finite number`);
     }
+  }
+  if (signals.affinity !== undefined && (typeof signals.affinity !== "number" || !Number.isFinite(signals.affinity))) {
+    throw new Error(`${location}.rankingSignals.affinity must be a finite number`);
   }
 }
 
@@ -130,12 +133,33 @@ function validateProfileOverview(value: unknown) {
 export function validateApiResponse(path: string, value: unknown): void {
   const pathOnly = path.split("?", 1)[0];
 
+  if (/^\/api\/posts\/[^/]+\/comments$/.test(pathOnly)) {
+    if (isRecord(value) && "items" in value) {
+      const root = assertRoot(value, ["items", "total"]);
+      assertArrayEntities(root.items, "PostComment", "response.items");
+    } else {
+      const root = assertRoot(value, ["comment", "post", "comments"]);
+      assertApiEntity(root.comment, "PostComment", "response.comment");
+      assertApiEntity(root.post, "FeedCard", "response.post");
+    }
+    return;
+  }
+
   if (pathOnly === "/api/feed") {
-    const root = assertRoot(value, ["feedCards", "trending", "suggestedPeople"]);
+    const root = assertRoot(value, ["feedCards", "trending", "suggestedPeople"], ["nextCursor", "snapshotId", "mode", "rankingVersion", "personalizationEnabled"]);
     if (!Array.isArray(root.feedCards)) {
       throw new Error("response.feedCards must be an array");
     }
     root.feedCards.forEach((card, index) => assertFeedRanking(card, `response.feedCards[${index}]`));
+    if (root.nextCursor !== undefined && root.nextCursor !== null && typeof root.nextCursor !== "string") throw new Error("Invalid feed cursor");
+    if (root.personalizationEnabled !== undefined && typeof root.personalizationEnabled !== "boolean") throw new Error("Invalid personalization setting");
+    if (root.snapshotId !== undefined && typeof root.snapshotId !== "string") throw new Error("Invalid feed snapshot");
+    if (root.mode !== undefined && root.mode !== "for-you" && root.mode !== "latest") throw new Error("Invalid feed mode");
+    if (root.rankingVersion !== undefined && typeof root.rankingVersion !== "string") throw new Error("Invalid ranking version");
+    return;
+  }
+  if (pathOnly === "/api/liked-posts") {
+    assertArrayEntities(value, "FeedCard", "response");
     return;
   }
   if (pathOnly === "/api/signal-bar" || /^\/api\/signal-bar\/\d+$/.test(pathOnly)) {

@@ -1,5 +1,7 @@
 # Campus Nexus
 
+See [Student UI and personalized feed](docs/personalized-feed.md) for ranking behavior, API/schema changes, learning controls, cleanup, and rollout. The persistent [implementation checklist](IMPLEMENTATION_CHECKLIST.md) records completed and outstanding work for later sessions.
+
 Campus Nexus is a campus social platform for student profiles, posts, clubs, events, marketplace listings, games, notifications, and direct messages.
 
 The application has three runtime parts:
