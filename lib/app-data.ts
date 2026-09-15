@@ -319,6 +319,10 @@ export type PostComment = {
 
 export type Conversation = {
   canMessage?: boolean;
+  isFriend?: boolean;
+  isBlocked?: boolean;
+  isBlockedByUser?: boolean;
+  isMessageRequest?: boolean;
   id?: number;
   threadId?: number;
   href?: string;
@@ -422,7 +426,7 @@ export type NotificationItem = {
   id: string;
   notificationId: string;
   type: string;
-  source: "friend" | "club";
+  source: "friend" | "club" | "marketplace";
   title: string;
   body: string;
   time: string;
@@ -488,10 +492,19 @@ export type FriendshipRecord = {
 export type FriendshipStatus = {
   isFriend: boolean;
   isSelf: boolean;
+  isBlocked?: boolean;
+  isBlockedByUser?: boolean;
   friends: number;
   friendship: FriendshipRecord | null;
   friendsList?: FriendshipUser[];
   mutualsList?: FriendshipUser[];
+};
+
+export type BlockStatus = {
+  userId: string;
+  isBlocked: boolean;
+  isBlockedByUser: boolean;
+  createdAt: string | null;
 };
 
 export type ClubFollowRecord = {

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ProfilePostsGrid } from "@/components/profile-posts-grid";
+import { MarketplaceInterestInbox } from "@/components/marketplace-interest";
 import { FeedPreferences } from "@/components/feed-preferences";
 import { LoadError } from "@/components/load-error";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_BASE_URL, authFetch } from "@/lib/auth-client";
 import {
   getInitials,
+  type BlockStatus,
   type CampusUser,
   type ClubCard,
   type ClubMember,
@@ -189,6 +191,8 @@ export function ProfilePageView({
   const [editMessage, setEditMessage] = useState("");
   const [messageStatus, setMessageStatus] = useState<RequestStatus>("idle");
   const [messageError, setMessageError] = useState("");
+  const [blockStatus, setBlockStatus] = useState<RequestStatus>("idle");
+  const [blockMessage, setBlockMessage] = useState("");
   const [preferences, setPreferences] = useState<ProfilePreferences | undefined>(initialPreferences);
   const [preferencesStatus, setPreferencesStatus] = useState<RequestStatus>("idle");
   const [preferencesMessage, setPreferencesMessage] = useState("");
@@ -227,8 +231,17 @@ export function ProfilePageView({
     loadFriendship();
   }, [loadFriendship]);
 
+  useEffect(() => {
+    const selectMarketplace = () => {
+      if (window.location.hash === "#marketplace") setActiveTab("marketplace");
+    };
+    selectMarketplace();
+    window.addEventListener("hashchange", selectMarketplace);
+    return () => window.removeEventListener("hashchange", selectMarketplace);
+  }, []);
+
   async function toggleFriendship() {
-    if (isSelf || friendStatus === "saving") {
+    if (isSelf || friendship?.isBlocked || friendship?.isBlockedByUser || friendStatus === "saving") {
       return;
     }
     setFriendStatus("saving");
@@ -246,6 +259,35 @@ export function ProfilePageView({
     } catch (error) {
       setFriendStatus("error");
       setFriendMessage(error instanceof Error ? error.message : "Friendship action failed");
+    }
+  }
+
+  async function toggleBlock() {
+    if (isSelf || blockStatus === "saving") {
+      return;
+    }
+    setBlockStatus("saving");
+    setBlockMessage("");
+    try {
+      const response = await authFetch(`${API_BASE_URL}/api/users/${encodeURIComponent(user.userId)}/block`, {
+        method: friendship?.isBlocked ? "DELETE" : "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Block action failed");
+      }
+      const status = parseApiResponse<BlockStatus>(`/api/users/${user.userId}/block`, data);
+      setFriendship((current) => current ? {
+        ...current,
+        isBlocked: status.isBlocked,
+        isBlockedByUser: status.isBlockedByUser,
+        isFriend: status.isBlocked ? false : current.isFriend,
+      } : current);
+      setBlockStatus("idle");
+      await loadFriendship();
+    } catch (error) {
+      setBlockStatus("error");
+      setBlockMessage(error instanceof Error ? error.message : "Block action failed");
     }
   }
 
@@ -275,7 +317,7 @@ export function ProfilePageView({
   }
 
   async function startConversation() {
-    if (isSelf || !friendship?.isFriend || messageStatus === "saving") {
+    if (isSelf || friendship?.isBlocked || friendship?.isBlockedByUser || messageStatus === "saving") {
       return;
     }
     setMessageStatus("saving");
@@ -405,8 +447,8 @@ export function ProfilePageView({
                 {!isSelf ? (
                   <Button
                     className="h-9 rounded border-[#d8d8d2] px-4 text-xs"
-                    disabled={!friendship?.isFriend || messageStatus === "saving"}
-                    title={friendship?.isFriend ? "Message your friend" : "Add this person as a friend to message them"}
+                    disabled={friendship?.isBlocked || friendship?.isBlockedByUser || messageStatus === "saving"}
+                    title={friendship?.isBlocked || friendship?.isBlockedByUser ? "Messaging is unavailable while either user has blocked the other" : "Send a message"}
                     type="button"
                     variant="outline"
                     onClick={startConversation}
@@ -421,7 +463,7 @@ export function ProfilePageView({
                   <Button className="h-9 rounded bg-primary px-4 text-xs text-white hover:bg-primary/90" type="button" onClick={() => setEditOpen(true)}>
                     Edit profile
                   </Button>
-                ) : (
+                ) : (<>
                   <Button
                     className={cn(
                       "h-9 rounded px-4 text-xs",
@@ -429,14 +471,23 @@ export function ProfilePageView({
                         ? "border-primary/15 bg-white text-black hover:bg-primary-fixed"
                         : "bg-secondary text-black hover:bg-secondary/90",
                     )}
-                    disabled={friendStatus === "loading" || friendStatus === "saving"}
+                    disabled={friendship?.isBlocked || friendship?.isBlockedByUser || friendStatus === "loading" || friendStatus === "saving"}
                     type="button"
                     variant={friendship?.isFriend ? "outline" : "default"}
                     onClick={toggleFriendship}
                   >
                     {friendStatus === "loading" ? "Checking…" : friendStatus === "saving" ? "Saving…" : friendship?.isFriend ? "Friends" : "Add friend"}
                   </Button>
-                )}
+                  <Button
+                    className="h-9 rounded px-4 text-xs"
+                    disabled={blockStatus === "saving"}
+                    type="button"
+                    variant="outline"
+                    onClick={toggleBlock}
+                  >
+                    {blockStatus === "saving" ? "Saving…" : friendship?.isBlocked ? "Unblock" : "Block"}
+                  </Button>
+                </>)}
               </div>
             </div>
 
@@ -453,7 +504,7 @@ export function ProfilePageView({
               )}
             </div>
 
-            {messageError ? <p className="mt-2 text-xs font-semibold text-destructive">{messageError}</p> : null}
+            {messageError || blockMessage ? <p className="mt-2 text-xs font-semibold text-destructive">{messageError || blockMessage}</p> : null}
 
             <button className="mt-4 text-left" type="button" onClick={() => setFriendsDialogView("friends")}>
               <strong className="block text-base">{friendCount === undefined ? "—" : friendCount}</strong>
@@ -578,6 +629,7 @@ export function ProfilePageView({
 
       {activeTab === "marketplace" ? (
         <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" role="tabpanel">
+          {isSelf && <MarketplaceInterestInbox />}
           <PlaceholderCard title={`Active listings (${listings.length})`}>
             {listings.length > 0 ? listings.map((listing) => (
               <Link key={listing.id || listing.postId || listing.title} className="flex items-center gap-3 border-b border-[#e8e8e2] py-3 last:border-0" href={`/marketplace#${listing.postId || listing.id || ""}`}>

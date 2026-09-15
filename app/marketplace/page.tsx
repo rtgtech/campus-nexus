@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExpressInterestButton } from "@/components/marketplace-interest";
 import { ArrowUpRight, ShoppingBag } from "lucide-react";
 import { CampusShell } from "@/components/campus-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -23,6 +24,7 @@ export default async function MarketplacePage() {
           <p className="text-sm leading-6">{item.description}</p>
           <div className="flex flex-wrap gap-2">{item.tags.map((tag) => <span key={tag} className="rounded bg-muted px-2 py-1 text-xs">{tag}</span>)}</div>
           <footer className="border-t pt-4"><p className="text-sm font-medium">{item.owner}</p><p className="mt-1 text-sm text-muted-foreground">{item.location}</p>
+            <ExpressInterestButton itemId={String(item.id || item.postId)} sellerId={item.sellerId} status={item.status} />
             {item.contact && <p className="mt-2 break-words text-sm">{item.contact}</p>}
             {item.sellerId && <Link href={"/" + encodeURIComponent(item.sellerId)} className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary">View seller <ArrowUpRight size={16} aria-hidden="true" /></Link>}
           </footer>

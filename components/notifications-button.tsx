@@ -157,7 +157,7 @@ export function NotificationsButton() {
           <DialogTitle className="font-sans text-xl font-bold tracking-tight text-on-background">
             Notifications
           </DialogTitle>
-          <DialogDescription className="sr-only">Recent friend and club updates</DialogDescription>
+          <DialogDescription className="sr-only">Recent friend, club, and marketplace updates</DialogDescription>
         </DialogHeader>
         <ScrollArea className="min-h-0 flex-1 md:max-h-[520px]">
           <div className="p-3">
@@ -172,7 +172,7 @@ export function NotificationsButton() {
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pr-1">
                         <span className="text-xs font-black uppercase tracking-[0.2em] text-on-secondary-fixed-variant">
-                          {item.source === "club" ? "Club" : "Friend"}
+                          {item.source === "marketplace" ? "Marketplace" : item.source === "club" ? "Club" : "Friend"}
                         </span>
                         <span className="text-xs font-semibold text-on-surface-variant">{item.time}</span>
                       </div>

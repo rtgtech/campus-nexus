@@ -23,6 +23,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    cast,
     create_engine,
     delete,
     event,
@@ -321,6 +322,29 @@ class Friendship(Base):
 
 
 UserFriendship = Friendship
+
+
+class UserBlock(Base):
+    __tablename__ = "user_blocks"
+    __table_args__ = (
+        CheckConstraint('"blockerId" <> "blockedId"', name="ck_user_blocks_distinct_users"),
+        UniqueConstraint("blockerId", "blockedId", name="uq_user_blocks_blocker_blocked"),
+    )
+
+    blockId: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    blockerId: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.userId", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    blockedId: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.userId", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class Club(Base):
@@ -722,6 +746,14 @@ class UserPoint(Base):
     gameId: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("games.gameId"), nullable=True)
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class MarketplaceInterest(Base):
+    __tablename__ = "marketplace_interests"
+
+    itemId: Mapped[int] = mapped_column(Integer, ForeignKey("marketplace_items.itemId", ondelete="CASCADE"), primary_key=True)
+    userId: Mapped[int] = mapped_column(Integer, ForeignKey("users.userId", ondelete="CASCADE"), primary_key=True)
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
@@ -1912,6 +1944,43 @@ def friendship_between(userAId: Any, userBId: Any) -> Optional[dict[str, Any]]:
     return graph_get_friendship(user_a, user_b)
 
 
+def user_block(blocker_id: Any, blocked_id: Any) -> Optional[UserBlock]:
+    blocker = user_pk(blocker_id)
+    blocked = user_pk(blocked_id)
+    if blocker is None or blocked is None or blocker == blocked:
+        return None
+    return db().scalar(
+        select(UserBlock).where(
+            UserBlock.blockerId == blocker,
+            UserBlock.blockedId == blocked,
+        )
+    )
+
+
+def block_between(user_a_id: Any, user_b_id: Any) -> Optional[UserBlock]:
+    user_a = user_pk(user_a_id)
+    user_b = user_pk(user_b_id)
+    if user_a is None or user_b is None or user_a == user_b:
+        return None
+    return db().scalar(
+        select(UserBlock).where(
+            ((UserBlock.blockerId == user_a) & (UserBlock.blockedId == user_b))
+            | ((UserBlock.blockerId == user_b) & (UserBlock.blockedId == user_a))
+        )
+    )
+
+
+def block_status_payload(current_user: User, target_user: User) -> dict[str, Any]:
+    outgoing = user_block(current_user.userId, target_user.userId)
+    incoming = user_block(target_user.userId, current_user.userId)
+    return {
+        "userId": str(target_user.userId),
+        "isBlocked": outgoing is not None,
+        "isBlockedByUser": incoming is not None,
+        "createdAt": utc_isoformat(outgoing.createdAt) if outgoing is not None else None,
+    }
+
+
 def friendship_rows(userId: Any) -> list[tuple[User, dict[str, Any]]]:
     pk = user_pk(userId)
     if pk is None:
@@ -1962,6 +2031,8 @@ def friendship_status_payload(current_user: User, target_user: User, include_lis
         "isSelf": current_user.userId == target_user.userId,
         "friends": len(friendship_rows(target_user.userId)),
         "friendship": friendship,
+        "isBlocked": user_block(current_user.userId, target_user.userId) is not None,
+        "isBlockedByUser": user_block(target_user.userId, current_user.userId) is not None,
     }
     if include_lists:
         payload.update(friendship_lists(target_user.userId, current_user.userId))
@@ -2220,6 +2291,8 @@ def notify_new_post(post: Post) -> None:
 
 
 def notification_href(notification: Notification, actor: Optional[User], post: Optional[Post], club: Optional[Club]) -> str:
+    if notification.type == "marketplace_interest":
+        return f"/{notification.userId}#marketplace"
     if notification.type in {"friend_request", "friend_accept"}:
         return f"/{actor.username}" if actor is not None else "/"
     if notification.type == "club_post" and club is not None:
@@ -2229,6 +2302,8 @@ def notification_href(notification: Notification, actor: Optional[User], post: O
 
 def notification_title(notification: Notification, actor: Optional[User], post: Optional[Post], club: Optional[Club]) -> str:
     actor_name = actor.fullName if actor is not None else "Someone"
+    if notification.type == "marketplace_interest":
+        return f"{actor_name} expressed interest in your listing"
     if notification.type in {"friend_request", "friend_accept"}:
         return f"{actor_name} is now your friend"
     if notification.type == "friend_post":
@@ -2252,7 +2327,7 @@ def serialize_notification(notification: Notification) -> dict[str, Any]:
     actor = db().get(User, notification.actorId)
     post = db().get(Post, optional_int(notification.targetId)) if notification.targetType == "post" else None
     club = db().get(Club, post.clubId) if post is not None and post.clubId is not None else None
-    source = "club" if notification.type == "club_post" else "friend"
+    source = "marketplace" if notification.type == "marketplace_interest" else "club" if notification.type == "club_post" else "friend"
     actor_name = actor.fullName if actor is not None else "Campus Nexus"
     return {
         "id": str(notification.notificationId),
@@ -2264,7 +2339,7 @@ def serialize_notification(notification: Notification) -> dict[str, Any]:
         "time": relative_time(notification.createdAt),
         "createdAt": utc_isoformat(notification.createdAt),
         "href": notification_href(notification, actor, post, club),
-        "actionLabel": "View profile" if notification.type in {"friend_request", "friend_accept"} else "View post",
+        "actionLabel": "View interested users" if notification.type == "marketplace_interest" else "View profile" if notification.type in {"friend_request", "friend_accept"} else "View post",
         "iconText": initials_for_name(actor_name),
         "iconName": "groups" if source == "club" else {"post_like": "favorite", "post_comment": "chat_bubble", "friend_post": "post_add"}.get(notification.type, "person"),
         "isRead": notification.isRead,
@@ -2392,8 +2467,10 @@ def unread_chat_messages(user_id: int):
 def can_message_thread(thread_id: int, viewer: User) -> bool:
     recipients = db().scalars(select(User).join(ChatParticipant, ChatParticipant.userId == User.userId)
         .where(ChatParticipant.threadId == thread_id, User.userId != viewer.userId)).all()
-    return bool(recipients) and all(person.isActive and friendship_between(viewer.userId, person.userId)
-                                    for person in recipients)
+    return bool(recipients) and all(
+        person.isActive and block_between(viewer.userId, person.userId) is None
+        for person in recipients
+    )
 
 
 def serialize_conversation(thread: ChatThread, viewer: User, active: bool = False) -> dict[str, Any]:
@@ -2410,13 +2487,29 @@ def serialize_conversation(thread: ChatThread, viewer: User, active: bool = Fals
         .order_by(ChatMessage.createdAt.desc(), ChatMessage.messageId.desc())
         .limit(1)
     )
-    try:
-        can_message = can_message_thread(thread.threadId, viewer)
-    except GraphUnavailable:
-        can_message = False
+    can_message = can_message_thread(thread.threadId, viewer)
+    is_friend = False
+    if len(participants) == 1:
+        try:
+            is_friend = friendship_between(viewer.userId, participants[0].userId) is not None
+        except GraphUnavailable:
+            app.logger.warning("Neo4j unavailable; treating chat participant as a non-friend")
+    blocked_by_viewer = bool(participants and user_block(viewer.userId, participants[0].userId))
+    blocked_by_participant = bool(participants and user_block(participants[0].userId, viewer.userId))
+    has_incoming_messages = db().scalar(
+        select(func.count()).select_from(ChatMessage).where(
+            ChatMessage.threadId == thread.threadId,
+            ChatMessage.senderId != viewer.userId,
+            ChatMessage.isDeleted.is_(False),
+        )
+    ) or 0
     return {
         "id": thread.threadId,
         "canMessage": can_message,
+        "isFriend": is_friend,
+        "isBlocked": blocked_by_viewer,
+        "isBlockedByUser": blocked_by_participant,
+        "isMessageRequest": bool(not is_friend and has_incoming_messages and not blocked_by_viewer),
         "threadId": thread.threadId,
         "name": name,
         "preview": latest.content or "" if latest is not None else "",
@@ -3026,6 +3119,8 @@ def user_friendship_collection(userId: str):
         return jsonify(friendship_status_payload(current_user, target_user, include_lists))
     if current_user.userId == target_user.userId:
         return jsonify({"error": "users cannot befriend themselves"}), 400
+    if block_between(current_user.userId, target_user.userId) is not None:
+        return jsonify({"error": "Blocked users cannot become friends."}), 403
     if request.method == "DELETE":
         graph_delete_friendship(current_user.userId, target_user.userId)
         return jsonify(friendship_status_payload(current_user, target_user))
@@ -3045,6 +3140,35 @@ def user_friendship_collection(userId: str):
             db().rollback()
             app.logger.exception("Friendship created but notification could not be saved")
     return jsonify(friendship_status_payload(current_user, target_user)), 201 if created else 200
+
+
+@app.route("/api/users/<userId>/block", methods=["GET", "POST", "DELETE"])
+def user_block_item(userId: str):
+    target_user = get_user(userId)
+    if target_user is None or not target_user.isActive:
+        return jsonify({"error": "not found"}), 404
+    current_user = current_auth_user()
+    if not isinstance(current_user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    if current_user.userId == target_user.userId:
+        return jsonify({"error": "users cannot block themselves"}), 400
+    existing = user_block(current_user.userId, target_user.userId)
+    if request.method == "GET":
+        return jsonify(block_status_payload(current_user, target_user))
+    if request.method == "DELETE":
+        if existing is not None:
+            db().delete(existing)
+            db().commit()
+        return jsonify(block_status_payload(current_user, target_user))
+    created = existing is None
+    if created:
+        db().add(UserBlock(blockerId=current_user.userId, blockedId=target_user.userId))
+        db().commit()
+        try:
+            graph_delete_friendship(current_user.userId, target_user.userId)
+        except GraphUnavailable:
+            app.logger.warning("Neo4j unavailable; block saved but friendship could not be removed")
+    return jsonify(block_status_payload(current_user, target_user)), 201 if created else 200
 
 
 @app.route("/api/posts", methods=["GET", "POST"])
@@ -3499,6 +3623,69 @@ def game_item(itemId: int):
     return jsonify(item.to_dict())
 
 
+@app.route("/api/marketplace/interests", methods=["GET"])
+def marketplace_interest_inbox():
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    rows = db().execute(
+        select(MarketplaceInterest, MarketplaceItem, User, Notification)
+        .join(MarketplaceItem, MarketplaceItem.itemId == MarketplaceInterest.itemId)
+        .join(User, User.userId == MarketplaceInterest.userId)
+        .join(
+            Notification,
+            (Notification.userId == MarketplaceItem.sellerId)
+            & (Notification.actorId == MarketplaceInterest.userId)
+            & (Notification.type == "marketplace_interest")
+            & (Notification.targetType == "marketplace_item")
+            & (Notification.targetId == cast(MarketplaceInterest.itemId, String)),
+        )
+        .where(MarketplaceItem.sellerId == user.userId, MarketplaceItem.status != "removed")
+        .order_by(MarketplaceInterest.createdAt.desc())
+    ).all()
+    return jsonify({"items": [{
+        "itemId": str(item.itemId), "title": item.title,
+        "userId": str(person.userId), "name": person.fullName, "username": person.username,
+        "notificationId": str(notification.notificationId),
+        "createdAt": utc_isoformat(interest.createdAt),
+        "canMessage": person.isActive and block_between(user.userId, person.userId) is None,
+    } for interest, item, person, notification in rows]})
+
+
+@app.route("/api/marketplace/items/<int:itemId>/interest", methods=["GET", "POST"])
+def marketplace_interest_item(itemId: int):
+    user = current_auth_user()
+    if not isinstance(user, User):
+        return jsonify({"error": "unauthorized"}), 401
+    item = db().get(MarketplaceItem, itemId)
+    if item is None or item.status == "removed":
+        return jsonify({"error": "Listing not found"}), 404
+    existing = db().get(MarketplaceInterest, (itemId, user.userId))
+    if request.method == "GET":
+        return jsonify({"interested": existing is not None})
+    seller = db().get(User, item.sellerId)
+    if item.sellerId == user.userId:
+        return jsonify({"error": "You cannot express interest in your own listing"}), 400
+    if seller is None or not seller.isActive or block_between(user.userId, item.sellerId):
+        return jsonify({"error": "Interest is unavailable for this listing"}), 403
+    if item.status != "available":
+        return jsonify({"error": "This listing is no longer available"}), 409
+    if existing is not None:
+        return jsonify({"interested": True})
+    try:
+        db().add(MarketplaceInterest(itemId=itemId, userId=user.userId))
+        db().flush()
+        add_notification(item.sellerId, user.userId, "marketplace_interest", "marketplace_item", itemId,
+                         f"{user.fullName} expressed interest in {item.title}.")
+        db().commit()
+    except IntegrityError:
+        db().rollback()
+        if db().get(MarketplaceInterest, (itemId, user.userId)) is None:
+            raise
+        return jsonify({"interested": True})
+    return jsonify({"interested": True}), 201
+
+
 @app.route("/api/marketplace")
 def marketplace():
     seller_id = optional_int(request.args.get("sellerId"))
@@ -3628,8 +3815,8 @@ def conversations_collection():
             return jsonify({"error": "participantUserId must reference an active user"}), 400
         if participant.userId == user.userId:
             return jsonify({"error": "direct conversations require another participant"}), 400
-        if not friendship_between(user.userId, participant.userId):
-            return jsonify({"error": "You can only message your friends."}), 403
+        if block_between(user.userId, participant.userId) is not None:
+            return jsonify({"error": "You cannot message this user."}), 403
         direct_key = direct_conversation_key(user.userId, participant.userId)
         existing = db().scalar(select(ChatThread).where(ChatThread.directKey == direct_key))
         if existing is not None:
@@ -3686,7 +3873,7 @@ def messages_collection():
         if threadId is None or not is_chat_participant(threadId, user.userId):
             return jsonify({"error": "threadId must reference one of the user's conversations"}), 400
         if not can_message_thread(threadId, user):
-            return jsonify({"error": "You can only message your friends."}), 403
+            return jsonify({"error": "You cannot message this user."}), 403
         content = text_value(get_first(data, "text", "content"))
         if not content:
             return jsonify({"error": "content is required"}), 400
@@ -3721,7 +3908,7 @@ def message_item(itemId: int):
         return ("", 204)
     if request.method in {"PATCH", "PUT"}:
         if not can_message_thread(item.threadId, user):
-            return jsonify({"error": "You can only message your friends."}), 403
+            return jsonify({"error": "You cannot message this user."}), 403
         item.content = text_value(get_first(read_json(), "text", "content"), item.content or "")
         db().commit()
         db().refresh(item)

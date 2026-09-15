@@ -146,6 +146,22 @@ CREATE INDEX "ix_friendships_receiverId" ON friendships ("receiverId");
 
 CREATE INDEX "ix_friendships_requesterId" ON friendships ("requesterId");
 
+CREATE TABLE user_blocks (
+	"blockId" INTEGER NOT NULL,
+	"blockerId" INTEGER NOT NULL,
+	"blockedId" INTEGER NOT NULL,
+	"createdAt" DATETIME NOT NULL,
+	PRIMARY KEY ("blockId"),
+	CONSTRAINT ck_user_blocks_distinct_users CHECK ("blockerId" <> "blockedId"),
+	CONSTRAINT uq_user_blocks_blocker_blocked UNIQUE ("blockerId", "blockedId"),
+	FOREIGN KEY("blockerId") REFERENCES users ("userId") ON DELETE CASCADE,
+	FOREIGN KEY("blockedId") REFERENCES users ("userId") ON DELETE CASCADE
+);
+
+CREATE INDEX "ix_user_blocks_blockerId" ON user_blocks ("blockerId");
+
+CREATE INDEX "ix_user_blocks_blockedId" ON user_blocks ("blockedId");
+
 CREATE TABLE marketplace_items (
 	"itemId" INTEGER NOT NULL,
 	"sellerId" INTEGER NOT NULL,
@@ -162,6 +178,15 @@ CREATE TABLE marketplace_items (
 );
 
 CREATE INDEX "ix_marketplace_items_sellerId" ON marketplace_items ("sellerId");
+
+CREATE TABLE marketplace_interests (
+    "itemId" INTEGER NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL,
+    PRIMARY KEY ("itemId", "userId"),
+    FOREIGN KEY("itemId") REFERENCES marketplace_items ("itemId") ON DELETE CASCADE,
+    FOREIGN KEY("userId") REFERENCES users ("userId") ON DELETE CASCADE
+);
 
 CREATE TABLE notifications (
 	"notificationId" INTEGER NOT NULL,

@@ -343,7 +343,11 @@ export function validateApiResponse(path: string, value: unknown): void {
     return;
   }
   if (/^\/api\/users\/[^/]+\/friends$/.test(pathOnly)) {
-    const root = assertRoot(value, ["isFriend", "isSelf", "friends", "friendship"], ["friendsList", "mutualsList"]);
+    const root = assertRoot(
+      value,
+      ["isFriend", "isSelf", "friends", "friendship"],
+      ["friendsList", "mutualsList", "isBlocked", "isBlockedByUser"],
+    );
     if (root.friendship !== null) {
       assertApiEntity(root.friendship, "FriendshipRecord", "response.friendship");
     }
@@ -353,6 +357,21 @@ export function validateApiResponse(path: string, value: unknown): void {
     if (root.mutualsList !== undefined) {
       assertArrayEntities(root.mutualsList, "FriendshipUser", "response.mutualsList");
     }
+    return;
+  }
+  if (/^\/api\/marketplace\/items\/\d+\/interest$/.test(pathOnly)) {
+    const root = assertRoot(value, ["interested"]);
+    if (typeof root.interested !== "boolean") throw new Error("interested must be a boolean");
+    return;
+  }
+  if (pathOnly === "/api/marketplace/interests") {
+    const root = assertRoot(value, ["items"]);
+    if (!Array.isArray(root.items)) throw new Error("items must be an array");
+    root.items.forEach((item) => assertRoot(item, ["itemId", "notificationId", "title", "userId", "name", "username", "createdAt", "canMessage"]));
+    return;
+  }
+  if (/^\/api\/users\/[^/]+\/block$/.test(pathOnly)) {
+    assertRoot(value, ["userId", "isBlocked", "isBlockedByUser", "createdAt"]);
     return;
   }
   if (/^\/api\/users\/[^/]+\/preferences$/.test(pathOnly)) {

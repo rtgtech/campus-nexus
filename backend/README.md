@@ -155,6 +155,9 @@ Compatibility aliases are preserved:
 - `POST /api/clubs` creates a club card.
 - `POST /api/marketplace` creates a marketplace item.
 - `POST /api/marketplace/items` also creates a marketplace item.
+- `GET /api/marketplace/items/<id>/interest` returns the signed-in user's interest state; `POST` expresses interest and notifies the seller once. Own, unavailable, and blocked listings reject interest.
+- `GET /api/marketplace/interests` returns interest received on the signed-in seller's listings, including interested users and whether they can be messaged. The profile Marketplace tab displays this inbox; interest notifications link to it and can be dismissed from either view.
+- Interest is stored in the new `marketplace_interests` SQLite table with one row per listing/user pair. Backend initialization creates the table on restart; no environment changes are required.
 
 `POST`, `PATCH`, `PUT`, and `DELETE` requests for `/api/clubs` and `/api/clubs/items` require admin access.
 Deleting a club permanently removes its club row, memberships, and follows so its name and slug can be reused. Its posts are soft-deleted and existing club chat threads are retained without the deleted club association.

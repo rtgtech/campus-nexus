@@ -28,12 +28,16 @@ class SocialInteractionsTest(unittest.TestCase):
             db.add_all(users)
             db.flush()
             self.viewer, self.friend, self.stranger = [user.userId for user in users]
-            self.auth = {"Authorization": "Bearer " + s.create_auth_token(users[0])}
+            self.tokens = {user.username: s.create_auth_token(user) for user in users}
+            self.auth = self.auth_for("viewer")
             post = s.Post(authorId=self.friend, content="A campus conversation", visibility="campus")
             db.add(post)
             db.commit()
             self.post = post.postId
         self.comments = f"/api/posts/{self.post}/comments"
+
+    def auth_for(self, username):
+        return {"Authorization": "Bearer " + self.tokens[username]}
 
     def create_thread(self):
         self.graph.create_friendship(self.viewer, self.friend)
@@ -42,40 +46,93 @@ class SocialInteractionsTest(unittest.TestCase):
         self.assertTrue(response.get_json()["canMessage"])
         return response.get_json()["threadId"]
 
-    def test_strangers_cannot_create_threads_even_with_spoofed_identity(self):
+    def test_nonfriends_can_create_threads_without_spoofing_identity(self):
         response = self.client.post("/api/messages/conversations", headers=self.auth,
             json={"participantUserId": self.friend, "userId": self.stranger})
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.get_json()["canMessage"])
+        self.assertFalse(response.get_json()["isFriend"])
         with s.SessionLocal() as db:
-            self.assertEqual(db.query(s.ChatThread).count(), 0)
+            participant_ids = {row.userId for row in db.query(s.ChatParticipant).all()}
+            self.assertEqual(participant_ids, {self.viewer, self.friend})
 
-    def test_unfriending_blocks_send_edit_and_reopening_but_preserves_history(self):
+    def test_unfriending_preserves_nonfriend_messaging_and_history(self):
         thread = self.create_thread()
         data = {"threadId": thread, "text": "Hello friend"}
         sent = self.client.post("/api/messages/items", headers=self.auth, json=data)
         self.assertEqual(sent.status_code, 201)
         self.graph.delete_friendship(self.viewer, self.friend)
-        self.assertEqual(self.client.post("/api/messages/items", headers=self.auth, json=data).status_code, 403)
-        self.assertEqual(self.client.patch(f"/api/messages/items/{sent.get_json()['id']}", headers=self.auth, json={"text": "Edited"}).status_code, 403)
-        self.assertEqual(self.client.post("/api/messages/conversations", headers=self.auth, json={"participantUserId": self.friend}).status_code, 403)
-        conversation = self.client.get(f"/api/messages/conversations/{thread}", headers=self.auth).get_json()
-        self.assertFalse(conversation["canMessage"])
-        self.assertEqual(self.client.get(f"/api/messages/items?threadId={thread}", headers=self.auth).get_json()[0]["text"], "Hello friend")
-        self.graph.create_friendship(self.viewer, self.friend)
         self.assertEqual(self.client.post("/api/messages/items", headers=self.auth, json=data).status_code, 201)
+        self.assertEqual(self.client.patch(f"/api/messages/items/{sent.get_json()['id']}", headers=self.auth, json={"text": "Edited"}).status_code, 200)
+        self.assertEqual(self.client.post("/api/messages/conversations", headers=self.auth, json={"participantUserId": self.friend}).status_code, 200)
+        conversation = self.client.get(f"/api/messages/conversations/{thread}", headers=self.auth).get_json()
+        self.assertTrue(conversation["canMessage"])
+        self.assertFalse(conversation["isFriend"])
+        self.assertEqual(self.client.get(f"/api/messages/items?threadId={thread}", headers=self.auth).get_json()[0]["text"], "Edited")
 
-    def test_graph_outage_fails_closed_for_messaging(self):
+    def test_graph_outage_does_not_disable_safe_nonfriend_messaging(self):
         thread = self.create_thread()
         with patch.object(s, "graph_get_friendship", side_effect=s.GraphUnavailable("offline")):
-            self.assertEqual(self.client.post("/api/messages/items", headers=self.auth, json={"threadId": thread, "text": "Blocked"}).status_code, 503)
-            self.assertFalse(self.client.get(f"/api/messages/conversations/{thread}", headers=self.auth).get_json()["canMessage"])
+            self.assertEqual(self.client.post("/api/messages/items", headers=self.auth, json={"threadId": thread, "text": "Delivered"}).status_code, 201)
+            conversation = self.client.get(f"/api/messages/conversations/{thread}", headers=self.auth).get_json()
+            self.assertTrue(conversation["canMessage"])
+            self.assertFalse(conversation["isFriend"])
 
-    def test_legacy_thread_with_nonfriend_cannot_bypass_creation_check(self):
+    def test_nonparticipant_cannot_send_to_an_existing_thread(self):
         thread = self.create_thread()
-        with s.SessionLocal() as db:
-            db.add(s.ChatParticipant(threadId=thread, userId=self.stranger))
-            db.commit()
-        self.assertEqual(self.client.post("/api/messages/items", headers=self.auth, json={"threadId": thread, "text": "Blocked"}).status_code, 403)
+        self.assertEqual(self.client.post("/api/messages/items", headers=self.auth_for("stranger"), json={"threadId": thread, "text": "Blocked"}).status_code, 400)
+
+    def test_incoming_nonfriend_message_is_a_blockable_message_request(self):
+        created = self.client.post(
+            "/api/messages/conversations",
+            headers=self.auth_for("stranger"),
+            json={"participantUserId": self.viewer},
+        )
+        self.assertEqual(created.status_code, 201)
+        thread = created.get_json()["threadId"]
+        self.assertFalse(created.get_json()["isMessageRequest"])
+        sent = self.client.post(
+            "/api/messages/items",
+            headers=self.auth_for("stranger"),
+            json={"threadId": thread, "text": "Hello from a non-friend"},
+        )
+        self.assertEqual(sent.status_code, 201)
+
+        request_view = self.client.get(f"/api/messages/conversations/{thread}", headers=self.auth).get_json()
+        self.assertTrue(request_view["isMessageRequest"])
+        self.assertFalse(request_view["isFriend"])
+
+        blocked = self.client.post(f"/api/users/{self.stranger}/block", headers=self.auth)
+        self.assertEqual(blocked.status_code, 201)
+        self.assertTrue(blocked.get_json()["isBlocked"])
+        self.assertEqual(self.client.post(
+            "/api/messages/items",
+            headers=self.auth_for("stranger"),
+            json={"threadId": thread, "text": "Cannot deliver"},
+        ).status_code, 403)
+        after_block = self.client.get(f"/api/messages/conversations/{thread}", headers=self.auth).get_json()
+        self.assertFalse(after_block["canMessage"])
+        self.assertTrue(after_block["isBlocked"])
+        self.assertFalse(after_block["isMessageRequest"])
+
+        unblocked = self.client.delete(f"/api/users/{self.stranger}/block", headers=self.auth)
+        self.assertEqual(unblocked.status_code, 200)
+        self.assertFalse(unblocked.get_json()["isBlocked"])
+        self.assertEqual(self.client.post(
+            "/api/messages/items",
+            headers=self.auth_for("stranger"),
+            json={"threadId": thread, "text": "Allowed again"},
+        ).status_code, 201)
+
+    def test_blocking_a_friend_removes_friendship_and_prevents_refriending(self):
+        self.graph.create_friendship(self.viewer, self.friend)
+        blocked = self.client.post(f"/api/users/{self.friend}/block", headers=self.auth)
+        self.assertEqual(blocked.status_code, 201)
+        self.assertIsNone(self.graph.get_friendship(self.viewer, self.friend))
+        status = self.client.get(f"/api/users/{self.friend}/friends", headers=self.auth).get_json()
+        self.assertTrue(status["isBlocked"])
+        self.assertFalse(status["isFriend"])
+        self.assertEqual(self.client.post(f"/api/users/{self.friend}/friends", headers=self.auth).status_code, 403)
 
     def test_comments_persist_with_authenticated_author_and_count(self):
         created = self.client.post(self.comments, headers=self.auth, json={"content": "  Great idea!\nSee you there.  ", "userId": self.stranger})
