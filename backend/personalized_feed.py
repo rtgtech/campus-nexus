@@ -130,16 +130,17 @@ class FeedService:
             for post_id, count in s.db().execute(query.group_by(model.postId)):
                 counts[post_id] += count * multiplier
         pagerank, graph_available = {}, context[3]
-        try:
-            pagerank, _ = s.feed_signals(user_ids={post.authorId for post in posts},
-                club_ids={post.clubId for post in posts if post.clubId is not None},
-                viewerUserId=user.userId if user else None)
-        except s.GraphUnavailable:
-            graph_available = False
+        if graph_available and posts and not latest:
+            try:
+                pagerank, _ = s.feed_signals(user_ids={post.authorId for post in posts},
+                    club_ids={post.clubId for post in posts if post.clubId is not None},
+                    viewerUserId=user.userId if user else None)
+            except s.GraphUnavailable:
+                graph_available = False
         # Population percentiles are refreshed with the persistent graph, not
         # normalized against whichever candidates happened to be retrieved.
         percentiles = {}
-        if graph_available:
+        if graph_available and posts and not latest:
             try:
                 percentiles = s.feed_pagerank_percentiles(user_ids={post.authorId for post in posts},
                     club_ids={post.clubId for post in posts if post.clubId is not None})
@@ -197,7 +198,12 @@ class FeedService:
         for post in posts:
             record = records[str(post.postId)]
             club = clubs.get(post.clubId)
-            card = post.to_dict(authors[post.authorId].fullName, club.slug if club else None, media.get(post.postId) or ([post.mediaUrl] if post.mediaUrl else []))
+            card = post.to_dict(
+                authors[post.authorId].fullName,
+                club.slug if club else None,
+                media.get(post.postId) or ([post.mediaUrl] if post.mediaUrl else []),
+                club.name if club else None,
+            )
             card.update(likedByCurrentUser=post.postId in liked, viewerHasLiked=post.postId in liked,
                         savedByCurrentUser=post.postId in saved, bookmarkedByCurrentUser=post.postId in saved,
                         viewerHasSaved=post.postId in saved)

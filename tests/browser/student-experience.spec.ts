@@ -63,6 +63,19 @@ test("personalization controls persist and reset history", async ({ page }) => {
   await expect(page.getByText("Your learning history has been cleared.", { exact: false })).toBeVisible();
 });
 
+test("saved profile interests appear on the profile card", async ({ page }) => {
+  await page.goto("/alex");
+  await expect(page.getByText("Robotics", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bio not added yet.", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit profile", exact: true }).click();
+  await page.getByLabel("Interests", { exact: true }).fill("Robotics, Music");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByText("Interests", { exact: true })).toBeVisible();
+  await expect(page.getByText("Robotics", { exact: true })).toBeVisible();
+  await expect(page.getByText("Music", { exact: true })).toBeVisible();
+});
+
 test("mobile navigation, post overlay and saved posts are reachable", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");

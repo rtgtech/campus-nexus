@@ -3,7 +3,10 @@ from __future__ import annotations
 import atexit
 from bisect import bisect_right
 import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from threading import Lock
+from time import monotonic
 from typing import Any, Iterable, Mapping, Optional
 
 from neo4j import GraphDatabase
@@ -19,6 +22,10 @@ class GraphStateError(RuntimeError):
 
 
 _driver = None
+_availability_lock = Lock()
+_retry_after = 0.0
+_probing = False
+_recovery_delay = 30.0
 
 
 def _database() -> str:
@@ -36,27 +43,55 @@ def _get_driver():
     if not uri or not username or not password:
         raise GraphUnavailable("Neo4j connection is not configured")
 
-    _driver = GraphDatabase.driver(uri, auth=(username, password), max_transaction_retry_time=2.0)
+    _driver = GraphDatabase.driver(
+        uri, auth=(username, password), max_transaction_retry_time=0.0,
+        connection_timeout=2.0, connection_acquisition_timeout=3.0,
+    )
     return _driver
 
 
 def close_driver() -> None:
-    global _driver
+    global _driver, _retry_after, _probing
     if _driver is not None:
         _driver.close()
         _driver = None
+    with _availability_lock:
+        _retry_after = 0.0
+        _probing = False
 
 
 atexit.register(close_driver)
 
 
-def _execute(query: str, **parameters):
+@contextmanager
+def _graph_operation():
+    """Fail fast during outages; let one request probe for recovery."""
+    global _retry_after, _probing
+    with _availability_lock:
+        if _probing or monotonic() < _retry_after:
+            raise GraphUnavailable("Neo4j is temporarily unavailable")
+        probe = _retry_after >= 0
+        if probe:
+            _probing = True
     try:
-        return _get_driver().execute_query(query, parameters_=parameters, database_=_database())
-    except GraphUnavailable:
-        raise
-    except (DriverError, Neo4jError, OSError) as error:
+        yield
+    except (GraphUnavailable, DriverError, Neo4jError, OSError) as error:
+        with _availability_lock:
+            _retry_after = monotonic() + _recovery_delay
         raise GraphUnavailable("Neo4j is unavailable") from error
+    else:
+        with _availability_lock:
+            if probe:
+                _retry_after = -1.0
+    finally:
+        if probe:
+            with _availability_lock:
+                _probing = False
+
+
+def _execute(query: str, **parameters):
+    with _graph_operation():
+        return _get_driver().execute_query(query, parameters_=parameters, database_=_database())
 
 
 def ensure_constraints() -> None:
@@ -187,11 +222,12 @@ def feed_signals(
             OPTIONAL MATCH (target:User {userId: target_id})
             OPTIONAL MATCH (viewer:User {userId: $viewer_id})-[edge:FRIENDS_WITH]-(target)
             RETURN target_id,
-                   coalesce(target.pagerank, 0.0) AS pagerank,
+                   coalesce(target[$pagerank_property], 0.0) AS pagerank,
                    CASE WHEN $viewer_id = target_id THEN 1.0 ELSE coalesce(edge.weight, 0.0) END AS social
             """,
             target_ids=users,
             viewer_id=viewer_id,
+            pagerank_property="pagerank",
         )
         for record in result.records:
             key = f"user:{record['target_id']}"
@@ -206,11 +242,12 @@ def feed_signals(
             OPTIONAL MATCH (target:Club {clubId: target_id})
             OPTIONAL MATCH (:User {userId: $viewer_id})-[edge:RELATED_TO]->(target)
             RETURN target_id,
-                   coalesce(target.pagerank, 0.0) AS pagerank,
+                   coalesce(target[$pagerank_property], 0.0) AS pagerank,
                    coalesce(edge.weight, 0.0) AS social
             """,
             target_ids=clubs,
             viewer_id=viewer_id,
+            pagerank_property="pagerank",
         )
         for record in result.records:
             key = f"club:{record['target_id']}"
@@ -221,12 +258,16 @@ def feed_signals(
 
 
 def feed_pagerank_percentiles(*, user_ids: Iterable[Any] = (), club_ids: Iterable[Any] = ()) -> dict[str, float]:
+    users = sorted({int(value) for value in user_ids})
+    clubs = sorted({int(value) for value in club_ids})
+    if not users and not clubs:
+        return {}
     result = _execute("""
         MATCH (node) WHERE (node:User AND node.userId IN $user_ids) OR (node:Club AND node.clubId IN $club_ids)
         RETURN CASE WHEN node:User THEN 'user:' + toString(node.userId)
                     ELSE 'club:' + toString(node.clubId) END AS key,
-               coalesce(node.pagerankPercentile, 0.0) AS percentile
-    """, user_ids=list(user_ids), club_ids=list(club_ids))
+               coalesce(node[$percentile_property], 0.0) AS percentile
+    """, user_ids=users, club_ids=clubs, percentile_property="pagerankPercentile")
     return {row["key"]: float(row["percentile"]) for row in result.records}
 
 
@@ -325,12 +366,6 @@ def replace_graph(
             """
         ).consume()
 
-    try:
+    with _graph_operation():
         with _get_driver().session(database=_database()) as session:
             session.execute_write(write)
-    except GraphStateError:
-        raise
-    except GraphUnavailable:
-        raise
-    except (DriverError, Neo4jError, OSError) as error:
-        raise GraphUnavailable("Neo4j is unavailable") from error

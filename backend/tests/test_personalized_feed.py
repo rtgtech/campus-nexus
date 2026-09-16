@@ -202,6 +202,15 @@ class PersonalizedFeedTest(unittest.TestCase):
         self.assertEqual(signals["social"], 1)
         self.assertEqual(signals["pagerank"], 0)
 
+    def test_graph_outage_skips_ranking_lookups_and_preserves_privacy(self):
+        public = self.post()
+        self.post(self.friend, visibility="friends")
+        with patch.object(s, "graph_friend_rows", side_effect=s.GraphUnavailable("offline")), patch.object(s, "feed_signals") as signals, patch.object(s, "feed_pagerank_percentiles") as percentiles:
+            cards = self.feed()["feedCards"]
+        self.assertEqual([card["postId"] for card in cards], [str(public)])
+        signals.assert_not_called()
+        percentiles.assert_not_called()
+
     def test_latest_is_chronological_and_ignores_seen_penalty(self):
         newer = self.post(hours=0)
         self.post(self.friend, hours=24)

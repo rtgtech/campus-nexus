@@ -211,6 +211,8 @@ class FrontendResponseContractTest(unittest.TestCase):
 
         post = self.client.get(f"/api/posts/{self.post_id}").get_json()
         self.assert_entity("FeedCard", post)
+        self.assertEqual(post["clubName"], "Contract Club")
+        self.assertEqual(post["clubSlug"], "contract-club")
 
         signal = self.client.get("/api/signal-bar").get_json()["items"][0]
         self.assert_entity("SignalBarItem", signal)

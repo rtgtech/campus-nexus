@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, Plus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LoaderCircle, SlidersHorizontal, Plus } from "lucide-react";
 import { FeedPostCard } from "@/components/feed-post-card";
 import { FeedPreferences } from "@/components/feed-preferences";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -19,6 +19,8 @@ export function FeedWorkspace({ initial, initialError, mode, signedIn }: {
 }) {
   const [feed, setFeed] = useState(initial);
   const [error, setError] = useState(initialError);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [pending, setPending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [undo, setUndo] = useState<string | null>(null);
@@ -26,23 +28,43 @@ export function FeedWorkspace({ initial, initialError, mode, signedIn }: {
   const root = useRef<HTMLDivElement>(null);
   const queue = useRef<ViewingEvent[]>([]);
   const flushRef = useRef<() => void>(() => {});
+  const loadingRef = useRef(false);
+  const retryReset = useRef(true);
   const canTrack = signedIn && feed.personalizationEnabled === true;
 
-  async function load(reset = false) {
-    if (pending) return;
+  const load = useCallback(async (reset = false) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    retryReset.current = reset;
     setPending(true);
     try {
       const query = new URLSearchParams({ mode, limit: "20" });
       if (!reset && feed.nextCursor) query.set("cursor", feed.nextCursor);
-      const response = await authFetch(`${API_BASE_URL}/api/feed?${query}`);
+      const response = await authFetch(`${API_BASE_URL}/api/feed?${query}`, { signal: AbortSignal.timeout(8000) });
+      if (response.status === 410) retryReset.current = true;
       if (!response.ok) throw new Error(response.status === 410 ? "This feed has expired. Refresh to see new posts." : "We couldn't load your feed. Please try again.");
       const next = parseApiResponse<FeedData>("/api/feed", await response.json());
       setFeed((current) => ({ ...next, feedCards: reset ? next.feedCards : [...current.feedCards, ...next.feedCards.filter((post) => !current.feedCards.some((old) => old.postId === post.postId))] }));
       setError(null);
+      setRetryCount(0);
       if (reset) { setHidden([]); queue.current = []; }
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Feed unavailable."); }
-    finally { setPending(false); }
-  }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Feed unavailable.");
+      setRetryCount((count) => count + 1);
+    } finally { loadingRef.current = false; setPending(false); }
+  }, [mode, feed.nextCursor]);
+
+  useEffect(() => {
+    if (!error || pending) return;
+    const timer = window.setTimeout(() => {
+      if (document.hidden || !navigator.onLine) {
+        setRetryCount((count) => count + 1);
+        return;
+      }
+      void load(retryReset.current);
+    }, retryCount === 0 ? 0 : Math.min(30000, 1000 * 2 ** Math.min(retryCount, 5)));
+    return () => window.clearTimeout(timer);
+  }, [error, pending, retryCount, load]);
 
   useEffect(() => {
     if (!canTrack || !feed.snapshotId || !root.current) return;
@@ -93,7 +115,8 @@ export function FeedWorkspace({ initial, initialError, mode, signedIn }: {
       if (!response.ok) throw new Error();
       setHidden((current) => restore ? current.filter((item) => item !== target) : [...current, target]);
       setUndo(restore ? null : target);
-    } catch { setError("We couldn't update your feed. Please try again."); }
+      setActionError(null);
+    } catch { setActionError("We couldn't update your feed. Please try again."); }
   }
 
   return <div ref={root} className="min-w-0">
@@ -102,7 +125,8 @@ export function FeedWorkspace({ initial, initialError, mode, signedIn }: {
       {signedIn && <Button aria-label="Feed preferences" variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}><SlidersHorizontal size={18} /></Button>}
     </div>
     {signedIn && <p className="mb-5 text-sm leading-6 text-muted-foreground">{feed.personalizationEnabled ? "Shaped by your network and the posts you spend time with." : "Recent posts and updates from your campus network."} <button className="font-medium text-primary underline underline-offset-4" onClick={() => setSettingsOpen(true)}>You're in control</button></p>}
-    {error && <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded border bg-white p-4 text-sm"><span>{error}</span><Button variant="outline" disabled={pending} onClick={() => void load(true)}>Refresh feed</Button></div>}
+    {(pending || error) && <div role="status" className="flex justify-center py-6"><LoaderCircle className="h-6 w-6 animate-spin text-primary" aria-hidden="true" /><span className="sr-only">Refreshing feed</span></div>}
+    {actionError && <p role="alert" className="mb-5 text-sm">{actionError}</p>}
     {undo && <div role="status" className="mb-4 flex items-center justify-between border bg-white p-3 text-sm">Hidden from your feed.<Button variant="ghost" onClick={() => void exclude(undo, true)}>Undo</Button></div>}
     <div className="space-y-5">{feed.feedCards.filter((post) => !hidden.includes(`post:${post.postId}`) && !hidden.includes(`author:${post.authorId}`) && !hidden.includes(`club:${post.clubId}`)).map((post) => <div key={post.postId} data-feed-post={post.postId}>
       <FeedPostCard post={post} showDeleteButton={false} onExclude={signedIn ? (target) => void exclude(target) : undefined}
@@ -111,7 +135,7 @@ export function FeedWorkspace({ initial, initialError, mode, signedIn }: {
           try { sessionStorage.setItem("campus-nexus:post-context", JSON.stringify({ postId: post.postId, snapshotId: feed.snapshotId })); } catch { /* Storage is optional. */ }
         } }} />
     </div>)}</div>
-    {!error && !feed.feedCards.length && <EmptyState title="A little quiet here" description="Posts from your campus will appear here. Start a conversation or find a club to follow." action={<Link href="/?=createpost" className={buttonVariants()}><Plus size={18} />Create post</Link>} />}
+    {!error && !pending && !feed.feedCards.length && <EmptyState title="A little quiet here" description="Posts from your campus will appear here. Start a conversation or find a club to follow." action={<Link href="/?=createpost" className={buttonVariants()}><Plus size={18} />Create post</Link>} />}
     {feed.nextCursor && <div className="mt-7 text-center"><Button variant="outline" disabled={pending} onClick={() => void load()}>{pending ? "Loading posts…" : "Load more"}</Button></div>}
     {!feed.nextCursor && feed.feedCards.length > 0 && <p className="py-8 text-center text-sm text-muted-foreground">You're all caught up. <button className="text-primary underline" disabled={pending} onClick={() => void load(true)}>Refresh feed</button></p>}
     <Dialog open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) void load(true); }}><DialogContent className="max-h-[85dvh] max-w-xl overflow-y-auto"><DialogHeader><DialogTitle>Feed preferences</DialogTitle></DialogHeader><FeedPreferences /></DialogContent></Dialog>

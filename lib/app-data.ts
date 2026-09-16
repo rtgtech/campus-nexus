@@ -4,6 +4,7 @@ export type FeedCard = {
   authorId?: string;
   clubId?: number | null;
   clubSlug?: string | null;
+  clubName?: string | null;
   author: string;
   meta: string;
   title: string;

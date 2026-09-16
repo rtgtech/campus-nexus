@@ -117,7 +117,7 @@ export function FeedPostCard({ post, onSavedChange, showDeleteButton = true, onE
         <Link href={authorHref} aria-label={"View " + post.author + "'s profile"} className="flex size-11 shrink-0 items-center justify-center rounded bg-accent text-sm font-semibold text-primary">{getInitials(post.author)}</Link>
         <div className="min-w-0"><Link href={authorHref} className="block truncate text-sm font-semibold hover:underline">{post.author}</Link>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-            {post.clubSlug && <Link href={"/clubs/" + encodeURIComponent(post.clubSlug)} className="text-primary hover:underline">{post.clubSlug}</Link>}
+            {post.clubSlug && <Link href={"/clubs/" + encodeURIComponent(post.clubSlug)} className="text-primary hover:underline">{post.clubName || post.clubSlug}</Link>}
             {announcement && <span className="font-medium text-primary">Announcement</span>}
             <PostTime value={post.createdAt || post.meta} />
           </div>

@@ -509,6 +509,7 @@ class Post(Base):
         author_name: Optional[str] = None,
         club_slug: Optional[str] = None,
         mediaUrls: Optional[list[str]] = None,
+        club_name: Optional[str] = None,
     ) -> dict[str, Any]:
         createdAt = utc_isoformat(self.createdAt)
         caption = self.caption
@@ -523,6 +524,7 @@ class Post(Base):
             "author": author_name or str(self.authorId),
             "clubId": self.clubId,
             "clubSlug": club_slug,
+            "clubName": club_name,
             "type": self.type_code,
             "postType": self.postType,
             "mediaUrl": primary_media,
@@ -1318,6 +1320,7 @@ def serialize_post(post: Post, viewerUserId: Optional[str] = None) -> dict[str, 
             author.fullName if author is not None else None,
             club.slug if club is not None else None,
             post_media_urls(post),
+            club.name if club is not None else None,
         ),
         "likedByCurrentUser": likedByCurrentUser,
         "viewerHasLiked": likedByCurrentUser,

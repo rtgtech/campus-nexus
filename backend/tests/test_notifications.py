@@ -245,6 +245,7 @@ class NotificationsTest(unittest.TestCase):
 
         self.assertEqual(created_posts[0]["mediaUrls"], ["data:image/png;base64,cGhvdG8=", "data:video/mp4;base64,dmlkZW8="])
         self.assertEqual(created_posts[1]["registrationLink"], "https://register.events.example.edu/robotics")
+        self.assertTrue(all(post["clubName"] == "Robotics" for post in created_posts))
 
         invalid_announcement = self.client.post(
             "/api/posts",

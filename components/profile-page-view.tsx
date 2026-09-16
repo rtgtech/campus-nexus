@@ -347,6 +347,10 @@ export function ProfilePageView({
     }
     setEditStatus("saving");
     setEditMessage("");
+    const submittedInterests = editInterests
+      .split(",")
+      .map((interest) => interest.trim())
+      .filter((interest, index, interests) => Boolean(interest) && interests.indexOf(interest) === index);
     try {
       const response = await authFetch(`${API_BASE_URL}/api/profiles/${encodeURIComponent(user.username || user.userId)}`, {
         method: "PATCH",
@@ -355,14 +359,16 @@ export function ProfilePageView({
           major: editMajor.trim(),
           bio: editBio.trim(),
           batchYear: editBatchYear.trim() ? Number(editBatchYear) : null,
-          interests: editInterests.split(",").map((interest) => interest.trim()).filter(Boolean),
+          interests: submittedInterests,
         }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "Profile update failed");
       }
-      setProfile(parseApiResponse<ProfileData>(`/api/profiles/${user.username || user.userId}`, data));
+      const savedProfile = parseApiResponse<ProfileData>(`/api/profiles/${user.username || user.userId}`, data);
+      setProfile({ ...savedProfile, interests: submittedInterests });
+      setEditInterests(submittedInterests.join(", "));
       setEditStatus("idle");
       setEditOpen(false);
     } catch (error) {
@@ -491,18 +497,21 @@ export function ProfilePageView({
               </div>
             </div>
 
-            <p className="mt-3 max-w-[560px] text-[13px] leading-6 text-[#353532]">
-              {profile.bio || "Bio not added yet."}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {profile.interests.length > 0 ? profile.interests.map((interest) => (
-                <span key={interest} className="rounded border border-primary/15 bg-primary-fixed/65 px-2.5 py-1 font-mono text-xs uppercase text-black">
-                  {interest}
-                </span>
-              )) : (
-                <span className="text-xs text-[#85857e]">No interests added.</span>
-              )}
-            </div>
+            {profile.bio ? (
+              <p className="mt-3 max-w-[560px] text-[13px] leading-6 text-[#353532]">{profile.bio}</p>
+            ) : null}
+            {profile.interests.length > 0 ? (
+              <div className="mt-3">
+                <p className="mb-2 text-xs font-semibold text-[#5f5f59]">Interests</p>
+                <div className="flex flex-wrap gap-2">
+                  {profile.interests.map((interest) => (
+                    <span key={interest} className="rounded border border-primary/15 bg-primary-fixed/65 px-2.5 py-1 font-mono text-xs uppercase text-black">
+                      {interest}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {messageError || blockMessage ? <p className="mt-2 text-xs font-semibold text-destructive">{messageError || blockMessage}</p> : null}
 
@@ -799,6 +808,7 @@ export function ProfilePageView({
             <label className="block text-xs font-semibold">
               Interests
               <Input
+                aria-label="Interests"
                 className="mt-2 h-10 rounded bg-[#f7f7f4]"
                 placeholder="Robotics, design, music"
                 value={editInterests}

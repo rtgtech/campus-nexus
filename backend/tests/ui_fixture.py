@@ -25,6 +25,7 @@ with s.SessionLocal() as db:
              for name, username in [("Alex Morgan", "alex"), ("Maya Chen", "maya"), ("Sam Taylor", "sam")]]
     db.add_all(users)
     db.flush()
+    db.add(s.UserInterest(userId=users[0].userId, interest="Robotics"))
     club = s.Club(name="Design Society", slug="design-society", description="A place to sketch, experiment, and make things together.", status="Open")
     db.add(club)
     db.flush()

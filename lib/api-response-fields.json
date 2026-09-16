@@ -4,7 +4,7 @@
     "optional": ["batchYear", "lastActiveAt", "isOnline"]
   },
   "FeedCard": {
-    "required": ["postId", "id", "authorId", "author", "clubId", "clubSlug", "type", "postType", "mediaUrl", "mediaUrls", "caption", "likes", "shares", "hashtags", "mentions", "price", "description", "registrationLink", "createdAt", "meta", "title", "body", "image", "tag", "comments", "engagementScore", "likedByCurrentUser", "viewerHasLiked", "savedByCurrentUser", "bookmarkedByCurrentUser", "viewerHasSaved"],
+    "required": ["postId", "id", "authorId", "author", "clubId", "clubSlug", "clubName", "type", "postType", "mediaUrl", "mediaUrls", "caption", "likes", "shares", "hashtags", "mentions", "price", "description", "registrationLink", "createdAt", "meta", "title", "body", "image", "tag", "comments", "engagementScore", "likedByCurrentUser", "viewerHasLiked", "savedByCurrentUser", "bookmarkedByCurrentUser", "viewerHasSaved"],
     "optional": ["feedScore", "rankingSignals", "explanationCode"]
   },
   "SignalBarItem": {
