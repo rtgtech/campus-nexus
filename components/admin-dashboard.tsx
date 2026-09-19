@@ -84,6 +84,7 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
   const [updatingMemberId, setUpdatingMemberId] = useState<number | null>(null);
   const [deletingClub, setDeletingClub] = useState(false);
+  const [deleteClubDialogOpen, setDeleteClubDialogOpen] = useState(false);
   const [memberMessage, setMemberMessage] = useState("");
   const [users, setUsers] = useState<CampusUser[]>([]);
   const [usersMessage, setUsersMessage] = useState("Loading profiles...");
@@ -104,6 +105,10 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    setDeleteClubDialogOpen(false);
+  }, [selectedSlug]);
 
   const isAdmin = isAdminUser(session?.user);
 
@@ -202,7 +207,7 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
 
   async function deleteClub() {
     const club = selectedClub?.club;
-    if (!session || !club?.id) {
+    if (!session || !club?.id || deletingClub) {
       return;
     }
 
@@ -214,10 +219,12 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
         const data = await response.json().catch(() => ({}));
         throw new Error(typeof data.error === "string" ? data.error : "Delete club failed");
       }
+      setDeleteClubDialogOpen(false);
       router.push("/admin?tab=clubs");
       router.refresh();
     } catch (error) {
       setMemberMessage(error instanceof Error ? error.message : "Delete club failed");
+    } finally {
       setDeletingClub(false);
     }
   }
@@ -515,7 +522,7 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
                           >
                             View
                           </Link>
-                          <AlertDialog>
+                          <AlertDialog key={selectedSlug} open={deleteClubDialogOpen} onOpenChange={setDeleteClubDialogOpen}>
                             <AlertDialogTrigger
                               render={
                                 <Button
@@ -534,7 +541,7 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction variant="destructive" onClick={deleteClub}>Delete club</AlertDialogAction>
+                                <AlertDialogAction variant="destructive" disabled={deletingClub} onClick={deleteClub}>{deletingClub ? "Deleting..." : "Delete club"}</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>

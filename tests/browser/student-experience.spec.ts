@@ -83,7 +83,7 @@ test("mobile navigation, post overlay and saved posts are reachable", async ({ p
   const postDialog = page.getByRole("dialog");
   await expect(postDialog).toBeVisible();
   await expect(postDialog.locator("article")).toBeVisible();
-  await expect(postDialog.getByRole("region", { name: "Post comments" })).toHaveCount(0);
+  await expect(postDialog.getByRole("region", { name: "Post comments" })).toBeVisible();
   await expect(postDialog.getByRole("button", { name: "Comments", exact: true })).toBeVisible();
   expect(await postDialog.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBeTruthy();
   const dialogBox = await postDialog.boundingBox();
@@ -149,7 +149,7 @@ test("comments preserve failed drafts and persist on post detail", async ({ page
   await page.goto(`/viewpost?=${postId}`);
   const detailDialog = page.getByRole("dialog");
   await expect(detailDialog).toBeVisible();
-  await expect(detailDialog.getByRole("region", { name: "Post comments" })).toHaveCount(0);
+  await expect(detailDialog.getByRole("region", { name: "Post comments" })).toBeVisible();
   await detailDialog.getByRole("button", { name: "Comments", exact: true }).click();
   const detailComments = page.getByRole("region", { name: "Post comments" });
   await expect(detailComments.getByText("Looking forward to this campus conversation!", { exact: true })).toBeVisible();

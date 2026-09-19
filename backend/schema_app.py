@@ -378,12 +378,16 @@ class Club(Base):
             "id": self.clubId,
             "title": self.name,
             "slug": self.slug,
+            "createdAt": utc_isoformat(self.createdAt),
             "description": self.description or "",
             "status": self.status or "Open",
             "icon": "groups",
             "iconBg": "bg-primary",
             "bannerBg": "bg-primary-fixed/20",
             "bannerImage": self.logoUrl or "",
+            "memberCount": int(db().scalar(select(func.count()).select_from(ClubMember).where(
+                (ClubMember.clubId == self.clubId) & (ClubMember.status == "active")
+            )) or 0),
             "extraMembers": "0",
             "extraMembersClass": "bg-primary-container text-white",
             "avatars": [],

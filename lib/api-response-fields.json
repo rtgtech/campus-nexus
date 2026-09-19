@@ -17,7 +17,7 @@
   },
   "ClubCard": {
     "required": ["id", "title", "slug", "description", "status", "icon", "iconBg", "bannerBg", "bannerImage", "extraMembers", "extraMembersClass", "avatars", "statusClass"],
-    "optional": ["followers", "postsCount"]
+    "optional": ["followers", "postsCount", "memberCount", "createdAt"]
   },
   "ClubMember": {
     "required": ["id", "clubId", "userId", "title", "createdAt", "user", "name", "username", "email", "initials", "canPost", "canCreateAnnouncement"],

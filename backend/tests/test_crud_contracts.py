@@ -173,6 +173,7 @@ class CrudContractsTest(unittest.TestCase):
         )
         self.assertEqual(created.status_code, 201)
         club_id = created.get_json()["id"]
+        self.assertEqual(created.get_json()["memberCount"], 0)
         self.assertEqual(self.client.get(f"/api/clubs/items/{club_id}").status_code, 200)
         self.assertIn(club_id, [item["id"] for item in self.client.get("/api/clubs/items").get_json()])
 
@@ -197,6 +198,9 @@ class CrudContractsTest(unittest.TestCase):
         )
         self.assertEqual(member.status_code, 201, member.get_data(as_text=True))
         member_id = member.get_json()["id"]
+        self.assertEqual(self.client.get("/api/clubs/crud-club").get_json()["club"]["memberCount"], 1)
+        cards = self.client.get("/api/clubs").get_json()["clubCards"]
+        self.assertEqual(next(card for card in cards if card["id"] == club_id)["memberCount"], 1)
         self.assertEqual(self.client.get(f"/api/clubs/crud-club/members/{member_id}").status_code, 200)
         member_update = self.client.patch(
             f"/api/clubs/crud-club/members/{member_id}",
@@ -221,6 +225,7 @@ class CrudContractsTest(unittest.TestCase):
         )
         self.assertEqual(self.client.get(f"/api/clubs/crud-club/members/{member_id}").status_code, 404)
         self.assertEqual(self.client.get("/api/clubs/crud-club/members").get_json(), [])
+        self.assertEqual(self.client.get("/api/clubs/crud-club").get_json()["club"]["memberCount"], 0)
 
         restored = self.client.post(
             "/api/clubs/crud-club/members",
@@ -229,6 +234,7 @@ class CrudContractsTest(unittest.TestCase):
         )
         self.assertEqual(restored.status_code, 201, restored.get_data(as_text=True))
         self.assertEqual(restored.get_json()["id"], member_id)
+        self.assertEqual(self.client.get("/api/clubs/crud-club").get_json()["club"]["memberCount"], 1)
 
         duplicate = self.client.post(
             "/api/clubs/items",

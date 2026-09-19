@@ -23,6 +23,7 @@ export function ViewPostBox({ postId, returnHref }: { postId: string; returnHref
   useEffect(() => {
     let active = true;
     setError(false);
+    setPost(null);
     authFetch(API_BASE_URL + "/api/posts/" + encodeURIComponent(postId))
       .then(async (response) => {
         if (!response.ok) throw new Error();
@@ -54,10 +55,10 @@ export function ViewPostBox({ postId, returnHref }: { postId: string; returnHref
     else router.replace("/");
   }
   return <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
-    <DialogContent className="h-[calc(100dvh-2rem)] max-h-[760px] w-[calc(100%-2rem)] max-w-3xl grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden p-4 sm:p-6">
-      <DialogHeader className="shrink-0 pr-10"><DialogTitle>Campus post</DialogTitle><DialogDescription>Catch up with your campus.</DialogDescription></DialogHeader>
+    <DialogContent className="h-[calc(100dvh-2rem)] max-h-[760px] w-[calc(100%-2rem)] max-w-6xl grid-rows-[minmax(0,1fr)] gap-0 overflow-hidden rounded-lg p-0 [&>[data-slot=dialog-close]]:bg-white [&>[data-slot=dialog-close]]:text-black">
+      <DialogHeader className="sr-only"><DialogTitle>Campus post</DialogTitle><DialogDescription>Catch up with your campus.</DialogDescription></DialogHeader>
       {error ? <div role="alert" className="self-center space-y-4 text-center"><p>This post couldn't be loaded.</p><Button variant="outline" onClick={() => setRevision((value) => value + 1)}>Try again</Button></div> :
-        post ? <FeedPostCard post={post} detail fitViewport /> : <p role="status" className="self-center text-center text-sm text-muted-foreground">Loading post…</p>}
+        post ? <FeedPostCard key={postId} post={post} detail fitViewport /> : <p role="status" className="self-center text-center text-sm text-muted-foreground">Loading post…</p>}
     </DialogContent>
   </Dialog>;
 }

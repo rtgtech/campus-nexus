@@ -261,6 +261,8 @@ export function ClubHub({ detail }: ClubHubProps) {
   const events = detail.events ?? [];
   const postsCount = detail.postsCount ?? club.postsCount ?? posts.length;
   const membersCount = club.memberCount ?? club.membersCount ?? members.length;
+  const createdYear = club.createdAt ? new Date(club.createdAt).getUTCFullYear() : NaN;
+  const establishedYear = Number.isFinite(createdYear) ? createdYear : undefined;
   const recruiting = club.status.toLowerCase().includes("recruit");
   const latestPostTime = <PostTime value={posts[0]?.createdAt || posts[0]?.meta} fallback="Not available" />;
 
@@ -286,18 +288,10 @@ export function ClubHub({ detail }: ClubHubProps) {
             <div>
               <h1 className="font-editorial font-medium text-2xl  tracking-[-0.03em]">{club.title}</h1>
               <p className="mt-1 font-mono text-xs uppercase text-[#72726c]">
-                {club.category || "Category —"} · {membersCount} members · est. {club.establishedYear ?? "—"}
+                {membersCount} members · est. {establishedYear ?? "—"}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                className="h-9 rounded border border-[#d7d7d1] bg-[#f7f7f4] px-4 text-xs font-bold text-[#777770]"
-                disabled
-                title="Club messaging is not available from the API yet."
-                type="button"
-              >
-                Message
-              </button>
               <ClubFollowButton
                 clubSlug={club.slug}
                 clubTitle={club.title}
@@ -320,16 +314,6 @@ export function ClubHub({ detail }: ClubHubProps) {
             <div>
               <dd className="text-base font-bold">{formatMetric(membersCount)}</dd>
               <dt className="mt-0.5 text-xs text-[#72726c]">Members</dt>
-            </div>
-            <div>
-              <dd className="text-base font-bold">{club.eventsHosted ?? "—"}</dd>
-              <dt className="mt-0.5 text-xs text-[#72726c]">Events hosted</dt>
-            </div>
-            <div>
-              <dd className="text-base font-bold">
-                {club.activityRank === undefined ? "—" : String(club.activityRank).startsWith("#") ? club.activityRank : `#${club.activityRank}`}
-              </dd>
-              <dt className="mt-0.5 text-xs text-[#72726c]">Activity rank</dt>
             </div>
           </dl>
 
@@ -484,8 +468,7 @@ export function ClubHub({ detail }: ClubHubProps) {
           </div>
           <dl className="rounded border border-[#deded8] bg-white p-5 text-xs">
             {[
-              ["Category", club.category || "Not available yet"],
-              ["Established", club.establishedYear ?? "Not available yet"],
+              ["Established", establishedYear ?? "Not available yet"],
               ["Members", membersCount],
               ["Status", club.status || "Not available yet"],
               ["Recruiting deadline", club.recruitingDeadline || "Not available yet"],

@@ -55,5 +55,11 @@ def fixture_session():
     return jsonify(token=token, user=session_user)
 
 
+@s.app.route("/__fixture__/admin-session")
+def fixture_admin_session():
+    admin = s.AdminIdentity()
+    return jsonify(token=s.create_auth_token(admin), user=admin.to_dict())
+
+
 if __name__ == "__main__":
     s.app.run(host="127.0.0.1", port=5055, threaded=False, use_reloader=False)

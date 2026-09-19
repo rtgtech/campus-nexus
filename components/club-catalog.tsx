@@ -7,23 +7,16 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ClubFollowButton } from "@/components/club-follow-button";
 import { getInitials, type ClubCard } from "@/lib/app-data";
-import { PostTime } from "@/components/post-time";
 import { cn } from "@/lib/utils";
 
 type ClubCatalogProps = {
   clubs: ClubCard[];
 };
 
-type SortMode = "alphabetical" | "active" | "followed";
-
 const categories = ["Tech", "Cultural", "Sports", "Literary", "Social Impact"];
 
 function memberCount(club: ClubCard) {
   return club.memberCount ?? club.membersCount;
-}
-
-function latestPostText(club: ClubCard) {
-  return club.latestPost?.caption || club.latestPost?.body || club.latestPost?.title || "Not available yet";
 }
 
 function statusDotClass(status: string) {
@@ -40,11 +33,8 @@ function statusDotClass(status: string) {
 export function ClubCatalog({ clubs }: ClubCatalogProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All");
-  const [sort, setSort] = useState<SortMode>("alphabetical");
 
   const hasCategoryData = clubs.some((club) => Boolean(club.category));
-  const canSortByActivity = clubs.some((club) => club.postsCount !== undefined);
-  const canSortByFollowers = clubs.some((club) => club.followers !== undefined);
 
   const visibleClubs = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -62,16 +52,8 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
       return matchesSearch && matchesFilter;
     });
 
-    return [...filtered].sort((left, right) => {
-      if (sort === "active") {
-        return (right.postsCount ?? -1) - (left.postsCount ?? -1);
-      }
-      if (sort === "followed") {
-        return (right.followers ?? -1) - (left.followers ?? -1);
-      }
-      return left.title.localeCompare(right.title);
-    });
-  }, [clubs, filter, query, sort]);
+    return [...filtered].sort((left, right) => left.title.localeCompare(right.title));
+  }, [clubs, filter, query]);
 
   return (
     <div className="space-y-6">
@@ -123,22 +105,6 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
           })}
         </div>
 
-        <div className="mt-3 flex justify-end">
-          <label className="flex items-center gap-2 text-xs text-[#72726c]">
-            <span>Sort</span>
-            <select
-              aria-label="Sort clubs"
-              className="rounded border border-primary/15 bg-white px-3 py-2 text-xs text-black focus:border-primary focus:ring-2 focus:ring-primary/15"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortMode)}
-            >
-              <option value="alphabetical">A–Z</option>
-              <option disabled={!canSortByActivity} value="active">Most active</option>
-              <option disabled={!canSortByFollowers} value="followed">Most followed</option>
-            </select>
-          </label>
-        </div>
-
         <div className="mb-3 mt-8 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold">All clubs</h2>
@@ -170,12 +136,11 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {visibleClubs.map((club) => {
               const count = memberCount(club);
-              const latestPostTime = <PostTime value={club.latestPost?.createdAt} fallback="—" />;
 
               return (
                 <article
                   key={club.slug}
-                  className="flex min-h-[330px] flex-col rounded border border-primary/12 bg-white p-4  transition hover:-translate-y-0.5 hover:border-primary/35 "
+                  className="flex flex-col rounded border border-primary/12 bg-white p-4  transition hover:-translate-y-0.5 hover:border-primary/35 "
                 >
                   <div className="flex items-start justify-between gap-4">
                     <Link
@@ -203,20 +168,13 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                       {club.title}
                     </Link>
                     <p className="mt-1 font-mono text-xs uppercase text-[#72726c]">
-                      {club.category || "Category —"} · {count === undefined ? "—" : count} members
+                      {count === undefined ? "—" : count} members
                     </p>
                   </div>
 
                   <p className="mt-3 line-clamp-2 min-h-10 text-xs leading-5 text-[#686862]">
                     {club.description || "Description not available yet."}
                   </p>
-
-                  <div className="mt-3 rounded border border-primary/10 bg-primary-fixed/55 px-3 py-2.5">
-                    <p className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-[#72726c]">
-                      Latest post · {latestPostTime}
-                    </p>
-                    <p className="mt-1 line-clamp-1 text-xs text-[#353532]">{latestPostText(club)}</p>
-                  </div>
 
                   <div className="mt-auto pt-4">
                     <ClubFollowButton
@@ -225,11 +183,6 @@ export function ClubCatalog({ clubs }: ClubCatalogProps) {
                       initialFollowers={club.followers}
                       layout="inline"
                     />
-                    <p className="mt-3 border-t border-[#e5e5df] pt-3 text-xs text-[#7c7c75]">
-                      {club.mutualFollowers === undefined
-                        ? "Mutual follows unavailable"
-                        : `${club.mutualFollowers} friends follow this`}
-                    </p>
                   </div>
                 </article>
               );

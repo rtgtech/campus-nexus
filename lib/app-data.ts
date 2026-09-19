@@ -194,6 +194,7 @@ export type ClubCard = {
   category?: string;
   memberCount?: number;
   membersCount?: number;
+  createdAt?: string;
   establishedYear?: number | string;
   eventsHosted?: number;
   activityRank?: number | string;

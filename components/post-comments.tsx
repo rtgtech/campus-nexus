@@ -9,10 +9,11 @@ import { API_BASE_URL, authFetch, readAuthSession } from "@/lib/auth-client";
 import { parseApiResponse } from "@/lib/api-response-contract";
 import type { PostComment } from "@/lib/app-data";
 
-export function PostComments({ postId, onCountChange, onClose }: {
+export function PostComments({ postId, onCountChange, onClose, inline = false }: {
   postId: string;
   onCountChange: (count: number) => void;
   onClose: () => void;
+  inline?: boolean;
 }) {
   const [comments, setComments] = useState<PostComment[]>([]);
   const [draft, setDraft] = useState("");
@@ -75,15 +76,15 @@ export function PostComments({ postId, onCountChange, onClose }: {
     }
   }
 
-  return <section aria-label="Post comments" className="absolute inset-0 z-20 flex min-h-0 flex-col bg-white">
+  return <section aria-label="Post comments" className={inline ? "flex min-h-0 flex-1 flex-col border-t bg-white" : "absolute inset-0 z-20 flex min-h-0 flex-col bg-white"}>
     <header className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
       <div>
         <h3 className="text-sm font-semibold">Comments</h3>
         <p className="text-xs text-muted-foreground">{comments.length === 1 ? "1 response" : `${comments.length} responses`}</p>
       </div>
-      <Button variant="ghost" size="icon" aria-label="Close comments" onClick={onClose}>
+      {!inline && <Button variant="ghost" size="icon" aria-label="Close comments" onClick={onClose}>
         <X size={19} />
-      </Button>
+      </Button>}
     </header>
 
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
