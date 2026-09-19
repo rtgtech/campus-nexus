@@ -77,7 +77,7 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
               <CampusIcon name={style.icon} className={` hidden text-xl ${style.score} sm:inline-block`} />
               <h2 className="truncate font-headline-md text-lg text-on-surface sm:text-xl">{entry.name}</h2>
             </div>
-            <p className="truncate text-xs font-semibold text-on-surface-variant sm:text-sm">{entry.userId}</p>
+            <p className="truncate text-xs font-semibold text-on-surface-variant sm:text-sm">{entry.username ? `@${entry.username}` : "Username unavailable"}</p>
           </div>
         </div>
       </div>

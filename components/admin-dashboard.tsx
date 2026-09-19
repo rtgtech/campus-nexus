@@ -438,7 +438,7 @@ export function AdminDashboard({ clubsData, initialEvents, initialTab, initialSi
                           {user.department || "Department unavailable"} · Year {user.yearOfStudy}
                         </span>
                         <span className="flex items-center justify-between gap-2 text-xs text-on-surface-variant sm:justify-end">
-                          ID {user.userId}
+                          View profile
                           <span aria-hidden="true">→</span>
                         </span>
                       </Link>

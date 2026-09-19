@@ -71,6 +71,12 @@ export function MarketplaceInterestInbox() {
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState<string | null>(null);
   const [dismissing, setDismissing] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setRevision((value) => value + 1);
+    window.addEventListener("marketplace-listings-changed", refresh);
+    return () => window.removeEventListener("marketplace-listings-changed", refresh);
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout>;
@@ -85,9 +91,11 @@ export function MarketplaceInterestInbox() {
     }
     void refresh();
     return () => { controller.abort(); clearTimeout(timeout); };
-  }, []);
+  }, [revision]);
   async function messageUser(userId: string) {
+    if (opening) return;
     setOpening(userId);
+    setError("");
     try {
       const conversation = await chatRequest<Conversation>("/api/messages/conversations", {
         method: "POST",
@@ -106,6 +114,7 @@ export function MarketplaceInterestInbox() {
     try {
       await chatRequest(`/api/notifications/${encodeURIComponent(item.notificationId)}`, { method: "DELETE" });
       setItems((current) => current.filter((entry) => `${entry.itemId}:${entry.userId}` !== key));
+      setRevision((value) => value + 1);
     } catch (cause) { setError((cause as Error).message); }
     finally { setDismissing(null); }
   }
@@ -125,12 +134,12 @@ export function MarketplaceInterestInbox() {
       <Button
         aria-label={`Dismiss interest from ${item.name} in ${item.title}`}
         disabled={dismissing !== null}
-        size="icon-sm"
+        size="sm"
         title="Dismiss"
         variant="ghost"
         onClick={() => void dismissInterest(item)}
       >
-        <X aria-hidden="true" />
+        <X aria-hidden="true" />Dismiss
       </Button>
     </div>)}
   </section>;

@@ -39,7 +39,7 @@ function UserRow({
     <EntityListItem
       href={profileEntityHref(user)}
       title={user.name}
-      subtitle={`@${user.username || userId}`}
+      subtitle={user.username ? `@${user.username}` : "Username unavailable"}
       kind="user"
       initials={user.initials || user.acronym}
       className="flex min-w-0 items-center gap-3 rounded bg-surface-container-low p-3"

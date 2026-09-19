@@ -54,7 +54,7 @@ class FeedService:
             excluded = set(s.db().scalars(select(s.FeedExclusion.target).where(s.FeedExclusion.userId == user.userId)))
         return friend_ids, club_ids, excluded, graph_available
 
-    def eligible_query(self, user, context):
+    def eligible_query(self, user, context, *, exclude_own=False):
         s = self.s
         friends, _, excluded, _ = context
         own_id = user.userId if user else -1
@@ -70,6 +70,8 @@ class FeedService:
                  .outerjoin(s.Club, s.Club.clubId == s.Post.clubId)
                  .where(s.Post.isDeleted.is_(False), s.User.isActive.is_(True), profile_visible, post_visible,
                         or_(s.Post.clubId.is_(None), s.Club.isActive.is_(True))))
+        if exclude_own and user is not None:
+            query = query.where(s.Post.authorId != user.userId)
         for kind, column in (("post", s.Post.postId), ("author", s.Post.authorId), ("club", s.Post.clubId)):
             ids = [int(target.split(":", 1)[1]) for target in excluded if target.startswith(kind + ":")]
             if ids:
@@ -97,7 +99,7 @@ class FeedService:
 
     def candidates(self, user, context, affinity, now, latest):
         s = self.s
-        base = self.eligible_query(user, context)
+        base = self.eligible_query(user, context, exclude_own=not latest)
         recent = base.where(s.Post.createdAt >= now - timedelta(days=30))
         order = (s.Post.createdAt.desc(), s.Post.postId.asc())
         if latest:
@@ -163,6 +165,7 @@ class FeedService:
                 affinity=sum(values) / len(values) if values else 0,
                 engagement=counts[post.postId], pagerank=percentiles.get(graph_target, 0), seen=post.postId in seen))
         ranked = rank_personalized_posts(rows, now_ts=now.timestamp(), has_history=bool(affinity),
+                                        viewerUserId=str(user.userId) if user else None,
                                         graph_available=graph_available, latest=latest)
         strategy = os.getenv("FEED_RANKER", "v2").lower()
         try:
@@ -260,7 +263,8 @@ class FeedService:
             batch = ordered[offset:offset + limit - len(selected)]
             offset += len(batch)
             ids = [int(row["postId"]) for row in batch]
-            visible = {post.postId: post for post in s.db().scalars(self.eligible_query(user, context).where(s.Post.postId.in_(ids)))}
+            visible = {post.postId: post for post in s.db().scalars(self.eligible_query(
+                user, context, exclude_own=mode == "for-you").where(s.Post.postId.in_(ids)))}
             selected.extend(visible[post_id] for post_id in ids if post_id in visible)
         cards = self.serialize_page(selected, user, {row["postId"]: row for row in ordered})
         s.app.logger.info("feed_request version=%s candidates=%s returned=%s duration_ms=%.1f", snapshot.version,

@@ -262,6 +262,8 @@ def rank_feed_posts(
     limit: Optional[int] = None,
     now_ts: Optional[float] = None,
 ) -> list[dict[str, Any]]:
+    if viewerUserId is not None:
+        posts = [post for post in posts if _read_id(post, "authorId", "userId") != str(viewerUserId)]
     if not posts:
         return []
 
@@ -320,6 +322,7 @@ def rank_personalized_posts(
     posts: Sequence[Mapping[str, Any]],
     *,
     now_ts: float,
+    viewerUserId: Optional[str] = None,
     has_history: bool = False,
     graph_available: bool = True,
     latest: bool = False,
@@ -331,6 +334,8 @@ def rank_personalized_posts(
     """
     scored = []
     for post in posts:
+        if not latest and viewerUserId is not None and _read_id(post, "authorId", "userId") == str(viewerUserId):
+            continue
         created = _timestamp(post.get("createdAt"), default=0.0)
         freshness = 0.5 ** (max(0.0, now_ts - created) / 86400) if created > 0 else 0.0
         relationship = min(1.0, max(0.0, _number(post.get("relationship"))))

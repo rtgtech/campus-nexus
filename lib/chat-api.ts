@@ -9,5 +9,6 @@ export async function chatRequest<T>(path: string, init?: RequestInit): Promise<
       ? "Your session has expired. Sign in again to continue chatting."
       : data?.error ?? "Chat is unavailable. Please try again.");
   }
+  if (response.status === 204) return undefined as T;
   return parseApiResponse<T>(path, data);
 }

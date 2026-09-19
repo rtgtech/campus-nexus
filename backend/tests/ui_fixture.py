@@ -61,5 +61,12 @@ def fixture_admin_session():
     return jsonify(token=s.create_auth_token(admin), user=admin.to_dict())
 
 
+@s.app.route("/__fixture__/session/<username>")
+def fixture_user_session(username):
+    with s.SessionLocal() as db:
+        user = db.query(s.User).filter_by(username=username).one()
+        return jsonify(token=s.create_auth_token(user), user=user.to_dict())
+
+
 if __name__ == "__main__":
     s.app.run(host="127.0.0.1", port=5055, threaded=False, use_reloader=False)

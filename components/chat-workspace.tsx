@@ -8,6 +8,8 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import type { Conversation, Message, SearchData, SearchItem } from "@/lib/app-data";
 import { readAuthSession } from "@/lib/auth-client";
 import { chatRequest } from "@/lib/chat-api";
@@ -50,6 +52,10 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [dismissedRequests, setDismissedRequests] = useState<Record<string, boolean>>({});
   const [revision, setRevision] = useState(0);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [managing, setManaging] = useState(false);
+  const managementLock = useRef(false);
   const activeId = useRef(selected);
   const sendLock = useRef(false);
   const sendVersion = useRef(0);
@@ -62,6 +68,7 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
   useEffect(() => {
     activeId.current = initialThread ?? null;
     setSelected(initialThread ?? null);
+    setOptionsOpen(false);
   }, [initialThread]);
 
   // Recursive timeouts avoid overlapping requests on slower connections.
@@ -190,6 +197,8 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
     setMessages([]);
     setActionError("");
     const url = new URL(window.location.href);
+    setOptionsOpen(false);
+    url.searchParams.delete("thred");
     if (id) url.searchParams.set("thread", id);
     else url.searchParams.delete("thread");
     window.history.replaceState(null, "", url);
@@ -216,12 +225,16 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
 
   async function blockActiveParticipant() {
     const participantId = active?.participants[0]?.userId;
-    if (!selected || !participantId) return;
+    if (!selected || !participantId || active?.isBlocked || managementLock.current) return;
+    const destination = selected;
+    managementLock.current = true;
+    setManaging(true);
+    setOptionsOpen(false);
     setActionError("");
     try {
       await chatRequest(`/api/users/${encodeURIComponent(participantId)}/block`, { method: "POST" });
-      setDismissedRequests((items) => ({ ...items, [selected]: true }));
-      setConversations((items) => items.map((conversation) => threadId(conversation) === selected ? {
+      setDismissedRequests((items) => ({ ...items, [destination]: true }));
+      setConversations((items) => items.map((conversation) => threadId(conversation) === destination ? {
         ...conversation,
         canMessage: false,
         isBlocked: true,
@@ -230,12 +243,38 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
       setRevision((value) => value + 1);
     } catch (error) {
       setActionError((error as Error).message);
+    } finally {
+      managementLock.current = false;
+      setManaging(false);
+    }
+  }
+
+  async function deleteConversation() {
+    if (!deleteTarget || managementLock.current || sendLock.current) return;
+    const destination = deleteTarget.id;
+    managementLock.current = true;
+    setManaging(true);
+    setActionError("");
+    try {
+      await chatRequest<void>(`/api/messages/conversations/${encodeURIComponent(destination)}`, { method: "DELETE" });
+      setConversations((items) => items.filter((item) => threadId(item) !== destination));
+      setDrafts((items) => { const next = { ...items }; delete next[destination]; return next; });
+      delete acknowledged.current[destination];
+      if (activeId.current === destination) selectConversation(null);
+      setRevision((value) => value + 1);
+      window.dispatchEvent(new Event(CHAT_READ_EVENT));
+    } catch (error) {
+      setActionError((error as Error).message);
+    } finally {
+      setDeleteTarget(null);
+      managementLock.current = false;
+      setManaging(false);
     }
   }
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
-    if (!selected || !active?.canMessage || !draft.trim() || sendLock.current) return;
+    if (!selected || !active?.canMessage || !draft.trim() || sendLock.current || managementLock.current) return;
     const destination = selected;
     const originalDraft = draft;
     sendLock.current = true;
@@ -261,6 +300,16 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
 
   return (
     <div className="overflow-hidden rounded border border-outline-variant/60 bg-white ">
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !managementLock.current) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Delete chat with {deleteTarget?.name}?</AlertDialogTitle>
+          <AlertDialogDescription>This permanently deletes the conversation and all messages for both participants. This cannot be undone.</AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={managing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={managing || sending} onClick={() => void deleteConversation()}>{managing ? "Deleting…" : "Delete chat"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {(listError || actionError) && <div role="alert" className="flex flex-wrap items-center gap-3 border-b bg-red-50 p-4 text-sm text-red-800">
         <span>{actionError || listError}</span>
         <Button variant="outline" size="sm" onClick={() => setRevision((value) => value + 1)}>Refresh chats</Button>
@@ -298,12 +347,21 @@ export function ChatWorkspace({ initialThread }: { initialThread?: string }) {
               <Button aria-label="Back to conversations" className="md:hidden" size="icon" variant="ghost" onClick={() => selectConversation(null)}><CampusIcon name="arrow_back" className="" /></Button>
               <Avatar name={active?.name ?? "Chat"} />
               <div><h2 className="font-bold">{active?.name ?? (loading ? "Loading…" : "Conversation unavailable")}</h2><p className="text-xs text-on-surface-variant">Private conversation</p></div>
+              {active && <div className="ml-auto">
+                <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>
+                  <PopoverTrigger render={<Button aria-label="Chat options" size="icon" variant="ghost" disabled={managing} />}><CampusIcon name="more_vert" /></PopoverTrigger>
+                  <PopoverContent align="end" className="w-48 gap-1" aria-label="Chat options">
+                    <Button variant="ghost" className="justify-start text-destructive" disabled={managing || sending} onClick={() => { setOptionsOpen(false); setDeleteTarget({ id: selected, name: active.name }); }}><CampusIcon name="delete" />Delete chat</Button>
+                    <Button variant="ghost" className="justify-start" disabled={managing || active.isBlocked || !active.participants[0]?.userId} onClick={() => void blockActiveParticipant()}><CampusIcon name="block" />{active.isBlocked ? "Blocked" : "Block"}</Button>
+                  </PopoverContent>
+                </Popover>
+              </div>}
             </header>
             {messageError && <p role="alert" className="bg-red-50 p-3 text-sm text-red-800">{messageError} Retrying automatically.</p>}
             {active?.isMessageRequest && !dismissedRequests[selected] ? (
               <div role="status" className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                 <span className="min-w-0 flex-1 font-medium">This user is not your friend</span>
-                <Button size="sm" variant="outline" type="button" onClick={() => void blockActiveParticipant()}>Block</Button>
+                <Button size="sm" variant="outline" type="button" disabled={managing} onClick={() => void blockActiveParticipant()}>Block</Button>
                 <Button aria-label="Dismiss non-friend warning" size="icon" variant="ghost" type="button" onClick={() => setDismissedRequests((items) => ({ ...items, [selected]: true }))}>
                   <CampusIcon name="close" />
                 </Button>

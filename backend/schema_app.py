@@ -525,7 +525,7 @@ class Post(Base):
             "postId": str(self.postId),
             "id": str(self.postId),
             "authorId": str(self.authorId),
-            "author": author_name or str(self.authorId),
+            "author": author_name or "Unknown user",
             "clubId": self.clubId,
             "clubSlug": club_slug,
             "clubName": club_name,
@@ -1524,7 +1524,7 @@ def make_club_card(data: dict[str, Any]) -> Club:
 
 def serialize_club_member(member: ClubMember) -> dict[str, Any]:
     user = db().get(User, member.userId)
-    name = user.fullName if user is not None else str(member.userId)
+    name = (user.fullName or user.username) if user is not None else "Unknown user"
     is_publisher = member.role in CLUB_PUBLISHER_ROLES
     return {
         "id": member.clubMemberId,
@@ -1917,11 +1917,14 @@ def update_neo4j_graph(session: Session, *, bootstrap: bool = False):
 
 
 def ranked_feed_cards(viewerUserId: Optional[str], limit: Optional[int]) -> list[dict[str, Any]]:
-    posts = db().scalars(
+    query = (
         select(Post)
         .where(Post.isDeleted.is_(False))
         .order_by(Post.createdAt.desc(), Post.postId.asc())
-    ).all()
+    )
+    if viewerUserId is not None:
+        query = query.where(Post.authorId != viewerUserId)
+    posts = db().scalars(query).all()
     serialized_posts = [serialize_post(post, viewerUserId) for post in posts]
     user_ids = [post.authorId for post in posts if post.type_code != 1]
     club_ids = [post.clubId for post in posts if post.type_code == 1 and post.clubId is not None]
@@ -2172,7 +2175,7 @@ def post_like_payload(post: Post, user: User) -> dict[str, Any]:
 
 def comment_payload(comment: Comment) -> dict[str, Any]:
     user = db().get(User, comment.userId)
-    name = user.fullName if user is not None else str(comment.userId)
+    name = (user.fullName or user.username) if user is not None else "Unknown user"
     createdAt = utc_isoformat(comment.createdAt)
     return {
         "id": str(comment.commentId),
@@ -2401,7 +2404,7 @@ def serialize_marketplace_item(item: MarketplaceItem) -> dict[str, Any]:
         "postId": str(item.itemId),
         "sellerId": str(item.sellerId),
         "title": item.title,
-        "owner": user.fullName if user is not None else str(item.sellerId),
+        "owner": (user.fullName or user.username) if user is not None else "Unknown user",
         "mode": "Sell",
         "category": item.category or "Marketplace",
         "condition": "",

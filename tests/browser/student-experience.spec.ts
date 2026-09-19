@@ -171,6 +171,99 @@ test("comments preserve failed drafts and persist on post detail", async ({ page
   await page.screenshot({ path: "test-results/screenshots/comments-360.png" });
 });
 
+test("leaderboard displays the signup username", async ({ page, request }) => {
+  const fixture = await (await request.get("http://127.0.0.1:5055/__fixture__/session")).json();
+  const response = await request.post("http://127.0.0.1:5055/api/games/xp", {
+    headers: { Authorization: `Bearer ${fixture.token}` }, data: { xp: 50 },
+  });
+  expect(response.ok()).toBeTruthy();
+  await page.goto("/games/leaderboards");
+  const row = page.getByRole("article").filter({ hasText: fixture.user.name });
+  await expect(row.getByText(`@${fixture.user.username}`, { exact: true })).toBeVisible();
+  await expect(row.locator("p").filter({ hasText: new RegExp(`^${fixture.user.userId}$`) })).toHaveCount(0);
+});
+
+test("marketplace publishing, interest, owner actions and deletion", async ({ page, request, browser }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/marketplace");
+  await page.getByRole("button", { name: "List an item", exact: true }).click();
+  await page.getByLabel("Item title").fill("Browser test calculator");
+  await page.getByLabel("Price in rupees").fill("450");
+  await page.getByLabel("Description", { exact: true }).fill("Working calculator with its case.");
+  await page.locator("#listing-image").setInputFiles({ name: "calculator.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64") });
+  await page.getByRole("button", { name: "Publish listing", exact: true }).click();
+  const card = page.getByRole("article").filter({ hasText: "Browser test calculator" });
+  await expect(card).toBeVisible();
+  await expect(card.getByLabel("Indian rupees")).toBeVisible();
+  await expect(card).not.toContainText("@example.edu");
+  await expect(card.getByRole("button", { name: "Delete item", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(card).toBeVisible();
+
+  const buyer = await (await request.get("http://127.0.0.1:5055/__fixture__/session/maya")).json();
+  const buyerContext = await browser.newContext({ baseURL: "http://127.0.0.1:3100" });
+  await buyerContext.addCookies([{ name: "campusNexusToken", value: buyer.token, domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  await buyerContext.addInitScript((user) => localStorage.setItem("campusNexusAuth", JSON.stringify({ user })), buyer.user);
+  try {
+    const buyerPage = await buyerContext.newPage();
+    await buyerPage.goto("/marketplace");
+    const buyerCard = buyerPage.getByRole("article").filter({ hasText: "Browser test calculator" });
+    await expect(buyerCard.getByRole("button", { name: "Delete item" })).toHaveCount(0);
+    await buyerCard.getByRole("button", { name: "Express Interest", exact: true }).click();
+    await expect(buyerCard.getByRole("button", { name: "Interest expressed" })).toBeDisabled();
+    await page.goto("/alex#marketplace");
+    const inbox = page.getByRole("heading", { name: "Interest in your listings" }).locator("..");
+    await expect(inbox).toContainText("Maya Chen");
+    await inbox.getByRole("button", { name: "Message", exact: true }).click();
+    await expect(page).toHaveURL(/\/chat\?thread=\d+/);
+    await expect(page.getByRole("heading", { name: "Maya Chen", exact: true })).toBeVisible();
+    await page.goto("/alex#marketplace");
+    await inbox.getByRole("button", { name: "Dismiss interest from Maya Chen in Browser test calculator" }).click();
+    await expect(inbox).toContainText("No interest expressed yet.");
+    await page.reload();
+    await expect(inbox).toContainText("No interest expressed yet.");
+    await page.getByRole("button", { name: "Delete item", exact: true }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "Delete item", exact: true }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete item", exact: true }).click();
+    await expect(page.getByText("No active listings.")).toBeVisible();
+    await buyerPage.reload();
+    await expect(buyerCard).toHaveCount(0);
+  } finally { await buyerContext.close(); }
+});
+
+test("chat options block a participant and delete the conversation", async ({ page, request }) => {
+  const fixture = await (await request.get("http://127.0.0.1:5055/__fixture__/session")).json();
+  const headers = { Authorization: `Bearer ${fixture.token}` };
+  const api = "http://127.0.0.1:5055";
+  const response = await request.post(`${api}/api/messages/conversations`, { headers, data: { participantUserId: 2 } });
+  expect(response.ok()).toBeTruthy();
+  const conversation = await response.json();
+  const id = conversation.threadId ?? conversation.id;
+  await page.goto(`/chat?thred=${id}`);
+  await page.getByRole("button", { name: "Chat options", exact: true }).click();
+  await page.getByRole("button", { name: "Delete chat", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("for both participants");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeEnabled();
+  try {
+    await page.getByRole("button", { name: "Chat options", exact: true }).click();
+    await page.getByRole("button", { name: "Block", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeDisabled();
+    await page.reload();
+    await expect(page.getByText("You blocked this user.", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Chat options", exact: true }).click();
+    await page.getByRole("button", { name: "Delete chat", exact: true }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete chat", exact: true }).click();
+    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page.getByRole("heading", { name: "Your campus conversations" })).toBeVisible();
+    expect((await request.get(`${api}/api/messages/conversations/${id}`, { headers })).status()).toBe(404);
+  } finally {
+    await request.delete(`${api}/api/users/2/block`, { headers });
+  }
+});
+
 test("chat offers friends and disables replies after unfriending", async ({ page, request }) => {
   const fixture = await (await request.get("http://127.0.0.1:5055/__fixture__/session")).json();
   const headers = { Authorization: `Bearer ${fixture.token}` };

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ProfilePostsGrid } from "@/components/profile-posts-grid";
 import { MarketplaceInterestInbox } from "@/components/marketplace-interest";
+import { MarketplaceDeleteButton } from "@/components/marketplace-delete-button";
 import { FeedPreferences } from "@/components/feed-preferences";
 import { LoadError } from "@/components/load-error";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -176,6 +177,8 @@ export function ProfilePageView({
 }: ProfilePageViewProps) {
   const router = useRouter();
   const isSelf = currentUserId === user.userId;
+  const [deletedListings, setDeletedListings] = useState<string[]>([]);
+  const visibleListings = listings.filter((listing) => !deletedListings.includes(String(listing.id || listing.postId)));
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [friendship, setFriendship] = useState<FriendshipStatus | null>(null);
   const [friendStatus, setFriendStatus] = useState<RequestStatus>("loading");
@@ -639,17 +642,21 @@ export function ProfilePageView({
       {activeTab === "marketplace" ? (
         <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" role="tabpanel">
           {isSelf && <MarketplaceInterestInbox />}
-          <PlaceholderCard title={`Active listings (${listings.length})`}>
-            {listings.length > 0 ? listings.map((listing) => (
-              <Link key={listing.id || listing.postId || listing.title} className="flex items-center gap-3 border-b border-[#e8e8e2] py-3 last:border-0" href={`/marketplace#${listing.postId || listing.id || ""}`}>
+          <PlaceholderCard title={`Active listings (${visibleListings.length})`}>
+            {isSelf && <Button className="mb-3" render={<Link href="/marketplace?list=1" />}>List an item</Button>}
+            {visibleListings.length > 0 ? visibleListings.map((listing) => (
+              <div key={listing.id || listing.postId || listing.title} className="flex flex-wrap items-center gap-3 border-b py-3 last:border-0">
+              <Link key={listing.id || listing.postId || listing.title} className="flex min-w-0 flex-1 items-center gap-3" href={`/marketplace#${listing.postId || listing.id || ""}`}>
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded border border-[#deded8] bg-[#f3f3ef]">
                   {listing.image ? <img alt="" className="h-full w-full object-cover" src={listing.image} /> : <CampusIcon name="sell" className=" text-base text-[#85857e]" />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-semibold">{listing.title}</span>
-                  <span className="mt-0.5 block text-xs text-[#777770]">{listing.price || "Price unavailable"} · {listingTime(listing.createdAt, now)}</span>
+                  <span className="mt-0.5 block text-xs text-[#777770]">{listing.price ? `\u20B9${listing.price}` : "Price unavailable"} · {listingTime(listing.createdAt, now)}</span>
                 </span>
               </Link>
+              {isSelf && <MarketplaceDeleteButton itemId={String(listing.id || listing.postId)} title={listing.title} onDeleted={() => { setDeletedListings((ids) => [...ids, String(listing.id || listing.postId)]); router.refresh(); }} />}
+              </div>
             )) : <p className="text-xs text-[#777770]">No active listings.</p>}
           </PlaceholderCard>
           <PlaceholderCard title="Trust">
@@ -765,7 +772,7 @@ export function ProfilePageView({
                   </Link>
                   <Link className="min-w-0 flex-1" href={profileHref(friend)}>
                     <span className="block truncate text-xs font-semibold">{friend.name}</span>
-                    <span className="block truncate text-xs text-[#777770]">@{friend.username || friend.userId}</span>
+                    <span className="block truncate text-xs text-[#777770]">{friend.username ? `@${friend.username}` : "Username unavailable"}</span>
                   </Link>
                   {isSelf && friendsDialogView === "friends" ? (
                     <Button className="rounded text-xs" size="sm" type="button" variant="outline" onClick={() => removeFriend(friend.userId)}>

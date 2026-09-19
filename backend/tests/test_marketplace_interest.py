@@ -62,6 +62,15 @@ class MarketplaceInterestTest(unittest.TestCase):
             self.assertEqual(db.query(s.MarketplaceInterest).count(), 0)
             self.assertEqual(db.query(s.Notification).count(), 0)
 
+    def test_only_owner_can_delete_and_removed_listing_leaves_inbox(self):
+        self.assertEqual(self.client.post(self.endpoint, headers=self.auth).status_code, 201)
+        item_endpoint = f"/api/marketplace/items/{self.item_id}"
+        self.assertEqual(self.client.delete(item_endpoint, headers=self.auth).status_code, 403)
+        self.assertEqual(self.client.delete(item_endpoint, headers=self.auth_for("friend")).status_code, 204)
+        self.assertEqual(self.client.get(item_endpoint).status_code, 404)
+        self.assertEqual(self.client.get("/api/marketplace/interests", headers=self.auth_for("friend")).get_json()["items"], [])
+        self.assertEqual(self.client.post(self.endpoint, headers=self.auth).status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()
